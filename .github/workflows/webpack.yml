@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v4
     - name: Use Node.js
@@ -21,22 +23,11 @@ jobs:
         pnpm install
         npx webpack
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: latest
-        release_name: Latest Build
-        body: This is the latest desktop build.
-        draft: false
-        prerelease: false
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./dist/desktop/bundle.js
-        asset_name: bundle.js
-        asset_content_type: application/javascript
+      run: |
+        gh release delete latest --yes || true
+        gh release create latest ./dist/desktop/bundle.js \
+          --title "Latest Build" \
+          --notes "This is the latest desktop build." \
+          --latest
