@@ -24,7 +24,8 @@ jobs:
         pnpm install
         npx webpack
     - name: Upload desktop build
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: desktop-build
         path: dist/desktop
+        if-no-files-found: error
