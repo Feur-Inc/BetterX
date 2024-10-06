@@ -1,4 +1,4 @@
-name: NodeJS with Webpack
+name: NodeJS with Webpack and Release
 
 on:
   push:
@@ -9,23 +9,34 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
     steps:
     - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
+    - name: Use Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: '20.x'
     - name: Build
       run: |
         npm install -g pnpm
         pnpm install
         npx webpack
-    - name: Upload desktop build
-      uses: actions/upload-artifact@v4
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: desktop-build
-        path: dist/desktop
-        if-no-files-found: error
+        tag_name: latest
+        release_name: Latest Build
+        body: This is the latest desktop build.
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/desktop/bundle.js
+        asset_name: bundle.js
+        asset_content_type: application/javascript
