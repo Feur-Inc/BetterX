@@ -1,0 +1,12 @@
+{
+    "manifest_version": 2,
+    "name": "BetterX",
+    "version": "1.0",
+    "description": "Enhances Twitter experience",
+    "content_scripts": [
+      {
+        "matches": ["*://twitter.com/*", "*://x.com/*"],
+        "js": ["bundle.js"]
+      }
+    ]
+  }
