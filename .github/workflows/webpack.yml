@@ -12,22 +12,24 @@ jobs:
     permissions:
       contents: write
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-    - name: Build
-      run: |
-        npm install -g pnpm
-        pnpm install
-        npx webpack
-    - name: Create Release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh release delete latest --yes || true
-        gh release create latest ./dist/desktop/bundle.js \
-          --title "Latest Build" \
-          --notes "This is the latest desktop build." \
-          --latest
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - name: Build
+        run: |
+          npm install -g pnpm
+          pnpm install
+          npx webpack
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes || true
+          RELEASE_ID=$(gh release create latest ./dist/desktop/bundle.js \
+            --title "Latest Build" \
+            --notes "This is the latest desktop build." \
+            --latest | grep -oP 'releases/tag/\K[^"]+')
+          echo "https://github.com/Feur-Inc/BetterX/releases/download/$RELEASE_ID/bundle.js" > bundle_url.txt
+          gh release upload latest bundle_url.txt --clobber
