@@ -86,7 +86,7 @@ function initializePlugin() {
 export default definePlugin({
     name: "DontOverthink",
     description: "Adds a timer to automatically send tweets after 10 seconds",
-    authors: [Devs.Mopi],
+    authors: [Devs.Mopi, Devs.TPM28],
     start() {
         console.log("TweetTimerPlugin started!");
         initializePlugin();
