@@ -4,7 +4,7 @@ import definePlugin from "@utils/types";
 export default definePlugin({
     name: "BringTwitterBack",
     description: "Reverts X branding back to Twitter",
-    authors: [Devs.SauceyRed],
+    authors: [Devs.Mopi],
     start() {
         console.log("Bring Twitter Back extension has loaded.");
         
