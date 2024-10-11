@@ -3,32 +3,37 @@ import definePlugin from "@utils/types";
 
 export default definePlugin({
     name: "NoTrending",
-    description: "Removes the trending page from Twitter",
+    description: "Removes the trending ",
     authors: [Devs.Mopi],
     start() {
-        const removeTrending = () => {
-            // Selector for the trending sidebar
-            const trendingSidebar = document.querySelector('div[aria-label="Timeline: Trending now"]');
-            if (trendingSidebar) {
-                trendingSidebar.remove();
-                console.log("Trending sidebar removed");
-            }
 
-            // Selector for the "What's happening" section (which often contains trending topics)
-            const whatsHappening = document.querySelector('h1[aria-level="1"][role="heading"]:not([id])');
-            if (whatsHappening && whatsHappening.textContent.includes("happening")) {
-                whatsHappening.closest('div[data-testid="sidebarColumn"]').remove();
-                console.log("What's happening section removed");
-            }
+        const removeTrending = () => {
+            // Remove trending sidebar
+            const trendingSidebars = document.querySelectorAll('div[data-testid="sidebarColumn"] section[aria-labelledby]');
+            trendingSidebars.forEach((sidebar) => {
+                const header = sidebar.querySelector('h1[dir="auto"][role="heading"]');
+                if (header) {
+                    sidebar.remove();
+                }
+            });
 
             // Remove trending from the Explore page
-            const exploreTrending = document.querySelector('div[aria-label="Timeline: Explore"]');
+            const exploreTrending = document.querySelector('div[aria-label^="Timeline:"][role="region"]');
             if (exploreTrending) {
                 exploreTrending.remove();
-                console.log("Explore page trending removed");
+            }
+
+            // Remove "Trends for you" section
+            const trendsForYou = document.querySelector('div[aria-label][role="region"]');
+            if (trendsForYou) {
+                trendsForYou.remove();
             }
         };
+
+        // Run the function immediately
         removeTrending();
+
+        // Set up a MutationObserver to watch for dynamically added content
         const observer = new MutationObserver((mutations) => {
             for (let mutation of mutations) {
                 if (mutation.type === 'childList') {
@@ -36,6 +41,8 @@ export default definePlugin({
                 }
             }
         });
+
+        // Start observing the document with the configured parameters
         observer.observe(document.body, { childList: true, subtree: true });
     },
     stop() {
