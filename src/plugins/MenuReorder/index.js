@@ -12,9 +12,6 @@ export default definePlugin({
     dropIndicator: null,
     STORAGE_KEY: 'customMenuOrder',
     observer: null,
-    initAttempts: 0,
-    maxInitAttempts: 10,
-    initInterval: null,
 
     start() {
         this.initPlugin();
@@ -26,17 +23,20 @@ export default definePlugin({
     },
 
     initPlugin() {
-        this.initInterval = setInterval(() => {
-            this.initAttempts++;
-            const nav = document.querySelector('nav[role="navigation"][class*="r-eqz5dr"]');
-            if (nav) {
-                clearInterval(this.initInterval);
-                this.initializePlugin(nav);
-            } else if (this.initAttempts >= this.maxInitAttempts) {
-                clearInterval(this.initInterval);
-                console.error("Menu Reorder Plugin: Failed to find navigation bar after multiple attempts");
+        this.observer = new MutationObserver((mutations) => {
+            for (let mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    const nav = document.querySelector('nav[role="navigation"][class*="r-eqz5dr"]');
+                    if (nav) {
+                        this.observer.disconnect();
+                        this.initializePlugin(nav);
+                        break;
+                    }
+                }
             }
-        }, 1000);
+        });
+
+        this.observer.observe(document.body, { childList: true, subtree: true });
     },
 
     addPageChangeListener() {
@@ -66,7 +66,9 @@ export default definePlugin({
     },
 
     cleanUp() {
-        clearInterval(this.initInterval);
+        if (this.observer) {
+            this.observer.disconnect();
+        }
         this.dropIndicator?.remove();
         window.removeEventListener('resize', this.updateMenuItems.bind(this));
         this.nav?.removeEventListener('dragover', this.dragOver.bind(this));
@@ -76,7 +78,6 @@ export default definePlugin({
             item.removeEventListener('dragend', this.dragEnd.bind(this));
             item.removeAttribute('draggable');
         });
-        this.initAttempts = 0;
     },
 
     createDropIndicator() {
