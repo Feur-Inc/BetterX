@@ -34,7 +34,7 @@ export default definePlugin({
                 this.initializePlugin(nav);
             } else if (this.initAttempts >= this.maxInitAttempts) {
                 clearInterval(this.initInterval);
-                console.error("Twitter Menu Reorder Plugin: Failed to find navigation bar after multiple attempts");
+                console.error("Menu Reorder Plugin: Failed to find navigation bar after multiple attempts");
             }
         }, 1000);
     },
@@ -196,7 +196,7 @@ export default definePlugin({
         enabled: {
             type: OptionType.BOOLEAN,
             default: true,
-            description: "Enable Twitter menu reordering"
+            description: "Enable menu reordering"
         }
     }
 });

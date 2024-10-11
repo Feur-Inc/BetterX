@@ -163,8 +163,6 @@ export class UIManager {
           e.preventDefault();
           this.settingsModal.style.display = 'block';
         });
-  
-        console.log('BetterX tab added');
       }
     }
   
