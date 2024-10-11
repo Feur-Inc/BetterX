@@ -15,7 +15,6 @@ function addTimer(composerBox) {
             "TwitterChirp, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
         timerDiv.style.marginTop = "10px";
         composerBox.parentNode.insertBefore(timerDiv, composerBox.nextSibling);
-        console.log("Timer div inserted successfully");
         startTimerProcess(timerDiv);
     }
 }
@@ -66,7 +65,6 @@ function checkAndAddTimer() {
 }
 
 function initializePlugin() {
-    console.log("Initializing TweetTimerPlugin");
     if (document.body) {
         observer = new MutationObserver((mutations) => {
             for (let mutation of mutations) {
@@ -78,7 +76,6 @@ function initializePlugin() {
         observer.observe(document.body, { childList: true, subtree: true });
         checkAndAddTimer();
     } else {
-        console.log("Document body not ready, waiting...");
         window.addEventListener('DOMContentLoaded', initializePlugin);
     }
 }
@@ -88,11 +85,9 @@ export default definePlugin({
     description: "Adds a timer to automatically send tweets after 10 seconds",
     authors: [Devs.Mopi, Devs.TPM28],
     start() {
-        console.log("TweetTimerPlugin started!");
         initializePlugin();
     },
     stop() {
-        console.log("TweetTimerPlugin stopped!");
         if (observer) {
             observer.disconnect();
         }

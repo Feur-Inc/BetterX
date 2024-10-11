@@ -231,8 +231,6 @@ export default definePlugin({
 
         init();
 
-        console.log("X.com GIF Favorites script injected successfully!");
-
     },
     stop() {
         if (originalXHR.open && originalXHR.send) {
@@ -246,7 +244,5 @@ export default definePlugin({
 
         const starIcons = document.querySelectorAll('.gif-favorite-star');
         starIcons.forEach(icon => icon.remove());
-
-        console.log("X.com GIF Favorites script stopped successfully!");
     }
 });

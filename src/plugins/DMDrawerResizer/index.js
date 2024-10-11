@@ -115,7 +115,6 @@ function clickCollapseButton() {
 }
 
 function initializePlugin() {
-    console.log("Initializing DMDrawerResizerPlugin");
     
     clickCollapseButton();
     updateDMDrawer();
@@ -140,11 +139,9 @@ export default definePlugin({
     description: "Makes the DM drawer resizable and persistent across sessions.",
     authors: [Devs.Mopi],
     start() {
-        console.log("DMDrawerResizerPlugin started!");
         initializePlugin();
     },
     stop() {
-        console.log("DMDrawerResizerPlugin stopped!");
         if (observer) {
             observer.disconnect();
         }
