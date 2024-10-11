@@ -23,7 +23,7 @@ cd BetterX
 ```
 3. Install dependencies:
 ```
-npm install - g pnpm
+npm install -g pnpm
 pnpm install
 ```
 ## Building the Project
