@@ -4,7 +4,7 @@ import definePlugin, { OptionType } from "@utils/types";
 export default definePlugin({
     name: "GifFavorites",
     description: "Add favorites like on discord",
-    authors: [Devs.Mopi],
+    authors: [Devs.Mopi, Devs.TPM28],
     start() {
         let originalXHR = {};
         let observer;

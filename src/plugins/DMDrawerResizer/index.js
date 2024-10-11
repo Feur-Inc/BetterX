@@ -137,7 +137,7 @@ function initializePlugin() {
 export default definePlugin({
     name: "DMDrawerResizer",
     description: "Makes the DM drawer resizable and persistent across sessions.",
-    authors: [Devs.Mopi],
+    authors: [Devs.Mopi, Devs.TPM28],
     start() {
         initializePlugin();
     },
