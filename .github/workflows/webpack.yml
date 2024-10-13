@@ -1,14 +1,13 @@
 name: Build and Deploy to GitHub Pages
-
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
 jobs:
   build-and-deploy:
-    runs-on: [self-hosted, TPM28] # Utilisation correcte du runner self-hosted
+    runs-on: self-hosted
+    runs-on: TPM28
     permissions:
       contents: write
     steps:
