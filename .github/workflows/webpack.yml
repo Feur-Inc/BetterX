@@ -10,11 +10,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Check Git installation
+      - name: Add Git to PATH
         run: |
-          which git || echo "Git not found in PATH"
-          git --version || echo "Unable to get Git version"
+          echo "Adding Git to PATH"
+          export PATH=$PATH:/usr/bin:/usr/local/bin
           echo $PATH
+          which git || echo "Git still not found in PATH"
+          git --version || echo "Unable to get Git version"
 
       - uses: actions/checkout@v4
       
