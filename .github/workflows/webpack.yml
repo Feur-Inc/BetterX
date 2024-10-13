@@ -10,13 +10,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Add Git to PATH
+      - name: Install Git (if not installed)
         run: |
-          echo "Adding Git to PATH"
-          export PATH=$PATH:/usr/bin:/usr/local/bin
-          echo $PATH
-          which git || echo "Git still not found in PATH"
-          git --version || echo "Unable to get Git version"
+          sudo apt-get update
+          sudo apt-get install git -y
+          git --version
 
       - uses: actions/checkout@v4
       
