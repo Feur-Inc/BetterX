@@ -10,11 +10,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Install Git (if not installed)
-        run: |
-          sudo apt-get update
-          sudo apt-get install git -y
-          git --version
 
       - uses: actions/checkout@v4
       
