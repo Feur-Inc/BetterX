@@ -6,10 +6,16 @@ on:
     branches: [ "main" ]
 jobs:
   build-and-deploy:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, TPM28]
     permissions:
       contents: write
     steps:
+      - name: Check Git installation
+        run: |
+          which git || echo "Git not found in PATH"
+          git --version || echo "Unable to get Git version"
+          echo $PATH
+
       - uses: actions/checkout@v4
       
       - name: Use Node.js
