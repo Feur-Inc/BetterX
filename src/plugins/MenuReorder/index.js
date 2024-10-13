@@ -42,7 +42,7 @@ export default definePlugin({
     addPageChangeListener() {
         window.addEventListener('popstate', this.handlePageChange.bind(this));
         const pushState = history.pushState;
-        history.pushState = function() {
+        history.pushState = function () {
             pushState.apply(history, arguments);
             dispatchEvent(new Event('pushstate'));
         };
@@ -106,8 +106,18 @@ export default definePlugin({
         });
     },
 
+    getLastPathSegment(url) {
+        const urlObj = new URL(url);
+        const path = urlObj.pathname;
+        return path.substring(path.lastIndexOf('/'));
+    },
+
     saveOrder() {
-        const order = this.menuItems.map(item => item.getAttribute('data-testid') || item.href);
+        const order = this.menuItems.map(item => {
+            const testId = item.getAttribute('data-testid');
+            const href = item.href ? this.getLastPathSegment(item.href) : null;
+            return testId || href;
+        });
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(order));
     },
 
@@ -115,9 +125,11 @@ export default definePlugin({
         const savedOrder = JSON.parse(localStorage.getItem(this.STORAGE_KEY));
         if (savedOrder) {
             savedOrder.forEach(savedId => {
-                const item = this.menuItems.find(menuItem => 
-                    menuItem.getAttribute('data-testid') === savedId || menuItem.href === savedId
-                );
+                const item = this.menuItems.find(menuItem => {
+                    const testId = menuItem.getAttribute('data-testid');
+                    const href = menuItem.href ? this.getLastPathSegment(menuItem.href) : null;
+                    return testId === savedId || href === savedId;
+                });
                 if (item) {
                     this.nav.appendChild(item);
                 }
