@@ -8,8 +8,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted
-    runner: TPM28
+    runs-on: [self-hosted, TPM28] # Utilisation correcte du runner self-hosted
     permissions:
       contents: write
     steps:
