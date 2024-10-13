@@ -6,7 +6,7 @@ on:
     branches: [ "main" ]
 jobs:
   build-and-deploy:
-    runs-on: [self-hosted, TPM28]
+    runs-on: [self-hosted]
     permissions:
       contents: write
     steps:
