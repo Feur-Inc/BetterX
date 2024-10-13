@@ -14,19 +14,19 @@ export default definePlugin({
             originalXHR.open = XHR.open;
             originalXHR.send = XHR.send;
 
-            XHR.open = function(method, url) {
+            XHR.open = function (method, url) {
                 this._method = method;
                 this._url = url;
                 return originalXHR.open.apply(this, arguments);
             };
 
-            XHR.send = function() {
+            XHR.send = function () {
                 this._startTime = new Date().getTime();
 
                 var self = this;
                 var onReadyStateChange = this.onreadystatechange;
 
-                this.onreadystatechange = function() {
+                this.onreadystatechange = function () {
                     if (self.readyState === 4) {
                         if (self._url.includes('/foundmedia/categories.json')) {
                             try {
@@ -95,9 +95,13 @@ export default definePlugin({
                 if (url.includes('giphy.com')) {
                     provider = { name: "giphy", display_name: "GIPHY", icon_images: [] };
                     id = `giphy_${Math.random().toString(36).substr(2, 9)}`;
+                    // Modify Giphy URL
+                    url = url.replace(/\/200_.+$/, '/giphy.gif');
                 } else if (url.includes('tenor.com')) {
                     provider = { name: "riffsy", display_name: "Tenor", icon_images: [] };
                     id = `riffsy_${Math.random().toString(36).substr(2, 9)}`;
+                    // Modify Riffsy (Tenor) URL
+                    url = url.replace(/AAAA.{1}\/[^\/]*/, 'AAAAC/');
                 }
 
                 return {
@@ -136,7 +140,7 @@ export default definePlugin({
                     object_type: "item"
                 };
             });
-
+            console.log(items);
             return { data: { items } };
         }
 
@@ -152,7 +156,26 @@ export default definePlugin({
                 if (!imgElement) return;
 
                 const gifUrl = imgElement.src;
-                const isFavorite = Object.values(favorites).includes(gifUrl);
+                let isFavorite = false;
+
+                if (gifUrl.startsWith('https://media.tenor.com/')) {
+                    const tenorMatch = gifUrl.match(/^(https:\/\/media\.tenor\.com\/[^/]+AAAA)/);
+                    if (tenorMatch) {
+                        isFavorite = Object.values(favorites).some(favUrl =>
+                            favUrl.startsWith(tenorMatch[1])
+                        );
+                    }
+                }
+
+                else if (gifUrl.match(/^https:\/\/media\d+\.giphy\.com\//)) {
+                    const giphyMatch = gifUrl.match(/^(https:\/\/media\d+\.giphy\.com\/media\/[^/]+)/);
+                    if (giphyMatch) {
+                        isFavorite = Object.values(favorites).some(favUrl =>
+                            favUrl.startsWith(giphyMatch[1])
+                        );
+                    }
+                }
+
                 const starIcon = createStarIcon(isFavorite);
                 starIcon.classList.add('gif-favorite-star');
 
@@ -162,7 +185,19 @@ export default definePlugin({
 
                     const newFavorites = JSON.parse(localStorage.getItem('xcomGifFavorites') || '{}');
                     const starInner = starIcon.querySelector('div');
-                    const existingKey = Object.keys(newFavorites).find(key => newFavorites[key] === gifUrl);
+                    let existingKey;
+
+                    if (gifUrl.startsWith('https://media.tenor.com/')) {
+                        const tenorUrlPart = gifUrl.match(/^(https:\/\/media\.tenor\.com\/[^/]+AAAA)/)[1];
+                        existingKey = Object.keys(newFavorites).find(key =>
+                            newFavorites[key].startsWith(tenorUrlPart)
+                        );
+                    } else if (gifUrl.match(/^https:\/\/media\d+\.giphy\.com\//)) {
+                        const giphyUrlPart = gifUrl.match(/^(https:\/\/media\d+\.giphy\.com\/media\/[^/]+)/)[1];
+                        existingKey = Object.keys(newFavorites).find(key =>
+                            newFavorites[key].startsWith(giphyUrlPart)
+                        );
+                    }
 
                     if (existingKey) {
                         delete newFavorites[existingKey];
