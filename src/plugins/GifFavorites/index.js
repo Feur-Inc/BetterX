@@ -101,7 +101,7 @@ export default definePlugin({
                     provider = { name: "riffsy", display_name: "Tenor", icon_images: [] };
                     id = `riffsy_${Math.random().toString(36).substr(2, 9)}`;
                     // Modify Riffsy (Tenor) URL
-                    url = url.replace(/AAAA.+?\//, 'AAAAC/');
+                    url = url.replace(/AAAA.{1}\/[^\/]*/, 'AAAAC/');
                 }
 
                 return {
