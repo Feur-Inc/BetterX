@@ -8,7 +8,6 @@ BetterX is a powerful enhancement tool designed to improve your X (formerly Twit
 
 - 🔌 Plugin System: Easily extend X's functionality with custom plugins
 - 🎨 Custom UI: Inject custom UI elements to enhance your X experience
-- 🛠 Patch Management: Apply patches to modify X's behavior
 - ⚙️ Settings Management: Configurable options for each plugin
 
 ## Installation
