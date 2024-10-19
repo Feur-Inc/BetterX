@@ -6,7 +6,6 @@ export default definePlugin({
     description: "Reverts X branding back to Twitter",
     authors: [Devs.Mopi],
     start() {
-        console.log("Bring Twitter Back extension has loaded.");
         
         const twitterLogoD = "M23.643 4.937c-.835.37-1.732.62-2.675.733.962-.576 1.7-1.49 2.048-2.578-.9.534-1.897.922-2.958 1.13-.85-.904-2.06-1.47-3.4-1.47-2.572 0-4.658 2.086-4.658 4.66 0 .364.042.718.12 1.06-3.873-.195-7.304-2.05-9.602-4.868-.4.69-.63 1.49-.63 2.342 0 1.616.823 3.043 2.072 3.878-.764-.025-1.482-.234-2.11-.583v.06c0 2.257 1.605 4.14 3.737 4.568-.392.106-.803.162-1.227.162-.3 0-.593-.028-.877-.082.593 1.85 2.313 3.198 4.352 3.234-1.595 1.25-3.604 1.995-5.786 1.995-.376 0-.747-.022-1.112-.065 2.062 1.323 4.51 2.093 7.14 2.093 8.57 0 13.255-7.098 13.255-13.254 0-.2-.005-.402-.014-.602.91-.658 1.7-1.477 2.323-2.41z";
 
@@ -29,21 +28,9 @@ export default definePlugin({
         const timelineSelector = 'div[aria-label="Timeline: Your Home Timeline"]';
 
         let notificationObserverConnected = false;
-        let logoObserverConnected = false;
-
-        const loggingKey = "bringTwitterBack.loggingEnabled";
-        if (!localStorage.getItem(loggingKey)) {
-            localStorage.setItem(loggingKey, "false");
-        }
 
         function delay(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        function log(message) {
-            if (localStorage.getItem(loggingKey) == "true") {
-                console.log(message);
-            }
         }
 
         function updateFavicon(faviconPath = "icons/favicon.ico") {
@@ -56,9 +43,8 @@ export default definePlugin({
             }
             const divElements = document.querySelectorAll('div[dir="ltr"][aria-live="polite"]');
             if (divElements.length == 0) {
-                return log("divElements not found");
+                return;
             }
-            log("divElements found");
             const regex = /^(\\d+)\\+?\\sunread\\sitems$/;
             for (let i = 0; i < divElements.length; i++) {
                 const attribute = divElements[i].getAttribute("aria-label");
@@ -77,9 +63,8 @@ export default definePlugin({
         function updateTitle() {
             let titleElement = document.querySelector("title");
             if (!titleElement) {
-                return log("titleElement not found");
+                return;
             }
-            log("titleElement found");
             let tabTitle = titleElement.textContent;
             if (tabTitle && tabTitle.includes("X")) {
                 if (tabTitle.includes(" / X")) {
@@ -101,10 +86,8 @@ export default definePlugin({
         function updateLogo() {
             const loadingLogo = document.querySelector(loadingLogoSelector);
             if (!loadingLogo) {
-                log("loadingLogo not found");
                 return;
             }
-            log("loadingLogo found");
             if (loadingLogo) {
                 loadingLogo.setAttribute("d", twitterLogoD);
             }
@@ -231,13 +214,10 @@ export default definePlugin({
                 }
                 const timelineResult = document.querySelector(timelineSelector);
                 if (timelineResult) {
-                    console.log("ayo");
                     const buttons = timelineResult.getElementsByTagName("span");
                     if (buttons.length == 0) {
-                        log("No timeline buttons");
                     }
                     else {
-                        console.log("hi");
                         if (buttons[0].textContent && buttons[0].textContent.includes("posts")) {
                             buttons[0].textContent = buttons[0].textContent.replace("posts", "tweets");
                         }
@@ -292,15 +272,8 @@ export default definePlugin({
                 const loadingLogo = document.querySelector(loadingLogoSelector);
                 if (loadingLogo) {
                     if (loadingLogo && loadingLogo.getAttribute("d") == twitterLogoD) {
-                        log("Logo is Twitter logo");
                         loadingLogoObserver.disconnect();
                     }
-                    else {
-                        log("Logo has no path");
-                    }
-                }
-                else {
-                    log("Logo is not Twitter logo");
                 }
             }
         };
@@ -310,16 +283,13 @@ export default definePlugin({
         function startLogoObserver() {
             loadingLogoObserver.observe(document.querySelector(loadingLogoSelector), { childList: true, subtree: true });
             logoObserverConnected = true;
-            log("Started logo observer");
         }
 
         (async () => {
             while (true) {
                 if (document.body) {
-                    log("Document body found");
                     bodyObserver.observe(document.body, { childList: true, subtree: true });
                     metaObserver.observe(document.head, { childList: true, subtree: true });
-                    log("Observers started");
                     break;
                 }
                 await delay(100);
@@ -332,7 +302,6 @@ export default definePlugin({
         updateLogo();
     },
     stop() {
-        console.log("Bring Twitter Back extension has been stopped.");
         // Disconnect all observers
         if (this.bodyObserver) this.bodyObserver.disconnect();
         if (this.notificationObserver) this.notificationObserver.disconnect();

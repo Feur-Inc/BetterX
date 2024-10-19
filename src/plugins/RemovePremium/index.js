@@ -4,8 +4,8 @@ import definePlugin, { OptionType } from "@utils/types";
 let observer;
 
 export default definePlugin({
-    name: "RemovePrenium",
-    description: "Remove all the premium elements from the Twitter website",
+    name: "RemovePremium",
+    description: "Remove all the premium elements",
     authors: [Devs.TPM28],
     start() {
         const selectors = [

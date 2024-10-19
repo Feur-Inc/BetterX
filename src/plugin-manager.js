@@ -13,37 +13,32 @@ export class PluginManager {
         console.log(plugin.default.name, "loaded");
       }
     }
-    this.loadPluginStates();
-    this.loadPluginSettings();
+    this.loadPluginData();
   }
 
-  loadPluginStates() {
-    const savedStates = JSON.parse(localStorage.getItem('betterXPluginStates')) || {};
+  loadPluginData() {
+    const savedData = JSON.parse(localStorage.getItem('betterXPluginStates')) || {};
     this.plugins.forEach(plugin => {
-      if (savedStates.hasOwnProperty(plugin.name)) {
-        plugin.enabled = savedStates[plugin.name];
-      }
-    });
-  }
-
-  savePluginStates() {
-    const states = {};
-    this.plugins.forEach(plugin => {
-      states[plugin.name] = plugin.enabled;
-    });
-    localStorage.setItem('betterXPluginStates', JSON.stringify(states));
-  }
-
-  loadPluginSettings() {
-    const savedSettings = JSON.parse(localStorage.getItem('betterXPluginSettings')) || {};
-    this.plugins.forEach(plugin => {
-      if (savedSettings.hasOwnProperty(plugin.name)) {
-        plugin.settings = plugin.settings || {};
-        plugin.settings.store = savedSettings[plugin.name];
+      plugin.settings = plugin.settings || {};
+      plugin.settings.store = plugin.settings.store || {};
+  
+      if (savedData.hasOwnProperty(plugin.name)) {
+        const pluginData = savedData[plugin.name];
+        plugin.enabled = pluginData.enabled;
+        
+        // Merge saved settings with defaults
+        if (plugin.options) {
+          Object.keys(plugin.options).forEach(optionKey => {
+            if (pluginData.settings && pluginData.settings.hasOwnProperty(optionKey)) {
+              plugin.settings.store[optionKey] = pluginData.settings[optionKey];
+            } else {
+              plugin.settings.store[optionKey] = plugin.options[optionKey].default;
+            }
+          });
+        }
       } else {
-        plugin.settings = plugin.settings || {};
-        plugin.settings.store = {};
-        // Initialize with default values if available
+        plugin.enabled = false;
+        // Initialize with default values
         if (plugin.options) {
           Object.keys(plugin.options).forEach(optionKey => {
             plugin.settings.store[optionKey] = plugin.options[optionKey].default;
@@ -52,15 +47,17 @@ export class PluginManager {
       }
     });
   }
+  
 
-  savePluginSettings() {
-    const settings = {};
+  savePluginData() {
+    const data = {};
     this.plugins.forEach(plugin => {
-      if (plugin.settings && plugin.settings.store) {
-        settings[plugin.name] = plugin.settings.store;
-      }
+      data[plugin.name] = {
+        enabled: plugin.enabled,
+        settings: plugin.settings?.store || {}
+      };
     });
-    localStorage.setItem('betterXPluginSettings', JSON.stringify(settings));
+    localStorage.setItem('betterXPluginStates', JSON.stringify(data));
   }
 
   togglePlugin(pluginName) {
@@ -72,7 +69,7 @@ export class PluginManager {
       } else if (!plugin.enabled && typeof plugin.stop === 'function') {
         plugin.stop();
       }
-      this.savePluginStates();
+      this.savePluginData();
     }
   }
 
@@ -80,8 +77,7 @@ export class PluginManager {
     const plugin = this.plugins.find(p => p.name === pluginName);
     if (plugin && plugin.settings && plugin.settings.store) {
       plugin.settings.store[optionId] = value;
-      this.savePluginSettings();
-      console.log(`Updated ${pluginName} option ${optionId} to:`, value);
+      this.savePluginData();
     }
   }
 }

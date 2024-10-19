@@ -66,6 +66,7 @@ export class UIManager {
   
     let optionElement;
     const optionType = option.type || OptionType.STRING;
+    const currentValue = plugin.settings.store[option.id];
   
     const updateOptionValue = (value) => {
       this.pluginManager.updatePluginOption(plugin.name, option.id, value);
@@ -76,7 +77,7 @@ export class UIManager {
         optionElement = this.createUIElement('label', {
           className: 'betterx-switch',
           innerHTML: `
-            <input type="checkbox" ${option.value ? 'checked' : ''}>
+            <input type="checkbox" ${currentValue ? 'checked' : ''}>
             <span class="betterx-slider"></span>
           `
         });
@@ -95,7 +96,7 @@ export class UIManager {
             const optionEl = document.createElement('option');
             optionEl.value = selectOption.value;
             optionEl.textContent = selectOption.label;
-            optionEl.selected = selectOption.value === option.value;
+            optionEl.selected = selectOption.value === currentValue;
             optionElement.appendChild(optionEl);
           });
         } else {
@@ -110,7 +111,7 @@ export class UIManager {
         optionElement = this.createUIElement('input', {
           type: 'number',
           className: 'betterx-input betterx-number-input',
-          value: option.value || option.default || 0,
+          value: currentValue,
           min: option.min,
           max: option.max,
           step: option.step || 1
@@ -128,7 +129,7 @@ export class UIManager {
         optionElement = this.createUIElement('input', {
           type: 'text',
           className: 'betterx-input',
-          value: option.value || option.default || ''
+          value: currentValue
         });
         optionElement.addEventListener('change', (e) => {
           updateOptionValue(e.target.value);
