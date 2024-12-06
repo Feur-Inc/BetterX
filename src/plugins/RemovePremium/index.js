@@ -14,7 +14,6 @@ export default definePlugin({
             'a[href="/i/monetization"]',
             'a[href^="https://ads.x.com/?"]',
             'a[href="/i/premium_sign_up?referring_page=settings"]',
-            'aside[aria-label="Cette offre expire bientôt !"]',
             'a[href="/i/grok"]',
             'a[href="/jobs"]'
         ];
@@ -22,7 +21,11 @@ export default definePlugin({
         const removeElements = () => {
             selectors.forEach(selector => {
                 const elements = document.querySelectorAll(selector);
-                elements.forEach(element => element.remove());
+                elements.forEach(element => {
+                    element.style.display = 'none';
+                    element.style.width = '0px';
+                    element.style.height = '0px';
+                });
             });
 
             const complementaryElements = document.querySelectorAll('[role="complementary"]');
@@ -30,9 +33,13 @@ export default definePlugin({
                 if (!element.querySelector('ul')) {
                     const parentDiv = element.parentElement;
                     if (parentDiv) {
-                        parentDiv.remove();
+                        parentDiv.style.display = 'none';
+                        parentDiv.style.width = '0px';
+                        parentDiv.style.height = '0px';
                     } else {
-                        element.remove();
+                        element.style.display = 'none';
+                        element.style.width = '0px';
+                        element.style.height = '0px';
                     }
                 }
             });
