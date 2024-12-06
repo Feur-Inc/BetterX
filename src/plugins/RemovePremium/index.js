@@ -28,9 +28,10 @@ export default definePlugin({
                 });
             });
 
-            const complementaryElements = document.querySelectorAll('[role="complementary"]');
-            complementaryElements.forEach(element => {
-                if (!element.querySelector('ul')) {
+            const elements = document.querySelectorAll('[role="complementary"].r-eqz5dr');
+            elements.forEach(element => {
+                const hasUlInside = element.querySelector('ul');
+                if (!hasUlInside) {
                     const parentDiv = element.parentElement;
                     if (parentDiv) {
                         parentDiv.style.display = 'none';
