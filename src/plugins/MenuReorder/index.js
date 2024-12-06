@@ -3,7 +3,7 @@ import definePlugin, { OptionType } from "@utils/types";
 
 export default definePlugin({
     name: "MenuReorder",
-    description: "Allows reordering of menu items in the navigation bar",
+    description: "Allows reordering of menu items in both vertical and horizontal navigation bars",
     authors: [Devs.TPM28],
 
     draggedElement: null,
@@ -13,13 +13,201 @@ export default definePlugin({
     STORAGE_KEY: 'customMenuOrder',
     observer: null,
 
-    start() {
-        this.initPlugin();
-        this.addPageChangeListener();
-    },
+    horizontalMenuContainer: null,
+    horizontalMenuItems: [],
+    horizontalDropIndicator: null,
+    HORIZONTAL_STORAGE_KEY: 'customHorizontalMenuOrder',
+    lastUrl: null,
+    urlObserver: null,
+
+        start() {
+            setTimeout(() => {
+                this.initPlugin();
+                this.addPageChangeListener();
+                this.initHorizontalMenuObserver();
+            }, 1000);
+        },
 
     stop() {
         this.cleanUp();
+        this.cleanupHorizontal();
+    },
+
+    initHorizontalMenuObserver() {
+        this.lastUrl = location.href;
+        this.urlObserver = new MutationObserver(() => {
+            const url = location.href;
+            if (url !== this.lastUrl) {
+                this.lastUrl = url;
+                if (url.includes('x.com/home') || url.includes('twitter.com/home')) {
+                    this.cleanupHorizontal();
+                    setTimeout(() => this.initHorizontalMenu(), 500);
+                }
+            }
+        });
+        this.urlObserver.observe(document, {subtree: true, childList: true});
+        this.initHorizontalMenu();
+    },
+
+    initHorizontalMenu() {
+        const primaryColumn = document.querySelector('[data-testid="primaryColumn"]');
+        if (primaryColumn) {
+            this.horizontalMenuContainer = primaryColumn.querySelector('[data-testid="ScrollSnap-List"]');
+            if (this.horizontalMenuContainer) {
+                this.createHorizontalDropIndicator();
+                this.updateHorizontalMenuItems();
+                this.restoreHorizontalOrder();
+            }
+        }
+    },
+
+    createHorizontalDropIndicator() {
+        this.horizontalDropIndicator = document.createElement('div');
+        this.horizontalDropIndicator.style.position = 'absolute';
+        this.horizontalDropIndicator.style.width = '2px';
+        this.horizontalDropIndicator.style.backgroundColor = '#1DA1F2';
+        this.horizontalDropIndicator.style.display = 'none';
+        this.horizontalDropIndicator.style.zIndex = '9999';
+        this.horizontalDropIndicator.style.pointerEvents = 'none';
+        document.body.appendChild(this.horizontalDropIndicator);
+    },
+
+    updateHorizontalMenuItems() {
+        if (this.horizontalMenuContainer) {
+            this.horizontalMenuItems = Array.from(this.horizontalMenuContainer.querySelectorAll('div[role="presentation"]'));
+            this.horizontalMenuItems.forEach((item, index) => {
+                item.setAttribute('draggable', 'true');
+                item.id = `horizontal-menu-item-${index}`;
+                item.classList.add('menu-item');
+
+                item.addEventListener('dragstart', this.horizontalDragStart.bind(this));
+                item.addEventListener('dragend', this.horizontalDragEnd.bind(this));
+            });
+            this.horizontalMenuContainer.addEventListener('dragover', this.horizontalDragOver.bind(this));
+            this.horizontalMenuContainer.addEventListener('drop', this.horizontalDrop.bind(this));
+        }
+    },
+
+    saveHorizontalOrder() {
+        const order = this.horizontalMenuItems.map(item => {
+            const span = item.querySelector('span.css-1jxf684');
+            return span ? span.textContent : '';
+        }).filter(text => text);
+        localStorage.setItem(this.HORIZONTAL_STORAGE_KEY, JSON.stringify(order));
+    },
+
+    restoreHorizontalOrder() {
+        const savedOrder = JSON.parse(localStorage.getItem(this.HORIZONTAL_STORAGE_KEY));
+        if (!savedOrder || !this.horizontalMenuContainer) return;
+
+        const fragment = document.createDocumentFragment();
+        savedOrder.forEach(savedText => {
+            const item = this.horizontalMenuItems.find(menuItem => {
+                const span = menuItem.querySelector('span.css-1jxf684');
+                return span && span.textContent === savedText;
+            });
+            if (item) {
+                fragment.appendChild(item);
+            }
+        });
+        
+        this.horizontalMenuContainer.appendChild(fragment);
+        this.updateHorizontalMenuItems();
+        this.clickFirstMenuItem();
+    },
+
+    clickFirstMenuItem() {
+        if (this.horizontalMenuItems.length > 0) {
+            const firstItem = this.horizontalMenuItems[0];
+            const clickableElement = firstItem.querySelector('a[role="tab"]');
+            if (clickableElement) {
+                clickableElement.click();
+            }
+        }
+    },
+
+    horizontalDragStart(e) {
+        this.draggedElement = e.currentTarget;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', e.currentTarget.id);
+        setTimeout(() => {
+            this.draggedElement.style.opacity = '0.5';
+        }, 0);
+    },
+
+    horizontalDragOver(e) {
+        e.preventDefault();
+        const closestItem = this.getClosestHorizontalMenuItem(e.clientX);
+        if (closestItem && closestItem !== this.draggedElement) {
+            const rect = closestItem.getBoundingClientRect();
+            const middleX = rect.left + rect.width / 2;
+
+            this.horizontalDropIndicator.style.left = e.clientX < middleX ? 
+                `${rect.left - 1}px` : `${rect.right - 1}px`;
+            this.horizontalDropIndicator.style.top = `${rect.top}px`;
+            this.horizontalDropIndicator.style.height = `${rect.height}px`;
+            this.horizontalDropIndicator.style.display = 'block';
+        } else {
+            this.horizontalDropIndicator.style.display = 'none';
+        }
+    },
+
+    horizontalDrop(e) {
+        e.preventDefault();
+        this.horizontalDropIndicator.style.display = 'none';
+
+        const closestItem = this.getClosestHorizontalMenuItem(e.clientX);
+        if (closestItem && closestItem !== this.draggedElement) {
+            const rect = closestItem.getBoundingClientRect();
+            const middleX = rect.left + rect.width / 2;
+
+            if (e.clientX < middleX) {
+                this.horizontalMenuContainer.insertBefore(this.draggedElement, closestItem);
+            } else {
+                this.horizontalMenuContainer.insertBefore(this.draggedElement, closestItem.nextSibling);
+            }
+
+            this.updateHorizontalMenuItems();
+            this.saveHorizontalOrder();
+            this.clickFirstMenuItem();
+        }
+    },
+
+    horizontalDragEnd() {
+        if (this.draggedElement) {
+            this.draggedElement.style.opacity = '1';
+            this.draggedElement = null;
+        }
+        this.horizontalDropIndicator.style.display = 'none';
+    },
+
+    getClosestHorizontalMenuItem(x) {
+        return this.horizontalMenuItems.reduce((closest, item) => {
+            const rect = item.getBoundingClientRect();
+            const offset = Math.abs(x - (rect.left + rect.width / 2));
+            return offset < closest.offset ? { offset, element: item } : closest;
+        }, { offset: Number.POSITIVE_INFINITY }).element;
+    },
+
+    cleanupHorizontal() {
+        if (this.horizontalMenuItems) {
+            this.horizontalMenuItems.forEach(item => {
+                item.removeEventListener('dragstart', this.horizontalDragStart.bind(this));
+                item.removeEventListener('dragend', this.horizontalDragEnd.bind(this));
+                item.removeAttribute('draggable');
+            });
+        }
+        if (this.horizontalMenuContainer) {
+            this.horizontalMenuContainer.removeEventListener('dragover', this.horizontalDragOver.bind(this));
+            this.horizontalMenuContainer.removeEventListener('drop', this.horizontalDrop.bind(this));
+        }
+        if (this.urlObserver) {
+            this.urlObserver.disconnect();
+        }
+        if (this.horizontalDropIndicator && this.horizontalDropIndicator.parentNode) {
+            this.horizontalDropIndicator.parentNode.removeChild(this.horizontalDropIndicator);
+        }
+        this.horizontalMenuItems = [];
     },
 
     initPlugin() {
