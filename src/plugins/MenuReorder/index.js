@@ -25,7 +25,7 @@ export default definePlugin({
                 this.initPlugin();
                 this.addPageChangeListener();
                 this.initHorizontalMenuObserver();
-            }, 1300);
+            }, 1400);
         },
 
     stop() {
@@ -41,7 +41,7 @@ export default definePlugin({
                 this.lastUrl = url;
                 if (url.includes('x.com/home') || url.includes('twitter.com/home')) {
                     this.cleanupHorizontal();
-                    setTimeout(() => this.initHorizontalMenu(), 600);
+                    setTimeout(() => this.initHorizontalMenu(), 300);
                 }
             }
         });
