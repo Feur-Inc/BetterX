@@ -55,7 +55,7 @@ export default definePlugin({
                         childList: true,
                         subtree: true
                     });
-                }, 1000);
+                }, 400);
             });
         } else {
             setTimeout(() => {
@@ -65,7 +65,7 @@ export default definePlugin({
                     childList: true,
                     subtree: true
                 });
-            }, 1000);
+            }, 400);
         }
     },
     stop() {
