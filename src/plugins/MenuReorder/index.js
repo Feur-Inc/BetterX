@@ -3,7 +3,7 @@ import definePlugin, { OptionType } from "@utils/types";
 
 export default definePlugin({
     name: "MenuReorder",
-    description: "Allows reordering of menu items and hiding them via right-click",
+    description: "Allows reordering of menu items in both vertical and horizontal navigation bars",
     authors: [Devs.TPM28],
 
     draggedElement: null,
@@ -19,15 +19,14 @@ export default definePlugin({
     HORIZONTAL_STORAGE_KEY: 'customHorizontalMenuOrder',
     lastUrl: null,
     urlObserver: null,
-    HIDDEN_ITEMS_KEY: 'hiddenMenuItems',
+    hiddenMenuItems: [],
 
     start() {
         setTimeout(() => {
             this.initPlugin();
             this.addPageChangeListener();
             this.initHorizontalMenuObserver();
-            this.setupContextMenu();
-        }, 1250);
+        }, 1400);
     },
 
     stop() {
@@ -227,6 +226,8 @@ export default definePlugin({
         });
 
         this.observer.observe(document.body, { childList: true, subtree: true });
+
+        this.hiddenMenuItems = JSON.parse(localStorage.getItem('hiddenMenuItems')) || [];
     },
 
     addPageChangeListener() {
@@ -293,11 +294,11 @@ export default definePlugin({
 
             item.addEventListener('dragstart', this.dragStart.bind(this));
             item.addEventListener('dragend', this.dragEnd.bind(this));
-        });
 
-        const hiddenItems = this.getHiddenItems();
-        this.menuItems.forEach(item => {
-            if (hiddenItems.includes(item.id)) {
+            item.addEventListener('contextmenu', this.handleContextMenu.bind(this));
+
+            const identifier = this.getMenuItemIdentifier(item);
+            if (this.hiddenMenuItems.includes(identifier)) {
                 item.style.display = 'none';
             }
         });
@@ -402,91 +403,73 @@ export default definePlugin({
         }, { offset: Number.POSITIVE_INFINITY }).element;
     },
 
-    setupContextMenu() {
-        document.addEventListener('contextmenu', (e) => {
-            const menuItem = e.target.closest('.menu-item');
-            if (menuItem) {
-                e.preventDefault();
-                this.showContextMenu(e, menuItem);
-            }
-        });
+    handleContextMenu(e) {
+        e.preventDefault();
 
-        // Close context menu when clicking outside
-        document.addEventListener('click', () => {
-            const existingMenu = document.querySelector('.custom-context-menu');
-            if (existingMenu) existingMenu.remove();
-        });
-    },
-
-    showContextMenu(e, menuItem) {
-        const existingMenu = document.querySelector('.custom-context-menu');
-        if (existingMenu) existingMenu.remove();
-
+        const menuItem = e.currentTarget;
         const contextMenu = document.createElement('div');
-        contextMenu.className = 'custom-context-menu';
-        contextMenu.style.cssText = `
-            position: fixed;
-            z-index: 1000;
-            background: #2f3336;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 4px 0;
-            min-width: 150px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        `;
+        contextMenu.style.position = 'fixed';
+        contextMenu.style.top = `${e.clientY}px`;
+        contextMenu.style.left = `${e.clientX}px`;
+        contextMenu.style.backgroundColor = '#15202b';
+        contextMenu.style.border = '1px solid #38444d';
+        contextMenu.style.padding = '5px';
+        contextMenu.style.zIndex = '10000';
 
         const hideOption = document.createElement('div');
-        hideOption.innerText = 'Hide';
-        hideOption.style.cssText = `
-            padding: 8px 12px;
-            cursor: pointer;
-            color: white;
-            &:hover { background: #444; }
-        `;
-        hideOption.onclick = () => this.hideMenuItem(menuItem);
-
-        const restoreOption = document.createElement('div');
-        restoreOption.innerText = 'Restore Defaults';
-        restoreOption.style.cssText = hideOption.style.cssText;
-        restoreOption.onclick = () => this.restoreDefaults();
-
+        hideOption.textContent = 'Hide this item';
+        hideOption.style.padding = '5px';
+        hideOption.style.cursor = 'pointer';
+        hideOption.addEventListener('click', () => {
+            this.hideMenuItem(menuItem);
+            document.body.removeChild(contextMenu);
+        });
         contextMenu.appendChild(hideOption);
-        contextMenu.appendChild(restoreOption);
 
-        // Position the menu
-        contextMenu.style.left = `${e.clientX}px`;
-        contextMenu.style.top = `${e.clientY}px`;
+        const resetOption = document.createElement('div');
+        resetOption.textContent = 'Reset menu';
+        resetOption.style.padding = '5px';
+        resetOption.style.cursor = 'pointer';
+        resetOption.addEventListener('click', () => {
+            this.resetMenu();
+            document.body.removeChild(contextMenu);
+        });
+        contextMenu.appendChild(resetOption);
 
         document.body.appendChild(contextMenu);
+
+        const closeContextMenu = (event) => {
+            if (event.target !== contextMenu && !contextMenu.contains(event.target)) {
+                document.body.removeChild(contextMenu);
+                document.removeEventListener('click', closeContextMenu);
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener('click', closeContextMenu);
+        }, 0);
     },
 
     hideMenuItem(menuItem) {
+        const identifier = this.getMenuItemIdentifier(menuItem);
         menuItem.style.display = 'none';
-        const hiddenItems = this.getHiddenItems();
-        const itemId = menuItem.id;
-        if (!hiddenItems.includes(itemId)) {
-            hiddenItems.push(itemId);
-            localStorage.setItem(this.HIDDEN_ITEMS_KEY, JSON.stringify(hiddenItems));
+        if (!this.hiddenMenuItems.includes(identifier)) {
+            this.hiddenMenuItems.push(identifier);
+            localStorage.setItem('hiddenMenuItems', JSON.stringify(this.hiddenMenuItems));
         }
     },
 
-    getHiddenItems() {
-        const stored = localStorage.getItem(this.HIDDEN_ITEMS_KEY);
-        return stored ? JSON.parse(stored) : [];
-    },
-
-    restoreDefaults() {
-        localStorage.removeItem(this.HIDDEN_ITEMS_KEY);
-        localStorage.removeItem(this.STORAGE_KEY);
-        localStorage.removeItem(this.HORIZONTAL_STORAGE_KEY);
+    resetMenu() {
+        this.hiddenMenuItems = [];
+        localStorage.removeItem('hiddenMenuItems');
         this.menuItems.forEach(item => {
             item.style.display = '';
         });
-        this.horizontalMenuItems.forEach(item => {
-            item.style.display = '';
-        });
-        this.initPlugin();
-        this.initHorizontalMenu();
+    },
+
+    getMenuItemIdentifier(menuItem) {
+        const testId = menuItem.getAttribute('data-testid');
+        const href = menuItem.href ? this.getLastPathSegment(menuItem.href) : null;
+        return testId || href || menuItem.id;
     },
 
     settings: {
