@@ -10,9 +10,6 @@ async function initializeBetterX() {
     if (plugin.enabled && typeof plugin.start === 'function') {
       plugin.start();
     }
-    if (plugin.enabled && Array.isArray(plugin.patches)) {
-      pluginManager.applyPatches(plugin.patches);
-    }
   });
 
   // Create and inject BetterX UI

@@ -3,7 +3,7 @@ import definePlugin, { OptionType } from "@utils/types";
 
 export default definePlugin({
     name: "MenuReorder",
-    description: "Allows reordering of menu items in the navigation bar",
+    description: "Allows reordering of menu items in both vertical and horizontal navigation bars",
     authors: [Devs.TPM28],
 
     draggedElement: null,
@@ -13,13 +13,202 @@ export default definePlugin({
     STORAGE_KEY: 'customMenuOrder',
     observer: null,
 
+    horizontalMenuContainer: null,
+    horizontalMenuItems: [],
+    horizontalDropIndicator: null,
+    HORIZONTAL_STORAGE_KEY: 'customHorizontalMenuOrder',
+    lastUrl: null,
+    urlObserver: null,
+    hiddenMenuItems: [],
+
     start() {
-        this.initPlugin();
-        this.addPageChangeListener();
+        setTimeout(() => {
+            this.initPlugin();
+            this.addPageChangeListener();
+            this.initHorizontalMenuObserver();
+        }, 1400);
     },
 
     stop() {
         this.cleanUp();
+        this.cleanupHorizontal();
+    },
+
+    initHorizontalMenuObserver() {
+        this.lastUrl = location.href;
+        this.urlObserver = new MutationObserver(() => {
+            const url = location.href;
+            if (url !== this.lastUrl) {
+                this.lastUrl = url;
+                if (url.includes('x.com/home') || url.includes('twitter.com/home')) {
+                    this.cleanupHorizontal();
+                    setTimeout(() => this.initHorizontalMenu(), 300);
+                }
+            }
+        });
+        this.urlObserver.observe(document, {subtree: true, childList: true});
+        this.initHorizontalMenu();
+    },
+
+    initHorizontalMenu() {
+        const primaryColumn = document.querySelector('[data-testid="primaryColumn"]');
+        if (primaryColumn) {
+            this.horizontalMenuContainer = primaryColumn.querySelector('[data-testid="ScrollSnap-List"]');
+            if (this.horizontalMenuContainer) {
+                this.createHorizontalDropIndicator();
+                this.updateHorizontalMenuItems();
+                this.restoreHorizontalOrder();
+            }
+        }
+    },
+
+    createHorizontalDropIndicator() {
+        this.horizontalDropIndicator = document.createElement('div');
+        this.horizontalDropIndicator.style.position = 'absolute';
+        this.horizontalDropIndicator.style.width = '2px';
+        this.horizontalDropIndicator.style.backgroundColor = '#1DA1F2';
+        this.horizontalDropIndicator.style.display = 'none';
+        this.horizontalDropIndicator.style.zIndex = '9999';
+        this.horizontalDropIndicator.style.pointerEvents = 'none';
+        document.body.appendChild(this.horizontalDropIndicator);
+    },
+
+    updateHorizontalMenuItems() {
+        if (this.horizontalMenuContainer) {
+            this.horizontalMenuItems = Array.from(this.horizontalMenuContainer.querySelectorAll('div[role="presentation"]'));
+            this.horizontalMenuItems.forEach((item, index) => {
+                item.setAttribute('draggable', 'true');
+                item.id = `horizontal-menu-item-${index}`;
+                item.classList.add('menu-item');
+
+                item.addEventListener('dragstart', this.horizontalDragStart.bind(this));
+                item.addEventListener('dragend', this.horizontalDragEnd.bind(this));
+            });
+            this.horizontalMenuContainer.addEventListener('dragover', this.horizontalDragOver.bind(this));
+            this.horizontalMenuContainer.addEventListener('drop', this.horizontalDrop.bind(this));
+        }
+    },
+
+    saveHorizontalOrder() {
+        const order = this.horizontalMenuItems.map(item => {
+            const span = item.querySelector('span.css-1jxf684');
+            return span ? span.textContent : '';
+        }).filter(text => text);
+        localStorage.setItem(this.HORIZONTAL_STORAGE_KEY, JSON.stringify(order));
+    },
+
+    restoreHorizontalOrder() {
+        const savedOrder = JSON.parse(localStorage.getItem(this.HORIZONTAL_STORAGE_KEY));
+        if (!savedOrder || !this.horizontalMenuContainer) return;
+
+        const fragment = document.createDocumentFragment();
+        savedOrder.forEach(savedText => {
+            const item = this.horizontalMenuItems.find(menuItem => {
+                const span = menuItem.querySelector('span.css-1jxf684');
+                return span && span.textContent === savedText;
+            });
+            if (item) {
+                fragment.appendChild(item);
+            }
+        });
+        
+        this.horizontalMenuContainer.appendChild(fragment);
+        this.updateHorizontalMenuItems();
+        this.clickFirstMenuItem();
+    },
+
+    clickFirstMenuItem() {
+        if (this.horizontalMenuItems.length > 0) {
+            const firstItem = this.horizontalMenuItems[0];
+            const clickableElement = firstItem.querySelector('a[role="tab"]');
+            if (clickableElement) {
+                clickableElement.click();
+            }
+        }
+    },
+
+    horizontalDragStart(e) {
+        this.draggedElement = e.currentTarget;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', e.currentTarget.id);
+        setTimeout(() => {
+            this.draggedElement.style.opacity = '0.5';
+        }, 0);
+    },
+
+    horizontalDragOver(e) {
+        e.preventDefault();
+        const closestItem = this.getClosestHorizontalMenuItem(e.clientX);
+        if (closestItem && closestItem !== this.draggedElement) {
+            const rect = closestItem.getBoundingClientRect();
+            const middleX = rect.left + rect.width / 2;
+
+            this.horizontalDropIndicator.style.left = e.clientX < middleX ? 
+                `${rect.left - 1}px` : `${rect.right - 1}px`;
+            this.horizontalDropIndicator.style.top = `${rect.top}px`;
+            this.horizontalDropIndicator.style.height = `${rect.height}px`;
+            this.horizontalDropIndicator.style.display = 'block';
+        } else {
+            this.horizontalDropIndicator.style.display = 'none';
+        }
+    },
+
+    horizontalDrop(e) {
+        e.preventDefault();
+        this.horizontalDropIndicator.style.display = 'none';
+
+        const closestItem = this.getClosestHorizontalMenuItem(e.clientX);
+        if (closestItem && closestItem !== this.draggedElement) {
+            const rect = closestItem.getBoundingClientRect();
+            const middleX = rect.left + rect.width / 2;
+
+            if (e.clientX < middleX) {
+                this.horizontalMenuContainer.insertBefore(this.draggedElement, closestItem);
+            } else {
+                this.horizontalMenuContainer.insertBefore(this.draggedElement, closestItem.nextSibling);
+            }
+
+            this.updateHorizontalMenuItems();
+            this.saveHorizontalOrder();
+            this.clickFirstMenuItem();
+        }
+    },
+
+    horizontalDragEnd() {
+        if (this.draggedElement) {
+            this.draggedElement.style.opacity = '1';
+            this.draggedElement = null;
+        }
+        this.horizontalDropIndicator.style.display = 'none';
+    },
+
+    getClosestHorizontalMenuItem(x) {
+        return this.horizontalMenuItems.reduce((closest, item) => {
+            const rect = item.getBoundingClientRect();
+            const offset = Math.abs(x - (rect.left + rect.width / 2));
+            return offset < closest.offset ? { offset, element: item } : closest;
+        }, { offset: Number.POSITIVE_INFINITY }).element;
+    },
+
+    cleanupHorizontal() {
+        if (this.horizontalMenuItems) {
+            this.horizontalMenuItems.forEach(item => {
+                item.removeEventListener('dragstart', this.horizontalDragStart.bind(this));
+                item.removeEventListener('dragend', this.horizontalDragEnd.bind(this));
+                item.removeAttribute('draggable');
+            });
+        }
+        if (this.horizontalMenuContainer) {
+            this.horizontalMenuContainer.removeEventListener('dragover', this.horizontalDragOver.bind(this));
+            this.horizontalMenuContainer.removeEventListener('drop', this.horizontalDrop.bind(this));
+        }
+        if (this.urlObserver) {
+            this.urlObserver.disconnect();
+        }
+        if (this.horizontalDropIndicator && this.horizontalDropIndicator.parentNode) {
+            this.horizontalDropIndicator.parentNode.removeChild(this.horizontalDropIndicator);
+        }
+        this.horizontalMenuItems = [];
     },
 
     initPlugin() {
@@ -37,6 +226,8 @@ export default definePlugin({
         });
 
         this.observer.observe(document.body, { childList: true, subtree: true });
+
+        this.hiddenMenuItems = JSON.parse(localStorage.getItem('hiddenMenuItems')) || [];
     },
 
     addPageChangeListener() {
@@ -103,6 +294,13 @@ export default definePlugin({
 
             item.addEventListener('dragstart', this.dragStart.bind(this));
             item.addEventListener('dragend', this.dragEnd.bind(this));
+
+            item.addEventListener('contextmenu', this.handleContextMenu.bind(this));
+
+            const identifier = this.getMenuItemIdentifier(item);
+            if (this.hiddenMenuItems.includes(identifier)) {
+                item.style.display = 'none';
+            }
         });
     },
 
@@ -203,6 +401,75 @@ export default definePlugin({
                 return closest;
             }
         }, { offset: Number.POSITIVE_INFINITY }).element;
+    },
+
+    handleContextMenu(e) {
+        e.preventDefault();
+
+        const menuItem = e.currentTarget;
+        const contextMenu = document.createElement('div');
+        contextMenu.style.position = 'fixed';
+        contextMenu.style.top = `${e.clientY}px`;
+        contextMenu.style.left = `${e.clientX}px`;
+        contextMenu.style.backgroundColor = '#15202b';
+        contextMenu.style.border = '1px solid #38444d';
+        contextMenu.style.padding = '5px';
+        contextMenu.style.zIndex = '10000';
+
+        const hideOption = document.createElement('div');
+        hideOption.textContent = 'Hide this item';
+        hideOption.style.padding = '5px';
+        hideOption.style.cursor = 'pointer';
+        hideOption.addEventListener('click', () => {
+            this.hideMenuItem(menuItem);
+            document.body.removeChild(contextMenu);
+        });
+        contextMenu.appendChild(hideOption);
+
+        const resetOption = document.createElement('div');
+        resetOption.textContent = 'Reset menu';
+        resetOption.style.padding = '5px';
+        resetOption.style.cursor = 'pointer';
+        resetOption.addEventListener('click', () => {
+            this.resetMenu();
+            document.body.removeChild(contextMenu);
+        });
+        contextMenu.appendChild(resetOption);
+
+        document.body.appendChild(contextMenu);
+
+        const closeContextMenu = (event) => {
+            if (event.target !== contextMenu && !contextMenu.contains(event.target)) {
+                document.body.removeChild(contextMenu);
+                document.removeEventListener('click', closeContextMenu);
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener('click', closeContextMenu);
+        }, 0);
+    },
+
+    hideMenuItem(menuItem) {
+        const identifier = this.getMenuItemIdentifier(menuItem);
+        menuItem.style.display = 'none';
+        if (!this.hiddenMenuItems.includes(identifier)) {
+            this.hiddenMenuItems.push(identifier);
+            localStorage.setItem('hiddenMenuItems', JSON.stringify(this.hiddenMenuItems));
+        }
+    },
+
+    resetMenu() {
+        this.hiddenMenuItems = [];
+        localStorage.removeItem('hiddenMenuItems');
+        this.menuItems.forEach(item => {
+            item.style.display = '';
+        });
+    },
+
+    getMenuItemIdentifier(menuItem) {
+        const testId = menuItem.getAttribute('data-testid');
+        const href = menuItem.href ? this.getLastPathSegment(menuItem.href) : null;
+        return testId || href || menuItem.id;
     },
 
     settings: {

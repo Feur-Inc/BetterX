@@ -3,7 +3,7 @@ import definePlugin, { OptionType } from "@utils/types";
 
 export default definePlugin({
     name: "AdBlocker",
-    description: "Blocks ads and sponsored content on X (formerly Twitter)",
+    description: "Blocks ads and sponsored content",
     authors: [Devs.Mopi],
 
     adsHidden: 0,
