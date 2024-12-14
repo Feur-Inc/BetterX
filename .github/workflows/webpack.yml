@@ -1,17 +1,16 @@
 name: Build and Deploy to GitHub Pages
-
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]
     permissions:
       contents: write
     steps:
+
       - uses: actions/checkout@v4
       
       - name: Use Node.js
