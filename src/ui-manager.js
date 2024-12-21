@@ -138,22 +138,37 @@ export class UIManager {
       className: 'betterx-theme-editor',
       innerHTML: `
         <div class="betterx-editor-header">
-          <input type="text" class="betterx-input" placeholder="Theme name" value="${theme?.name || ''}">
+          <div class="betterx-editor-title">
+            <h3>${theme ? 'Edit Theme' : 'Create New Theme'}</h3>
+            <input type="text" class="betterx-input" placeholder="Theme name" value="${theme?.name || ''}" maxlength="50">
+          </div>
           <div class="betterx-editor-controls">
-            <button class="betterx-button save">Save</button>
-            <button class="betterx-button cancel">Cancel</button>
+            <button class="betterx-button secondary cancel">Cancel</button>
+            <button class="betterx-button primary save">Save Theme</button>
           </div>
         </div>
-        <div class="betterx-codemirror-wrapper"></div>
+        <div class="betterx-editor-main">
+          <div class="betterx-editor-toolbar">
+            <span class="betterx-editor-info">CSS Editor</span>
+            <div class="betterx-editor-actions">
+              <button class="betterx-button mini format">Format</button>
+              <button class="betterx-button mini clear">Clear</button>
+            </div>
+          </div>
+          <div class="betterx-codemirror-wrapper"></div>
+        </div>
       `
     });
+
     const overlay = this.createUIElement('div', {
       className: 'betterx-editor-overlay'
     });
     overlay.appendChild(editor);
     document.body.appendChild(overlay);
+
     const nameInput = editor.querySelector('input');
     const editorContainer = editor.querySelector('.betterx-codemirror-wrapper');
+    
     // Initialize CodeMirror
     const view = new EditorView({
       doc: theme?.css || '',
@@ -177,6 +192,7 @@ export class UIManager {
       ],
       parent: editorContainer
     });
+
     editor.querySelector('.save').addEventListener('click', () => {
       const css = view.state.doc.toString();
       if (theme) {
@@ -188,12 +204,46 @@ export class UIManager {
       view.destroy();
       overlay.remove();
     });
+
     editor.querySelector('.cancel').addEventListener('click', () => {
       view.destroy();
       overlay.remove();
     });
+
+    // Add format button functionality
+    editor.querySelector('.format').addEventListener('click', () => {
+      try {
+        const css = view.state.doc.toString();
+        const formatted = this.formatCSS(css);
+        view.dispatch({
+          changes: {from: 0, to: view.state.doc.length, insert: formatted}
+        });
+      } catch (e) {
+        console.error('Failed to format CSS:', e);
+      }
+    });
+
+    // Add clear button functionality
+    editor.querySelector('.clear').addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear all CSS?')) {
+        view.dispatch({
+          changes: {from: 0, to: view.state.doc.length, insert: ''}
+        });
+      }
+    });
   }
 
+  formatCSS(css) {
+    // Simple CSS formatter
+    return css
+      .replace(/\s*{\s*/g, ' {\n  ')
+      .replace(/\s*}\s*/g, '\n}\n')
+      .replace(/;\s*/g, ';\n  ')
+      .replace(/\/\*\s*/g, '\n/* ')
+      .replace(/\s*\*\//g, ' */\n')
+      .replace(/\n\s*\n/g, '\n')
+      .trim();
+  }
 
   getAuthorNames(authors) {
     if (!authors || authors.length === 0) return 'Unknown';
@@ -702,68 +752,128 @@ export class UIManager {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(0, 0, 0, 0.85);
           z-index: 10001;
           display: flex;
           align-items: center;
           justify-content: center;
+          backdrop-filter: blur(5px);
         }
         
         .betterx-theme-editor {
           background: #15202b;
           padding: 20px;
-          border-radius: 8px;
+          border-radius: 12px;
           width: 90%;
-          max-width: 800px;
-          height: 80vh;
+          max-width: 900px;
+          height: 85vh;
           display: flex;
           flex-direction: column;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+          border: 1px solid #38444d;
         }
         
         .betterx-editor-header {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          margin-bottom: 10px;
+          align-items: flex-start;
+          margin-bottom: 20px;
+          gap: 20px;
         }
-        
-        .betterx-css-editor {
-          flex-grow: 1;
-          background: #192734;
-          color: white;
-          border: 1px solid #38444d;
-          border-radius: 4px;
-          padding: 10px;
-          font-family: monospace;
-          resize: none;
+
+        .betterx-editor-title {
+          flex: 1;
         }
-        .betterx-codemirror-wrapper {
-          flex-grow: 1;
-          overflow: hidden;
-          border-radius: 4px;
-          border: 1px solid #38444d;
+
+        .betterx-editor-title h3 {
+          margin: 0 0 10px 0;
+          font-size: 18px;
+          color: #fff;
         }
-        .betterx-codemirror-wrapper .cm-editor {
-          height: 100%;
-        }
-        .betterx-codemirror-wrapper .cm-scroller {
-          font-family: monospace;
-          line-height: 1.6;
-        }
-        
-        .betterx-theme-editor {
+
+        .betterx-editor-main {
+          flex: 1;
           display: flex;
           flex-direction: column;
-          background: #15202b;
-          padding: 20px;
+          background: #192734;
           border-radius: 8px;
-          width: 90%;
-          max-width: 800px;
-          height: 80vh;
+          overflow: hidden;
+          border: 1px solid #38444d;
+        }
+
+        .betterx-editor-toolbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 12px;
+          background: #22303c;
+          border-bottom: 1px solid #38444d;
+        }
+
+        .betterx-editor-info {
+          font-size: 12px;
+          color: #8899a6;
+          font-weight: 500;
+        }
+
+        .betterx-editor-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .betterx-button.primary {
+          background: #1da1f2;
+        }
+
+        .betterx-button.secondary {
+          background: transparent;
+          border: 1px solid #38444d;
+        }
+
+        .betterx-button.mini {
+          padding: 4px 8px;
+          font-size: 12px;
+          background: transparent;
+          border: 1px solid #38444d;
+        }
+
+        .betterx-button.mini:hover {
+          background: rgba(29, 161, 242, 0.1);
+          border-color: #1da1f2;
         }
         
-        .betterx-editor-header {
-          margin-bottom: 15px;
+        .betterx-codemirror-wrapper {
+          flex: 1;
+          overflow: hidden;
+        }
+
+        .betterx-codemirror-wrapper .cm-editor {
+          height: 100%;
+          font-size: 14px;
+        }
+
+        .betterx-codemirror-wrapper .cm-scroller {
+          padding: 8px 0;
+        }
+
+        .betterx-codemirror-wrapper .cm-gutters {
+          background: #192734;
+          border-right: 1px solid #38444d;
+        }
+
+        .betterx-codemirror-wrapper .cm-activeLineGutter {
+          background: #22303c;
+        }
+
+        .betterx-input {
+          width: 100%;
+          max-width: 300px;
+        }
+
+        .betterx-editor-controls {
+          display: flex;
+          gap: 12px;
+          align-items: center;
         }
       `
     });

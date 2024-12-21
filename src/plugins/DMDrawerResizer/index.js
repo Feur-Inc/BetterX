@@ -59,6 +59,7 @@ function makeResizable(element, innerElement) {
         
         currentResizer = type;
         
+        document.body.style.userSelect = 'none';
         document.addEventListener('mousemove', doDrag, false);
         document.addEventListener('mouseup', stopDrag, false);
     }
@@ -66,32 +67,32 @@ function makeResizable(element, innerElement) {
     function doDrag(e) {
         if (!currentResizer) return;
 
-        const dx = startX - e.clientX;
-        const dy = startY - e.clientY;
-        
-        if (currentResizer === 'horizontal' || currentResizer === 'corner') {
-            const newWidth = startWidth + dx;
-            if (newWidth <= 900 && newWidth >= 300) {
-                element.style.width = `${newWidth}px`;
-                localStorage.setItem('dmDrawerWidth', newWidth);
+        requestAnimationFrame(() => {
+            const dx = startX - e.clientX;
+            const dy = startY - e.clientY;
+            
+            if (currentResizer === 'horizontal' || currentResizer === 'corner') {
+                const newWidth = startWidth + dx;
+                if (newWidth <= 900 && newWidth >= 300) {
+                    element.style.width = `${newWidth}px`;
+                    localStorage.setItem('dmDrawerWidth', newWidth);
+                }
             }
-        }
-        
-        if (currentResizer === 'vertical' || currentResizer === 'corner') {
-            const newHeight = startHeight + dy;
-            if (newHeight <= 740 && newHeight >= 53) {
-                innerElement.style.maxHeight = `${newHeight}px`;
-                localStorage.setItem('dmDrawerHeight', newHeight);
+            
+            if (currentResizer === 'vertical' || currentResizer === 'corner') {
+                const newHeight = startHeight + dy;
+                if (newHeight <= 740 && newHeight >= 53) {
+                    innerElement.style.maxHeight = `${newHeight}px`;
+                    localStorage.setItem('dmDrawerHeight', newHeight);
+                }
             }
-        }
-        
-        element.style.minHeight = `53px`;
-        innerElement.style.minHeight = `53px`;
+        });
     }
 
     function stopDrag() {
         document.removeEventListener('mousemove', doDrag, false);
         document.removeEventListener('mouseup', stopDrag, false);
+        document.body.style.userSelect = '';
         currentResizer = null;
     }
 
