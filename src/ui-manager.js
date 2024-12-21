@@ -1,4 +1,7 @@
 import { OptionType } from "@utils/types";
+import { EditorView, basicSetup } from "codemirror";
+import { css } from "@codemirror/lang-css";
+import { oneDark } from '@codemirror/theme-one-dark';
 
 export class UIManager {
   constructor(pluginManager) {
@@ -23,11 +26,49 @@ export class UIManager {
             <span class="betterx-close">&times;</span>
           </div>
           <div class="betterx-modal-body">
-            <div id="betterx-plugin-list"></div>
+            <div class="betterx-tabs">
+              <button class="betterx-tab active" data-tab="plugin">Plugins</button>
+              <button class="betterx-tab" data-tab="theme">Themes</button>
+            </div>
+            <div id="betterx-plugin-list" class="betterx-tab-content active"></div>
+            <div id="betterx-theme-list" class="betterx-tab-content">
+              <div class="betterx-theme-controls">
+                <button class="betterx-button" id="new-theme">New Theme</button>
+              </div>
+              <div class="betterx-themes-container"></div>
+            </div>
           </div>
         </div>
       `
     });
+
+    // Add tab switching logic after the modal is created
+    const setupTabs = () => {
+      const tabs = modal.querySelectorAll('.betterx-tab');
+      const contents = modal.querySelectorAll('.betterx-tab-content');
+      
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          // Remove active class from all tabs and contents
+          tabs.forEach(t => t.classList.remove('active'));
+          contents.forEach(c => c.classList.remove('active'));
+          
+          // Add active class to clicked tab and corresponding content
+          tab.classList.add('active');
+          const contentId = `betterx-${tab.dataset.tab}-list`;
+          const content = modal.querySelector(`#${contentId}`);
+          if (content) {
+            content.classList.add('active');
+          }
+        });
+      });
+    };
+
+    // Set up tabs after a short delay to ensure DOM is ready
+    setTimeout(setupTabs, 0);
+
+    // Initialize theme UI
+    this.initializeThemeUI(modal);
 
     // Add event listeners for the modal
     const closeBtn = modal.querySelector('.betterx-close');
@@ -44,6 +85,128 @@ export class UIManager {
     this.populatePluginList(modal.querySelector('#betterx-plugin-list'));
 
     return modal;
+  }
+
+  initializeThemeUI(modal) {
+    const themesContainer = modal.querySelector('.betterx-themes-container');
+    const newThemeButton = modal.querySelector('#new-theme');
+
+    newThemeButton.addEventListener('click', () => {
+      this.showThemeEditor();
+    });
+
+    this.refreshThemesList(themesContainer);
+  }
+
+  refreshThemesList(container) {
+    container.innerHTML = '';
+    this.themeManager.themes.forEach(theme => {
+      const themeElement = this.createUIElement('div', {
+        className: 'betterx-theme-item',
+        innerHTML: `
+          <div class="betterx-theme-header">
+            <h3>${theme.name}</h3>
+            <div class="betterx-theme-controls">
+              <label class="betterx-switch">
+                <input type="checkbox" ${theme === this.themeManager.activeTheme ? 'checked' : ''}>
+                <span class="betterx-slider"></span>
+              </label>
+              <button class="betterx-button edit">Edit</button>
+              <button class="betterx-button delete">Delete</button>
+            </div>
+          </div>
+        `
+      });
+
+      const toggle = themeElement.querySelector('input[type="checkbox"]');
+      toggle.addEventListener('change', () => {
+        if (toggle.checked) {
+          this.themeManager.applyTheme(theme);
+        } else {
+          this.themeManager.disableTheme();
+        }
+      });
+
+      themeElement.querySelector('.edit').addEventListener('click', () => {
+        this.showThemeEditor(theme);
+      });
+
+      themeElement.querySelector('.delete').addEventListener('click', () => {
+        if (confirm('Are you sure you want to delete this theme?')) {
+          this.themeManager.deleteTheme(theme.id);
+          this.refreshThemesList(container);
+        }
+      });
+
+      container.appendChild(themeElement);
+    });
+  }
+
+  showThemeEditor(theme = null) {
+    const editor = this.createUIElement('div', {
+      className: 'betterx-theme-editor',
+      innerHTML: `
+        <div class="betterx-editor-header">
+          <input type="text" class="betterx-input" placeholder="Theme name" value="${theme?.name || ''}">
+          <div class="betterx-editor-controls">
+            <button class="betterx-button save">Save</button>
+            <button class="betterx-button cancel">Cancel</button>
+          </div>
+        </div>
+        <div class="betterx-codemirror-wrapper"></div>
+      `
+    });
+
+    const overlay = this.createUIElement('div', {
+      className: 'betterx-editor-overlay'
+    });
+
+    overlay.appendChild(editor);
+    document.body.appendChild(overlay);
+
+    const nameInput = editor.querySelector('input');
+    const editorContainer = editor.querySelector('.betterx-codemirror-wrapper');
+
+    // Initialize CodeMirror
+    const view = new EditorView({
+      doc: theme?.css || '',
+      extensions: [
+        basicSetup,
+        css(),
+        oneDark,
+        EditorView.theme({
+          "&": {
+            height: "100%",
+            fontSize: "14px"
+          },
+          ".cm-content": {
+            fontFamily: "monospace"
+          },
+          ".cm-line": {
+            padding: "0 3px",
+            lineHeight: "1.6"
+          }
+        })
+      ],
+      parent: editorContainer
+    });
+
+    editor.querySelector('.save').addEventListener('click', () => {
+      const css = view.state.doc.toString();
+      if (theme) {
+        this.themeManager.updateTheme(theme.id, nameInput.value, css);
+      } else {
+        this.themeManager.createTheme(nameInput.value, css);
+      }
+      this.refreshThemesList(this.settingsModal.querySelector('.betterx-themes-container'));
+      view.destroy();
+      overlay.remove();
+    });
+
+    editor.querySelector('.cancel').addEventListener('click', () => {
+      view.destroy();
+      overlay.remove();
+    });
   }
 
   getAuthorNames(authors) {
@@ -486,6 +649,139 @@ export class UIManager {
             margin: 2vh auto;
             max-height: 96vh;
           }
+        }
+
+        .betterx-tabs {
+          display: flex;
+          border-bottom: 1px solid #38444d;
+          margin-bottom: 20px;
+        }
+        
+        .betterx-tab {
+          background: none;
+          border: none;
+          color: #8899a6;
+          padding: 10px 20px;
+          cursor: pointer;
+          border-bottom: 2px solid transparent;
+        }
+        
+        .betterx-tab.active {
+          color: #1da1f2;
+          border-bottom-color: #1da1f2;
+        }
+        
+        .betterx-tab-content {
+          display: none;
+        }
+        
+        .betterx-tab-content.active {
+          display: block;
+        }
+        
+        .betterx-theme-item {
+          background: #192734;
+          border-radius: 8px;
+          padding: 15px;
+          margin-bottom: 10px;
+        }
+        
+        .betterx-theme-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .betterx-theme-controls {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+        }
+        
+        .betterx-button {
+          background: #1da1f2;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        .betterx-button:hover {
+          background: #1a91da;
+        }
+        
+        .betterx-editor-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.8);
+          z-index: 10001;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .betterx-theme-editor {
+          background: #15202b;
+          padding: 20px;
+          border-radius: 8px;
+          width: 90%;
+          max-width: 800px;
+          height: 80vh;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .betterx-editor-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+        }
+        
+        .betterx-css-editor {
+          flex-grow: 1;
+          background: #192734;
+          color: white;
+          border: 1px solid #38444d;
+          border-radius: 4px;
+          padding: 10px;
+          font-family: monospace;
+          resize: none;
+        }
+
+        .betterx-codemirror-wrapper {
+          flex-grow: 1;
+          overflow: hidden;
+          border-radius: 4px;
+          border: 1px solid #38444d;
+        }
+
+        .betterx-codemirror-wrapper .cm-editor {
+          height: 100%;
+        }
+
+        .betterx-codemirror-wrapper .cm-scroller {
+          font-family: monospace;
+          line-height: 1.6;
+        }
+        
+        .betterx-theme-editor {
+          display: flex;
+          flex-direction: column;
+          background: #15202b;
+          padding: 20px;
+          border-radius: 8px;
+          width: 90%;
+          max-width: 800px;
+          height: 80vh;
+        }
+        
+        .betterx-editor-header {
+          margin-bottom: 15px;
         }
       `
     });
