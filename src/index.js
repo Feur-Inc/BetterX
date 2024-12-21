@@ -1,10 +1,8 @@
 import { PluginManager } from './plugin-manager.js';
 import { UIManager } from './ui-manager.js';
-import { ThemeManager } from './theme-manager.js';
 
 async function initializeBetterX() {
   const pluginManager = new PluginManager();
-  const themeManager = new ThemeManager();
   await pluginManager.loadPlugins();
 
   // Initialize and apply plugins
@@ -16,14 +14,11 @@ async function initializeBetterX() {
 
   // Create and inject BetterX UI
   const uiManager = new UIManager(pluginManager);
-  uiManager.themeManager = themeManager;  // Inject theme manager into UI manager
   uiManager.injectBetterXUI();
 
   window.BetterX = {
     plugins: pluginManager.plugins,
-    themes: themeManager.themes,
-    togglePlugin: (pluginName) => pluginManager.togglePlugin(pluginName),
-    createTheme: (name, css) => themeManager.createTheme(name, css)
+    togglePlugin: (pluginName) => pluginManager.togglePlugin(pluginName)
   };
 
   console.log("BetterX loaded with plugins:", pluginManager.plugins.map(p => `${p.name} (${p.enabled ? 'enabled' : 'disabled'})`));
