@@ -249,11 +249,18 @@ export class UIManager {
     if (!authors || authors.length === 0) return 'Unknown';
 
     return authors.map(author => {
+      let authorName, handle;
       if (typeof author === 'string') {
-        return this.pluginManager.Devs[author]?.name || author;
+        authorName = this.pluginManager.Devs[author]?.name || author;
+        handle = this.pluginManager.Devs[author]?.handle;
       } else {
-        return author.name || 'Unknown';
+        authorName = author.name || 'Unknown';
+        handle = author.handle;
       }
+
+      return handle ? 
+        `<a href="https://twitter.com/${handle}" target="_blank" class="betterx-author-link">${authorName}</a>` : 
+        authorName;
     }).join(', ');
   }
 
@@ -874,6 +881,13 @@ export class UIManager {
           display: flex;
           gap: 12px;
           align-items: center;
+        }
+        .betterx-author-link {
+          color: #1da1f2;
+          text-decoration: none;
+        }
+        .betterx-author-link:hover {
+          text-decoration: underline;
         }
       `
     });
