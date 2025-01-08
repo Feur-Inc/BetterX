@@ -125,6 +125,8 @@ export default definePlugin({
     },
 
     handleMouseDown(e) {
+        if (e.button !== 0) return;
+        
         this.isActive = true;
         this.currentImage = e.target;
         this.currentImage.style.cursor = 'crosshair';
