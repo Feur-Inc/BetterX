@@ -1,6 +1,6 @@
 import { PluginManager } from './plugin-manager.js';
 import { UIManager } from './ui-manager.js';
-import { ThemeManager } from './theme-manager.js';
+import { ThemeManager, applyTheme } from './theme-manager.js';
 
 async function initializeBetterX() {
   const pluginManager = new PluginManager();
@@ -18,6 +18,9 @@ async function initializeBetterX() {
   const uiManager = new UIManager(pluginManager);
   uiManager.themeManager = themeManager;
   uiManager.injectBetterXUI();
+
+  const testTheme = { color: "red", background_color: "red" };
+  applyTheme(testTheme);
 
   window.BetterX = {
     plugins: pluginManager.plugins,

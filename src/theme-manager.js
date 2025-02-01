@@ -73,3 +73,14 @@ export class ThemeManager {
       this.saveThemes();
     }
   }
+  
+function camelCase(str) {
+	return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+export function applyTheme(theme) {
+	for (const key in theme) {
+		// Convert underscore keys to camelCase for style assignments
+		document.body.style[camelCase(key)] = theme[key];
+	}
+}
