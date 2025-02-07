@@ -110,14 +110,15 @@ export default definePlugin({
         this.magnifier.style.width = this.magnifierSize + 'px';
         this.magnifier.style.height = this.magnifierSize + 'px';
 
-        const relativeX = (e.clientX - rect.left) / rect.width;
-        const relativeY = (e.clientY - rect.top) / rect.height;
+        // Clamp relative positions between 0 and 1
+        const relativeX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const relativeY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
 
         const zoomedWidth = rect.width * this.zoomLevel;
         const zoomedHeight = rect.height * this.zoomLevel;
 
-        const bgX = Math.max(0, (relativeX * zoomedWidth - (this.magnifierSize / 2) * this.zoomLevel));
-        const bgY = Math.max(0, (relativeY * zoomedHeight - (this.magnifierSize / 2) * this.zoomLevel));
+        const bgX = relativeX * zoomedWidth - this.magnifierSize / 2;
+        const bgY = relativeY * zoomedHeight - this.magnifierSize / 2;
 
         this.magnifier.style.backgroundImage = `url(${img.src})`;
         this.magnifier.style.backgroundSize = `${zoomedWidth}px ${zoomedHeight}px`;
@@ -131,6 +132,8 @@ export default definePlugin({
         this.currentImage = e.target;
         this.currentImage.style.cursor = 'crosshair';
         this.magnifier.style.display = 'block';
+        
+        this.updateMagnifier(e, this.currentImage);
         
         this.moveHandler = (e) => {
             if (this.isActive) {
