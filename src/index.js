@@ -19,9 +19,6 @@ async function initializeBetterX() {
   uiManager.themeManager = themeManager;
   uiManager.injectBetterXUI();
 
-  const testTheme = { color: "red", background_color: "red" };
-  applyTheme(testTheme);
-
   window.BetterX = {
     plugins: pluginManager.plugins,
     themes: themeManager.themes,
