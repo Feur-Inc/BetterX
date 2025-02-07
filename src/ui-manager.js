@@ -512,11 +512,18 @@ export class UIManager {
           background-color: rgba(91, 112, 131, 0.4);
           font-family: "Segoe UI", Arial, sans-serif;
           overflow-y: auto;
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE and Edge */
+        }
+        .betterx-modal::-webkit-scrollbar {
+          display: none; /* Chrome, Safari and Opera */
         }
         .betterx-modal-content {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
           background-color: #15202b;
-          margin: 5vh auto;
-          padding: 20px;
           border: 1px solid #38444d;
           border-radius: 16px;
           width: 90%;
@@ -524,31 +531,26 @@ export class UIManager {
           max-height: 90vh;
           overflow-y: auto;
           color: #ffffff;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          z-index: 10001;
+        }
+        .betterx-modal-content::-webkit-scrollbar {
+          display: none;
         }
         .betterx-modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 20px;
           position: sticky;
           top: 0;
           background-color: #15202b;
-          padding: 10px 0;
-          z-index: 1;
+          padding: 20px;
+          border-bottom: 1px solid #38444d;
+          z-index: 2;
         }
-        .betterx-modal-header h2 {
-          margin: 0;
-          font-size: 20px;
-          font-weight: bold;
-        }
-        .betterx-close {
-          color: #8899a6;
-          font-size: 28px;
-          font-weight: bold;
-          cursor: pointer;
-        }
-        .betterx-close:hover {
-          color: #ffffff;
+        .betterx-modal-body {
+          padding: 20px;
         }
         .betterx-plugin-item {
           border-bottom: 1px solid #38444d;
@@ -673,7 +675,6 @@ export class UIManager {
         @media screen and (max-width: 480px) {
           .betterx-modal-content {
             width: 95%;
-            margin: 2vh auto;
             padding: 15px;
           }
           .betterx-modal-header h2 {
@@ -689,14 +690,14 @@ export class UIManager {
 
         @media screen and (max-height: 600px) {
           .betterx-modal-content {
-            margin: 2vh auto;
             max-height: 96vh;
           }
         }
                   .betterx-tabs {
           display: flex;
           border-bottom: 1px solid #38444d;
-          margin-bottom: 20px;
+          margin: -20px -20px 20px -20px;
+          padding: 0 20px;
         }
         
         .betterx-tab {
@@ -852,24 +853,19 @@ export class UIManager {
         .betterx-codemirror-wrapper {
           flex: 1;
           overflow: hidden;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
-
-        .betterx-codemirror-wrapper .cm-editor {
-          height: 100%;
-          font-size: 14px;
+        .betterx-codemirror-wrapper::-webkit-scrollbar {
+          display: none;
         }
-
         .betterx-codemirror-wrapper .cm-scroller {
           padding: 8px 0;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
-
-        .betterx-codemirror-wrapper .cm-gutters {
-          background: #192734;
-          border-right: 1px solid #38444d;
-        }
-
-        .betterx-codemirror-wrapper .cm-activeLineGutter {
-          background: #22303c;
+        .betterx-codemirror-wrapper .cm-scroller::-webkit-scrollbar {
+          display: none;
         }
 
         .betterx-input {
