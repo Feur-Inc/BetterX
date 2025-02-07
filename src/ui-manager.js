@@ -740,6 +740,11 @@ export class UIManager {
           gap: 10px;
           align-items: center;
         }
+
+        /* Add as a separate selector to avoid affecting theme item controls */
+        #betterx-theme-list > .betterx-theme-controls {
+          margin-bottom: 20px;
+        }
         
         .betterx-button {
           background: #1da1f2;
@@ -884,6 +889,27 @@ export class UIManager {
         }
         .betterx-author-link:hover {
           text-decoration: underline;
+        }
+        .betterx-close {
+          color: #8899a6;
+          font-size: 32px;
+          font-weight: bold;
+          cursor: pointer;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          margin: -6px -6px -6px 0;
+          transition: background-color 0.2s;
+        }
+        .betterx-close:hover {
+          color: #ffffff;
+          background-color: rgba(239, 243, 244, 0.1);
+        }
+        .betterx-theme-controls {
+          margin-bottom: 20px;
         }
       `
     });
