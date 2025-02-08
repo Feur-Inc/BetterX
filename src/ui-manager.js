@@ -30,7 +30,10 @@ export class UIManager {
               <button class="betterx-tab active" data-tab="plugin">Plugins</button>
               <button class="betterx-tab" data-tab="theme">Themes</button>
             </div>
-            <div id="betterx-plugin-list" class="betterx-tab-content active"></div>
+            <div id="betterx-plugin-list" class="betterx-tab-content active">
+              <input type="text" id="betterx-plugin-search" placeholder="Search plugins..." class="betterx-input search-bar">
+              <div id="betterx-plugin-list-container"></div>
+            </div>
             <div id="betterx-theme-list" class="betterx-tab-content">
               <div class="betterx-theme-controls">
                 <button class="betterx-button" id="new-theme">New Theme</button>
@@ -81,7 +84,14 @@ export class UIManager {
       }
     };
 
-    this.populatePluginList(modal.querySelector('#betterx-plugin-list'));
+    // Attach search event listener to filter plugins
+    const searchInput = modal.querySelector('#betterx-plugin-search');
+    searchInput.addEventListener('input', () => {
+      this.populatePluginList(modal.querySelector('#betterx-plugin-list-container'));
+    });
+
+    // Populate plugin list using the new container
+    this.populatePluginList(modal.querySelector('#betterx-plugin-list-container'));
 
     return modal;
   }
@@ -357,7 +367,11 @@ export class UIManager {
 
 
   populatePluginList(container) {
+    container.innerHTML = '';
+    const searchInput = document.getElementById('betterx-plugin-search');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     this.pluginManager.plugins.forEach(plugin => {
+      if (!plugin.name.toLowerCase().includes(searchTerm)) return;
       const authorNames = this.getAuthorNames(plugin.authors);
 
       const pluginElement = this.createUIElement('div', {
@@ -695,7 +709,10 @@ export class UIManager {
         }
                   .betterx-tabs {
           display: flex;
-          border-bottom: 1px solid #38444d;
+          position: sticky;
+          top: 65px;
+          z-index: 2;
+          background-color: #15202b;
           margin: -20px -20px 20px -20px;
           padding: 0 20px;
         }
@@ -910,6 +927,33 @@ export class UIManager {
         }
         .betterx-theme-controls {
           margin-bottom: 20px;
+        }
+        .betterx-input.search-bar {
+          background-color: #273340;
+          border: 1px solid #38444d;
+          border-radius: 20px;
+          padding: 8px 16px;
+          margin-bottom: 15px;
+          font-size: 14px;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        .betterx-input.search-bar:focus {
+          background-color: #15202b;
+          border-color: #1da1f2;
+          outline: none;
+          box-shadow: 0 0 0 1px rgba(29, 161, 242, 0.3);
+        }
+
+        .betterx-input.search-bar::placeholder {
+          color: #8899a6;
+        }
+        #betterx-plugin-list {
+          padding: 0 16px;
+          box-sizing: border-box;
         }
       `
     });
