@@ -281,7 +281,7 @@ export default definePlugin({
                     height: 22px;
                     background-color: ${STATUS_COLORS[status]};
                     border-radius: 100%;
-                    border: 6px solid rgb(0 0 0);
+                    border: 5px solid rgb(0 0 0);
                     box-sizing: content-box;
                     z-index: 999;
                 `;
