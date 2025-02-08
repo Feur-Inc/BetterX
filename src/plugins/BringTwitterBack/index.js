@@ -75,11 +75,9 @@ export default definePlugin({
                     faviconPath = "../icons/favicon-notification.ico";
                 }
             }
-            const faviconURL = typeof chrome != "undefined" ? chrome.runtime.getURL(faviconPath) : browser.runtime.getURL(faviconPath);
 
             const favicon = document.createElement("link");
             favicon.setAttribute("rel", "shortcut icon");
-            favicon.setAttribute("href", faviconURL);
             document.head.appendChild(favicon);
         }
 
