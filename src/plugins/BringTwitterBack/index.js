@@ -38,6 +38,14 @@ export default definePlugin({
             localStorage.setItem(loggingKey, "false");
         }
 
+        function debounce(func, delay) {
+            let timer;
+            return function(...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
         function delay(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
         }
@@ -300,23 +308,6 @@ export default definePlugin({
             log("Started logo observer");
         }
 
-        (async () => {
-            while (true) {
-                if (document.body) {
-                    log("Document body found");
-                    bodyObserver.observe(document.body, { childList: true, subtree: true });
-                    metaObserver.observe(document.head, { childList: true, subtree: true });
-                    log("Observers started");
-                    break;
-                }
-                await delay(100);
-            }
-        })();
-
-        updateFavicon();
-        updateTitle();
-        updateLogo();
-
         function findTargetColor() {
             const element = document.querySelector('div[data-testid="ScrollSnap-List"] div[style*="background-color:"]');
             if (!element) return null;
@@ -372,26 +363,18 @@ export default definePlugin({
             `, 2);
         }
 
+        const debouncedUpdateStylesheet = debounce(updateStylesheet, 200);
+
         const styleElement = document.createElement('style');
         document.head.appendChild(styleElement);
         const styleSheet = styleElement.sheet;
 
         updateStylesheet();
 
-        const buttonObserver = new MutationObserver((mutations) => {
-            mutations.forEach(mutation => {
-                if (mutation.target.matches('[data-testid="tweetButtonInline"] div[style*="color"]') ||
-                    mutation.target.matches('[data-testid="SideNav_NewTweet_Button"] div[style*="color"]') ||
-                    mutation.target.matches('[data-testid="tweetButton"] div[style*="color"]')) {
-                    mutation.target.style.color = 'rgb(231, 233, 234)';
-                }
-            });
-        });
-
         const targetElement = document.querySelector('div[data-testid="ScrollSnap-List"]');
         if (targetElement) {
             const observer = new MutationObserver(() => {
-                updateStylesheet();
+                debouncedUpdateStylesheet();
             });
             observer.observe(targetElement, {
                 attributes: true,
@@ -402,17 +385,16 @@ export default definePlugin({
             this.observers.push(observer);
         }
 
-        function observeButtons() {
-            const buttons = document.querySelectorAll('[data-testid="tweetButtonInline"], [data-testid="SideNav_NewTweet_Button"], [data-testid="tweetButton"]');
-            buttons.forEach(button => {
-                buttonObserver.observe(button, {
-                    attributes: true,
-                    childList: true,
-                    subtree: true,
-                    attributeFilter: ['style']
-                });
+        const buttonObserver = new MutationObserver((mutations) => {
+            mutations.forEach(mutation => {
+                if (mutation.target.matches('[data-testid="tweetButtonInline"] div[style*="color"]') ||
+                    mutation.target.matches('[data-testid="SideNav_NewTweet_Button"] div[style*="color"]') ||
+                    mutation.target.matches('[data-testid="tweetButton"] div[style*="color"]')) {
+                    mutation.target.style.color = 'rgb(231, 233, 234)';
+                }
+                debouncedUpdateStylesheet();
             });
-        }
+        });
 
         const colorBodyObserver = new MutationObserver((mutations) => {
             const shouldObserveButtons = mutations.some(mutation => {
@@ -430,9 +412,9 @@ export default definePlugin({
             if (!targetElement) {
                 const newTargetElement = document.querySelector('div[data-testid="ScrollSnap-List"]');
                 if (newTargetElement) {
-                    updateStylesheet();
+                    debouncedUpdateStylesheet();
                     const observer = new MutationObserver(() => {
-                        updateStylesheet();
+                        debouncedUpdateStylesheet();
                     });
                     observer.observe(newTargetElement, {
                         attributes: true,
@@ -452,8 +434,37 @@ export default definePlugin({
         this.observers.push(colorBodyObserver);
         this.observers.push(buttonObserver);
 
+        function observeButtons() {
+            const buttons = document.querySelectorAll('[data-testid="tweetButtonInline"], [data-testid="SideNav_NewTweet_Button"], [data-testid="tweetButton"]');
+            buttons.forEach(button => {
+                buttonObserver.observe(button, {
+                    attributes: true,
+                    childList: true,
+                    subtree: true,
+                    attributeFilter: ['style']
+                });
+            });
+        }
+
         observeButtons();
-        updateStylesheet();
+        debouncedUpdateStylesheet();
+
+        (async () => {
+            while (true) {
+                if (document.body) {
+                    log("Document body found");
+                    bodyObserver.observe(document.body, { childList: true, subtree: true });
+                    metaObserver.observe(document.head, { childList: true, subtree: true });
+                    log("Observers started");
+                    break;
+                }
+                await delay(100);
+            }
+        })();
+
+        updateFavicon();
+        updateTitle();
+        updateLogo();
 
         this.styleElement = styleElement;
     },
