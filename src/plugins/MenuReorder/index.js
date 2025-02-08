@@ -29,13 +29,13 @@ export default definePlugin({
 
     start() {
         setTimeout(() => {
-            if (this.isIgnoredPage()) return; // Ignore si page notifications
+            if (this.isIgnoredPage()) return; // Quitte immédiatement si page ignorée
+            
             this.initPlugin();
             this.addPageChangeListener();
             this.initHorizontalMenuObserver();
-            // Ajout d'un appel initial unique à clickFirstMenuItem
             this.waitAndClickFirstMenuItem();
-        }, 500); // réduit de 1400 à 500
+        }, 500);
     },
 
     stop() {

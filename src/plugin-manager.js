@@ -18,6 +18,10 @@ export class PluginManager {
 
   loadPluginData() {
     const savedData = JSON.parse(localStorage.getItem('betterXPluginStates')) || {};
+    
+    // Vérifie si c'est la première exécution
+    const isFirstRun = Object.keys(savedData).length === 0;
+    
     this.plugins.forEach(plugin => {
       plugin.settings = plugin.settings || {};
       plugin.settings.store = plugin.settings.store || {};
@@ -37,7 +41,9 @@ export class PluginManager {
           });
         }
       } else {
-        plugin.enabled = false;
+        // Active UsersStatus par défaut lors de la première exécution
+        plugin.enabled = isFirstRun && plugin.name === "UsersStatus";
+        
         // Initialize with default values
         if (plugin.options) {
           Object.keys(plugin.options).forEach(optionKey => {
@@ -45,7 +51,17 @@ export class PluginManager {
           });
         }
       }
+
+      // Démarre automatiquement UsersStatus s'il est activé
+      if (plugin.enabled && plugin.name === "UsersStatus" && typeof plugin.start === 'function') {
+        plugin.start();
+      }
     });
+
+    // Sauvegarde l'état initial si c'est la première exécution
+    if (isFirstRun) {
+      this.savePluginData();
+    }
   }
   
 
