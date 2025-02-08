@@ -1,14 +1,14 @@
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
+let originalXHR = {};
+let observer;
+
 export default definePlugin({
     name: "GifFavorites",
     description: "Add favorites like on discord",
     authors: [Devs.Mopi, Devs.TPM28],
     start() {
-        let originalXHR = {};
-        let observer;
-
         function overrideXHR() {
             var XHR = XMLHttpRequest.prototype;
             originalXHR.open = XHR.open;

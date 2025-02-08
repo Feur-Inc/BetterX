@@ -63,13 +63,28 @@ export class PluginManager {
   togglePlugin(pluginName) {
     const plugin = this.plugins.find(p => p.name === pluginName);
     if (plugin) {
+      // Changer et sauvegarder l'état immédiatement
       plugin.enabled = !plugin.enabled;
-      if (plugin.enabled && typeof plugin.start === 'function') {
-        plugin.start();
-      } else if (!plugin.enabled && typeof plugin.stop === 'function') {
-        plugin.stop();
-      }
       this.savePluginData();
+      
+      // Vérifier la persistance
+      const saved = JSON.parse(localStorage.getItem('betterXPluginStates') || '{}');
+      if (saved[pluginName]?.enabled !== plugin.enabled) {
+        console.error(`État non persisté pour ${pluginName}`);
+        this.savePluginData(); // Deuxième tentative
+      }
+
+      console.log(`Changing ${pluginName} state to: ${plugin.enabled}`);
+      
+      try {
+        if (plugin.enabled && typeof plugin.start === 'function') {
+          plugin.start();
+        } else if (!plugin.enabled && typeof plugin.stop === 'function') {
+          plugin.stop();
+        }
+      } catch (error) {
+        console.error(`Error ${plugin.enabled ? 'starting' : 'stopping'} plugin ${pluginName}:`, error);
+      }
     }
   }
 
