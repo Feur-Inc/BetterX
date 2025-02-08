@@ -52,17 +52,33 @@ export class UIManager {
 
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-          // Remove active class from all tabs and contents
+          // Remove active class from all tabs
           tabs.forEach(t => t.classList.remove('active'));
-          contents.forEach(c => c.classList.remove('active'));
-
-          // Add active class to clicked tab and corresponding content
+          
+          // Add active class to clicked tab
           tab.classList.add('active');
-          const contentId = `betterx-${tab.dataset.tab}-list`;
-          const content = modal.querySelector(`#${contentId}`);
-          if (content) {
-            content.classList.add('active');
-          }
+          
+          // Handle content switching with animation
+          contents.forEach(c => {
+            if (c.classList.contains('active')) {
+              c.style.opacity = '0';
+              setTimeout(() => {
+                c.classList.remove('active');
+                c.style.display = 'none';
+                
+                // Show new content
+                const contentId = `betterx-${tab.dataset.tab}-list`;
+                const newContent = modal.querySelector(`#${contentId}`);
+                if (newContent) {
+                  newContent.classList.add('active');
+                  newContent.style.display = 'block';
+                  // Force reflow
+                  newContent.offsetHeight;
+                  newContent.style.opacity = '1';
+                }
+              }, 200);
+            }
+          });
         });
       });
     };
@@ -104,17 +120,24 @@ export class UIManager {
     });
     this.refreshThemesList(themesContainer);
   }
+
   refreshThemesList(container) {
     container.innerHTML = '';
     this.themeManager.themes.forEach(theme => {
       const themeElement = this.createUIElement('div', {
         className: 'betterx-theme-item',
+        draggable: true,
         innerHTML: `
           <div class="betterx-theme-header">
+            <div class="betterx-drag-handle">
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M3 8h18v2H3V8zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+              </svg>
+            </div>
             <h3>${theme.name}</h3>
             <div class="betterx-theme-controls">
               <label class="betterx-switch">
-                <input type="checkbox" ${theme === this.themeManager.activeTheme ? 'checked' : ''}>
+                <input type="checkbox" ${theme.enabled ? 'checked' : ''}>
                 <span class="betterx-slider"></span>
               </label>
               <button class="betterx-button edit">Edit</button>
@@ -123,26 +146,63 @@ export class UIManager {
           </div>
         `
       });
-      const toggle = themeElement.querySelector('input[type="checkbox"]');
-      toggle.addEventListener('change', () => {
-        if (toggle.checked) {
-          this.themeManager.applyTheme(theme);
-        } else {
-          this.themeManager.disableTheme();
+
+      // Add drag and drop event listeners
+      themeElement.dataset.themeId = theme.id;
+      
+      themeElement.addEventListener('dragstart', (e) => {
+        e.target.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', theme.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      themeElement.addEventListener('dragend', (e) => {
+        e.target.classList.remove('dragging');
+      });
+
+      themeElement.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggingElement = container.querySelector('.dragging');
+        if (draggingElement !== themeElement) {
+          const box = themeElement.getBoundingClientRect();
+          const offsetY = e.clientY - box.top - box.height / 2;
+          
+          if (offsetY < 0) {
+            themeElement.parentNode.insertBefore(draggingElement, themeElement);
+          } else {
+            themeElement.parentNode.insertBefore(draggingElement, themeElement.nextSibling);
+          }
         }
       });
+
+      // Update theme toggle handler
+      const toggle = themeElement.querySelector('input[type="checkbox"]');
+      toggle.addEventListener('change', () => {
+        this.themeManager.toggleTheme(theme.id, toggle.checked);
+      });
+
       themeElement.querySelector('.edit').addEventListener('click', () => {
         this.showThemeEditor(theme);
       });
+
       themeElement.querySelector('.delete').addEventListener('click', () => {
         if (confirm('Are you sure you want to delete this theme?')) {
           this.themeManager.deleteTheme(theme.id);
           this.refreshThemesList(container);
         }
       });
+
       container.appendChild(themeElement);
     });
+
+    // Add drop event listener to container
+    container.addEventListener('dragend', () => {
+      const newOrder = Array.from(container.querySelectorAll('.betterx-theme-item'))
+        .map(item => item.dataset.themeId);
+      this.themeManager.reorderThemes(newOrder);
+    });
   }
+
   showThemeEditor(theme = null) {
     const editor = this.createUIElement('div', {
       className: 'betterx-theme-editor',
@@ -548,6 +608,9 @@ export class UIManager {
           scrollbar-width: none;
           -ms-overflow-style: none;
           z-index: 10001;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-origin: center center;
+          will-change: transform, height;
         }
         .betterx-modal-content::-webkit-scrollbar {
           display: none;
@@ -715,6 +778,7 @@ export class UIManager {
           background-color: #15202b;
           margin: -20px -20px 20px -20px;
           padding: 0 20px;
+          border-bottom: 1px solid #38444d;
         }
         
         .betterx-tab {
@@ -724,6 +788,11 @@ export class UIManager {
           padding: 10px 20px;
           cursor: pointer;
           border-bottom: 2px solid transparent;
+          transition: color 0.2s ease, border-color 0.2s ease;
+        }
+        
+        .betterx-tab:hover {
+          color: #1da1f2;
         }
         
         .betterx-tab.active {
@@ -733,10 +802,13 @@ export class UIManager {
         
         .betterx-tab-content {
           display: none;
+          opacity: 0;
+          transition: opacity 0.3s ease-out;
         }
         
         .betterx-tab-content.active {
           display: block;
+          opacity: 1;
         }
         
         .betterx-theme-item {
@@ -744,6 +816,33 @@ export class UIManager {
           border-radius: 8px;
           padding: 15px;
           margin-bottom: 10px;
+          cursor: move;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .betterx-theme-item.dragging {
+          opacity: 0.5;
+          transform: scale(1.02);
+          box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .betterx-drag-handle {
+          color: #8899a6;
+          margin-right: 12px;
+          cursor: move;
+          display: flex;
+          align-items: center;
+        }
+
+        .betterx-theme-header {
+          display: flex;
+          justify-content: flex-start;
+          align-items: center;
+        }
+
+        .betterx-theme-header h3 {
+          margin: 0;
+          flex-grow: 1;
         }
         
         .betterx-theme-header {
