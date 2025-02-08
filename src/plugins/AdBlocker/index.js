@@ -4,7 +4,7 @@ import definePlugin from "@utils/types";
 export default definePlugin({
     name: "AdBlocker",
     description: "Hides sponsored posts and ads from your feed",
-    authors: [Devs.Mopi],
+    authors: [Devs.Ayaz, Devs.Mopi],
 
     start() {
         this.observer = (event) => {
