@@ -21,12 +21,20 @@ export default definePlugin({
     urlObserver: null,
     hiddenMenuItems: [],
 
+    // Nouvelle méthode pour vérifier la page à ignorer
+    isIgnoredPage() {
+        return location.href.includes("x.com/notifications");
+    },
+
     start() {
         setTimeout(() => {
+            if (this.isIgnoredPage()) return; // Ignore si page notifications
             this.initPlugin();
             this.addPageChangeListener();
             this.initHorizontalMenuObserver();
-        }, 1400);
+            // Ajout d'un appel initial unique à clickFirstMenuItem
+            this.waitAndClickFirstMenuItem();
+        }, 500); // réduit de 1400 à 500
     },
 
     stop() {
@@ -36,7 +44,12 @@ export default definePlugin({
 
     initHorizontalMenuObserver() {
         this.lastUrl = location.href;
+        if (this.urlObserver) this.urlObserver.disconnect();
         this.urlObserver = new MutationObserver(() => {
+            const primaryColumn = document.querySelector('[data-testid="primaryColumn"]');
+            if (primaryColumn && !this.horizontalMenuContainer) {
+                this.initHorizontalMenu();
+            }
             const url = location.href;
             if (url !== this.lastUrl) {
                 this.lastUrl = url;
@@ -64,7 +77,8 @@ export default definePlugin({
 
     createHorizontalDropIndicator() {
         this.horizontalDropIndicator = document.createElement('div');
-        this.horizontalDropIndicator.style.position = 'absolute';
+        // Modification : on passe de 'absolute' à 'fixed'
+        this.horizontalDropIndicator.style.position = 'fixed';
         this.horizontalDropIndicator.style.width = '2px';
         this.horizontalDropIndicator.style.backgroundColor = '#1DA1F2';
         this.horizontalDropIndicator.style.display = 'none';
@@ -100,7 +114,13 @@ export default definePlugin({
     restoreHorizontalOrder() {
         const savedOrder = JSON.parse(localStorage.getItem(this.HORIZONTAL_STORAGE_KEY));
         if (!savedOrder || !this.horizontalMenuContainer) return;
-
+        const currentOrder = this.horizontalMenuItems.map(item => {
+            const span = item.querySelector('span.css-1jxf684');
+            return span ? span.textContent : '';
+        }).filter(text => text);
+        if (JSON.stringify(currentOrder) === JSON.stringify(savedOrder)) {
+            return;
+        }
         const fragment = document.createDocumentFragment();
         savedOrder.forEach(savedText => {
             const item = this.horizontalMenuItems.find(menuItem => {
@@ -114,17 +134,41 @@ export default definePlugin({
         
         this.horizontalMenuContainer.appendChild(fragment);
         this.updateHorizontalMenuItems();
-        this.clickFirstMenuItem();
     },
 
-    clickFirstMenuItem() {
-        if (this.horizontalMenuItems.length > 0) {
-            const firstItem = this.horizontalMenuItems[0];
-            const clickableElement = firstItem.querySelector('a[role="tab"]');
-            if (clickableElement) {
-                clickableElement.click();
+    waitAndClickFirstMenuItem() {
+        const savedOrder = JSON.parse(localStorage.getItem(this.HORIZONTAL_STORAGE_KEY));
+        if (!savedOrder || savedOrder.length === 0) return;
+
+        const targetText = savedOrder[0];
+        const maxAttempts = 30; // 3 secondes avec 100ms entre chaque tentative
+        let attempts = 0;
+
+        const findAndClickItem = () => {
+            const items = document.querySelectorAll('div[role="presentation"] span.css-1jxf684');
+            const targetItem = Array.from(items).find(span => span.textContent === targetText);
+
+            if (targetItem) {
+                const clickableElement = targetItem.closest('a[role="tab"]');
+                if (clickableElement) {
+                    clickableElement.click();
+                    return true;
+                }
             }
-        }
+
+            attempts++;
+            if (attempts >= maxAttempts) return true;
+
+            return false;
+        };
+
+        const attemptClick = () => {
+            if (!findAndClickItem()) {
+                setTimeout(attemptClick, 100);
+            }
+        };
+
+        setTimeout(attemptClick, 100);
     },
 
     horizontalDragStart(e) {
@@ -170,7 +214,6 @@ export default definePlugin({
 
             this.updateHorizontalMenuItems();
             this.saveHorizontalOrder();
-            this.clickFirstMenuItem();
         }
     },
 
@@ -241,8 +284,16 @@ export default definePlugin({
     },
 
     handlePageChange() {
-        this.cleanUp();
-        this.initPlugin();
+        // On ne nettoie plus tout le plugin, seulement la partie horizontale
+        this.cleanupHorizontal();
+        setTimeout(() => {
+            if (this.isIgnoredPage()) return;
+            if (!this.nav) {
+                this.initPlugin(); // Initialise seulement si nav n'existe pas encore
+            }
+            // Réinitialise uniquement le menu horizontal
+            this.initHorizontalMenu();
+        }, 200);
     },
 
     initializePlugin(nav) {
@@ -273,12 +324,14 @@ export default definePlugin({
 
     createDropIndicator() {
         this.dropIndicator = document.createElement('div');
-        this.dropIndicator.style.position = 'absolute';
+        this.dropIndicator.style.position = 'fixed'; // Changé de 'absolute' à 'fixed'
         this.dropIndicator.style.height = '2px';
         this.dropIndicator.style.backgroundColor = '#1DA1F2';
         this.dropIndicator.style.display = 'none';
         this.dropIndicator.style.zIndex = '9999';
         this.dropIndicator.style.pointerEvents = 'none';
+        this.dropIndicator.style.width = '200px'; // Ajout d'une largeur par défaut
+        this.dropIndicator.style.borderRadius = '4px'; // Ajout d'arrondi
         document.body.appendChild(this.dropIndicator);
     },
 
@@ -351,14 +404,9 @@ export default definePlugin({
             const rect = closestItem.getBoundingClientRect();
             const middleY = rect.top + rect.height / 2;
 
-            if (e.clientY < middleY) {
-                this.dropIndicator.style.top = `${rect.top - 1}px`;
-            } else {
-                this.dropIndicator.style.top = `${rect.bottom - 1}px`;
-            }
-
+            this.dropIndicator.style.top = `${e.clientY < middleY ? rect.top : rect.bottom}px`;
             this.dropIndicator.style.left = `${rect.left}px`;
-            this.dropIndicator.style.width = `${rect.width}px`;
+            this.dropIndicator.style.width = `${rect.width - 40}px`;
             this.dropIndicator.style.display = 'block';
         } else {
             this.dropIndicator.style.display = 'none';
