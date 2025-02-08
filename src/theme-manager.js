@@ -151,6 +151,14 @@ export class ThemeManager {
       }
     }
 
+    processCSS(css) {
+      return css.replace(/:\s*([^;]+)(?=;)/g, (_, p1) => {
+        return p1.includes('!important')
+          ? `: ${p1}`
+          : `: ${p1.trim()} !important`;
+      });
+    }
+
     async applyTheme(theme) {
         if (!this.styleElement) {
             this.styleElement = document.createElement('style');
@@ -161,11 +169,9 @@ export class ThemeManager {
         theme.enabled = true;
         this.saveThemes();
 
-        // Get all enabled themes in order
         const enabledThemes = this.themes.filter(t => t.enabled);
-        const combinedCSS = enabledThemes
-          .map(t => t.css)
-          .join('\n\n');
+        let combinedCSS = enabledThemes.map(t => t.css).join('\n\n');
+        combinedCSS = this.processCSS(combinedCSS);
         
         this.styleElement.textContent = combinedCSS;
     }
@@ -187,12 +193,10 @@ export class ThemeManager {
         theme.enabled = false;
         this.saveThemes();
         
-        // Reapply remaining enabled themes
         const enabledThemes = this.themes.filter(t => t.enabled);
         if (enabledThemes.length > 0) {
-          const combinedCSS = enabledThemes
-            .map(t => t.css)
-            .join('\n\n');
+          let combinedCSS = enabledThemes.map(t => t.css).join('\n\n');
+          combinedCSS = this.processCSS(combinedCSS);
           this.styleElement.textContent = combinedCSS;
         } else {
           this.styleElement.textContent = '';
@@ -208,12 +212,10 @@ export class ThemeManager {
       this.themes = reorderedThemes;
       this.saveThemes();
 
-      // Reapply enabled themes in new order
       const enabledThemes = this.themes.filter(t => t.enabled);
       if (enabledThemes.length > 0) {
-        const combinedCSS = enabledThemes
-          .map(t => t.css)
-          .join('\n\n');
+        let combinedCSS = enabledThemes.map(t => t.css).join('\n\n');
+        combinedCSS = this.processCSS(combinedCSS);
         this.styleElement.textContent = combinedCSS;
       }
     }

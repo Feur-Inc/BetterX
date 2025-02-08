@@ -1,10 +1,17 @@
 import { Devs } from "@utils/constants";
-import definePlugin from "@utils/types";
+import definePlugin, { OptionType } from "@utils/types";
 
 export default definePlugin({
     name: "BringTwitterBack",
     description: "Reverts X branding back to Twitter",
     authors: [Devs.Mopi],
+    options: {
+        accentColorButton: {
+            type: OptionType.BOOLEAN,
+            description: "Use Twitter's accent color for Tweet buttons",
+            default: true
+        }
+    },
 
     observers: [],
 
@@ -323,7 +330,9 @@ export default definePlugin({
             return `rgb(${newR}, ${newG}, ${newB})`;
         }
 
-        function updateStylesheet() {
+        const updateStylesheet = () => {
+            if (!this.settings.store.accentColorButton) return;
+            
             const targetColor = findTargetColor();
             if (!targetColor) return;
             const hoverColor = adjustColor(targetColor);
@@ -359,7 +368,7 @@ export default definePlugin({
                     color: rgb(231, 233, 234) !important;
                 }
             `, 2);
-        }
+        };
 
         const debouncedUpdateStylesheet = debounce(updateStylesheet, 200);
 
@@ -395,6 +404,8 @@ export default definePlugin({
         });
 
         const colorBodyObserver = new MutationObserver((mutations) => {
+            if (!this.settings.store.accentColorButton) return;
+            
             const shouldObserveButtons = mutations.some(mutation => {
                 return Array.from(mutation.addedNodes).some(node => {
                     return node.nodeType === 1 && (
@@ -425,12 +436,17 @@ export default definePlugin({
             }
         });
 
-        colorBodyObserver.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-        this.observers.push(colorBodyObserver);
-        this.observers.push(buttonObserver);
+        if (this.settings.store.accentColorButton) {
+            colorBodyObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            this.observers.push(colorBodyObserver);
+            this.observers.push(buttonObserver);
+
+            observeButtons();
+            debouncedUpdateStylesheet();
+        }
 
         function observeButtons() {
             const buttons = document.querySelectorAll('[data-testid="tweetButtonInline"], [data-testid="SideNav_NewTweet_Button"], [data-testid="tweetButton"]');
