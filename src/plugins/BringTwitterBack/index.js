@@ -133,17 +133,6 @@ export default definePlugin({
                         startLogoObserver();
                     }
                 }
-                const tweetButtonsSelectorResults = document.querySelectorAll(tweetButtonsSelector);
-                if (tweetButtonsSelectorResults) {
-                    for (const result of tweetButtonsSelectorResults) {
-                        const spans = document.getElementsByTagName("span");
-                        for (const span of spans) {
-                            if (span.textContent == "Post") {
-                                span.textContent = "Tweet";
-                            }
-                        }
-                    }
-                }
                 const homeTweetButtonResult = document.querySelector(homeTweetButtonSelector);
                 if (homeTweetButtonResult) {
                     const homeTweetButton = homeTweetButtonResult.getElementsByTagName("span")[1];
