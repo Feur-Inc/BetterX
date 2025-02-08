@@ -4,13 +4,13 @@ import definePlugin from "@utils/types";
 let observer;
 let statusInterval;
 let settingsObserver;
-let pageObserver; // Ajout de l'observateur pour les mutations de page
+let pageObserver;
 let heartbeatInterval;
 
 const STATUS_COLORS = {
-    0: '#747f8d', // Inactive - Gris
-    1: '#43b581', // Active - Vert
-    2: '#f04747'  // DoNotDisturb - Rouge
+    0: '#747f8d',
+    1: '#43b581',
+    2: '#f04747'
 };
 
 const STATUS_LABELS = {
@@ -28,7 +28,6 @@ export default definePlugin({
     maxRetries: 5,
 
     hashToken(token) {
-        // Simple hachage pour l'exemple - à remplacer par un algorithme plus sécurisé
         let hash = 0;
         for (let i = 0; i < token.length; i++) {
             const char = token.charCodeAt(i);
@@ -43,20 +42,17 @@ export default definePlugin({
     },
 
     getCurrentUsername() {
-        // Chercher dans le DOM
         const profileLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
         let username = null;
         
         if (profileLink) {
             const href = profileLink.getAttribute('href');
             if (href) {
-                username = href.substring(1); // Enlever le '/' au début
-                // Sauvegarder dans le localStorage
+                username = href.substring(1);
                 localStorage.setItem('betterx-username', username);
             }
         }
 
-        // Si pas trouvé dans le DOM, essayer le localStorage
         if (!username) {
             username = localStorage.getItem('betterx-username');
         }
@@ -65,7 +61,6 @@ export default definePlugin({
     },
 
     async createAuthPopup() {
-        // Vérifier si une popup existe déjà
         if (document.querySelector('.betterx-auth-popup')) {
             return;
         }
@@ -152,7 +147,6 @@ export default definePlugin({
             overlay.appendChild(popup);
             document.body.appendChild(overlay);
 
-            // Gestionnaire pour le bouton d'ouverture
             const openAuthButton = popup.querySelector('#openAuth');
             const verifierSection = popup.querySelector('#verifierSection');
             
@@ -165,7 +159,6 @@ export default definePlugin({
                 }
             });
 
-            // Gérer le hover du bouton
             const submitButton = popup.querySelector('#submitVerifier');
             submitButton.addEventListener('mouseenter', () => {
                 submitButton.style.backgroundColor = 'rgb(26, 140, 216)';
@@ -174,7 +167,6 @@ export default definePlugin({
                 submitButton.style.backgroundColor = 'rgb(29, 155, 240)';
             });
 
-            // Gérer la soumission du code
             submitButton.addEventListener('click', async () => {
                 const verifier = popup.querySelector('#verifierInput').value.trim();
                 if (!verifier) return;
@@ -207,7 +199,6 @@ export default definePlugin({
                             Error: Invalid verification code
                         </p>
                     `;
-                    // Actualiser la page après 2 secondes
                     setTimeout(() => {
                         window.location.reload();
                     }, 2000);
@@ -229,7 +220,6 @@ export default definePlugin({
     async sendHeartbeat() {
         try {
             console.log('Sending heartbeat...');
-            // Vérifier si une authentification est déjà en cours
             if (document.querySelector('.betterx-auth-popup')) {
                 return;
             }
@@ -256,37 +246,31 @@ export default definePlugin({
     },
 
     startHeartbeat() {
-        // Vérifier si l'utilisateur est invisible
         if (this.getCurrentUserStatus() === 0) {
-            return; // Ne pas démarrer le heartbeat si invisible
+            return;
         }
 
         if (heartbeatInterval) {
             clearInterval(heartbeatInterval);
         }
 
-        // Démarrer immédiatement
         this.sendHeartbeat();
         
-        // Configurer l'intervalle
         heartbeatInterval = setInterval(() => {
             this.sendHeartbeat();
-        }, 60000); // Passage à 60 secondes
+        }, 60000);
     },
 
     updateProfileDot(status) {
         const avatarContainer = document.querySelector('div.css-175oi2r.r-1adg3ll.r-bztko3.r-16l9doz.r-6gpygo.r-2o1y69.r-1v6e3re.r-1xce0ei[data-testid^="UserAvatar-Container-"]');
         if (avatarContainer) {
-            // Supprimer l'ancien point de statut s'il existe
             const existingStatusDot = document.querySelector('.betterx-status-dot');
             if (existingStatusDot) {
                 existingStatusDot.remove();
             }
 
-            // Trouver la div cible pour l'injection
             const targetDiv = avatarContainer.querySelector('div.r-1p0dtai.r-1pi2tsx.r-1d2f490.r-u8s1d.r-ipm5af.r-13qz1uu');
             if (targetDiv) {
-                // Créer le nouveau point de statut
                 const statusDot = document.createElement('div');
                 statusDot.className = 'betterx-status-dot';
                 statusDot.style.cssText = `
@@ -302,7 +286,6 @@ export default definePlugin({
                     z-index: 999;
                 `;
 
-                // Ajouter le point dans la div cible
                 targetDiv.appendChild(statusDot);
             }
         }
@@ -319,32 +302,26 @@ export default definePlugin({
     },
 
     startStatusInterval(username) {
-        // Clear existing interval if any
         if (statusInterval) {
             clearInterval(statusInterval);
         }
         
-        // Initial check
         this.checkUserStatus(username);
         
-        // Set up 10-second interval
         statusInterval = setInterval(() => {
             this.checkUserStatus(username);
         }, 10000);
     },
 
     clearBetterXElements() {
-        // Remove BetterX icon
         document.querySelectorAll('[data-testid="icon-betterx"]').forEach(icon => {
             icon.parentElement.remove();
         });
 
-        // Remove status dot
         document.querySelectorAll('.betterx-status-dot').forEach(dot => {
             dot.remove();
         });
 
-        // Clear interval if exists
         if (statusInterval) {
             clearInterval(statusInterval);
             statusInterval = null;
@@ -353,18 +330,15 @@ export default definePlugin({
 
     async checkUserAndInjectIcon(username) {
         try {
-            // Récupérer d'abord le statut
             const statusResponse = await window.api.fetch(`https://tpm28.com/betterx/users/${username}/status`);
             const statusData = await statusResponse.json();
             
-            // Ensuite vérifier si l'utilisateur existe
             const response = await window.api.fetch(`https://tpm28.com/betterx/users/${username}`);
             const data = await response.json();
             
             this.clearBetterXElements();
             
             if (data.exists) {
-                // Fonction pour tenter l'injection
                 const tryInject = () => {
                     const userNameContainer = document.querySelector('div[data-testid="UserName"]');
                     const profileLink = document.querySelector('a[href*="/photo"]');
@@ -380,10 +354,8 @@ export default definePlugin({
 
                     this.retryCount = 0;
 
-                    // Appliquer immédiatement le bon statut
                     this.updateProfileDot(statusData.status);
 
-                    // Injecter le badge
                     const targetSpan = userNameContainer.querySelector('.css-1jxf684.r-bcqeeo.r-1ttztb7.r-qvutc0.r-poiln3.r-1awozwy.r-xoduu5');
                     if (targetSpan && !userNameContainer.querySelector('[data-testid="icon-betterx"]')) {
                         const newDiv = document.createElement('div');
@@ -396,7 +368,6 @@ export default definePlugin({
                         targetSpan.appendChild(newDiv);
                     }
 
-                    // Démarrer l'intervalle de vérification du statut
                     this.startStatusInterval(username);
                 };
 
@@ -431,10 +402,8 @@ export default definePlugin({
             
             if (!username || !token) return;
 
-            // Enregistrement dans localStorage
             this.setCurrentUserStatus(status);
             
-            // Mise à jour du statut sur le serveur
             await window.api.fetch(`https://tpm28.com/betterx/users/${username}/status?token=${token}`, {
                 method: 'PUT',
                 headers: {
@@ -443,10 +412,8 @@ export default definePlugin({
                 body: JSON.stringify({ status })
             });
             
-            // Mise à jour de l'interface
             this.updateProfileDot(status);
 
-            // Gestion du heartbeat
             if (status === 0) {
                 if (heartbeatInterval) {
                     clearInterval(heartbeatInterval);
@@ -476,7 +443,6 @@ export default definePlugin({
 
         const currentStatus = this.getCurrentUserStatus();
 
-        // Créer les options de statut
         Object.entries(STATUS_COLORS).forEach(([status, color]) => {
             const option = document.createElement('div');
             option.className = 'betterx-status-option';
@@ -494,7 +460,6 @@ export default definePlugin({
                 transition: background-color 0.2s;
             `;
 
-            // Ajouter l'indicateur de statut
             const indicator = document.createElement('div');
             indicator.style.cssText = `
                 width: 12px;
@@ -507,12 +472,10 @@ export default definePlugin({
             option.appendChild(indicator);
             option.appendChild(document.createTextNode(STATUS_LABELS[status]));
 
-            // Ajouter un indicateur pour le statut actuel
             if (parseInt(status) === currentStatus) {
                 option.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             }
 
-            // Effet de survol
             option.addEventListener('mouseenter', () => {
                 option.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             });
@@ -520,7 +483,6 @@ export default definePlugin({
                 option.style.backgroundColor = 'transparent';
             });
 
-            // Clic sur une option
             option.addEventListener('click', async () => {
                 const statusId = parseInt(option.dataset.statusId);
                 await this.updateUserStatus(statusId);
@@ -534,11 +496,9 @@ export default definePlugin({
     },
 
     injectStatusButton() {
-        // Vérifier la structure parent correcte
         const actionContainer = document.querySelector('div.css-175oi2r.r-obd0qt.r-18u37iz.r-1w6e6rj.r-1h0z5md.r-dnmrzs');
         if (!actionContainer || !actionContainer.closest('div.css-175oi2r.r-1habvwh.r-18u37iz.r-1w6e6rj.r-1wtj0ep')) return;
 
-        // Vérifier si le bouton existe déjà
         if (actionContainer.querySelector('button[aria-label="Status"]')) return;
 
         const statusButton = document.createElement('button');
@@ -549,7 +509,6 @@ export default definePlugin({
         statusButton.style.borderColor = 'rgb(83, 100, 113)';
         statusButton.style.backgroundColor = 'rgba(0, 0, 0, 0)';
         
-        // Ajouter les événements de survol
         statusButton.addEventListener('mouseenter', () => {
             statusButton.className = 'css-175oi2r r-sdzlij r-1phboty r-rs99b7 r-lrvibr r-6gpygo r-1wron08 r-2yi16 r-1qi8awa r-1loqt21 r-o7ynqc r-6416eg r-pjtv4k r-1ny4l3l';
             statusButton.style.backgroundColor = 'rgba(239, 243, 244, 0.1)';
@@ -569,18 +528,14 @@ export default definePlugin({
             </div>
         `;
 
-        // Ajouter le gestionnaire de clic pour afficher le menu
         statusButton.addEventListener('click', (event) => {
             event.stopPropagation();
             
-            // Supprimer tout menu existant
             document.querySelectorAll('.betterx-status-menu').forEach(m => m.remove());
             
-            // Créer et positionner le nouveau menu
             const menu = this.createStatusMenu();
             document.body.appendChild(menu);
             
-            // Positionner le menu sous le bouton
             const buttonRect = statusButton.getBoundingClientRect();
             const menuLeft = Math.min(
                 buttonRect.left,
@@ -590,7 +545,6 @@ export default definePlugin({
             menu.style.left = `${menuLeft}px`;
             menu.style.top = `${buttonRect.bottom + 4}px`;
 
-            // Fermer le menu en cliquant ailleurs
             const closeMenu = (e) => {
                 if (!menu.contains(e.target) && !statusButton.contains(e.target)) {
                     menu.remove();
@@ -600,7 +554,6 @@ export default definePlugin({
             document.addEventListener('click', closeMenu);
         });
 
-        // Insérer au début du conteneur
         actionContainer.insertBefore(statusButton, actionContainer.firstChild);
     },
 
@@ -612,12 +565,10 @@ export default definePlugin({
             const statusButton = document.querySelector('button[aria-label="Status"]');
             
             if (settingsLink) {
-                // Injecter le bouton s'il n'existe pas déjà
                 if (!statusButton) {
                     this.injectStatusButton();
                 }
             } else {
-                // Supprimer le bouton s'il existe et que le lien des paramètres n'existe plus
                 if (statusButton) {
                     statusButton.remove();
                 }
@@ -630,7 +581,6 @@ export default definePlugin({
             subtree: true
         });
 
-        // Initial check
         checkAndInject();
     },
 
@@ -638,7 +588,6 @@ export default definePlugin({
         let currentUsername = null;
         let lastPathname = null;
 
-        // Observateur pour les changements dans l'URL
         const checkPathChange = () => {
             const currentPathname = window.location.pathname;
             const match = currentPathname.match(/^\/([^/]+)(?:\/.*)?$/);
@@ -650,7 +599,6 @@ export default definePlugin({
                 this.retryCount = 0;
                 
                 if (currentUsername) {
-                    // Vérifier si nous sommes sur un profil d'utilisateur
                     if (currentPathname === `/${currentUsername}` || currentPathname.startsWith(`/${currentUsername}/`)) {
                         this.checkUserAndInjectIcon(currentUsername);
                     }
@@ -660,7 +608,6 @@ export default definePlugin({
             }
         };
 
-        // Observer les changements du DOM pour détecter les changements de page dynamiques
         const observeDOM = () => {
             if (pageObserver) {
                 pageObserver.disconnect();
@@ -690,12 +637,10 @@ export default definePlugin({
             });
         };
 
-        // Écouter les changements d'historique
         window.addEventListener('popstate', checkPathChange);
         window.addEventListener('pushState', checkPathChange);
         window.addEventListener('replaceState', checkPathChange);
 
-        // Intercepter les modifications de l'historique
         const originalPushState = history.pushState;
         history.pushState = function() {
             originalPushState.apply(this, arguments);
@@ -708,14 +653,11 @@ export default definePlugin({
             checkPathChange();
         };
 
-        // Démarrer les observateurs
         observeDOM();
         this.startSettingsObserver();
 
-        // Vérification initiale
         checkPathChange();
 
-        // Vérifier et mettre à jour le statut initial
         const initialStatus = this.getCurrentUserStatus();
         if (initialStatus === 1 || initialStatus === 2) {
             this.updateUserStatus(initialStatus).then(() => {
@@ -740,19 +682,16 @@ export default definePlugin({
             settingsObserver.disconnect();
         }
 
-        // Remove status button if exists
         const statusButton = document.querySelector('button[aria-label="Status"]');
         if (statusButton) {
             statusButton.remove();
         }
 
-        // Arrêter le heartbeat
         if (heartbeatInterval) {
             clearInterval(heartbeatInterval);
             heartbeatInterval = null;
         }
 
-        // Restaurer les fonctions d'historique originales
         if (history.pushState._original) {
             history.pushState = history.pushState._original;
         }
