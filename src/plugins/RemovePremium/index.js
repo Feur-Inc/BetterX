@@ -14,7 +14,8 @@ export default definePlugin({
             'a[href="/i/monetization"]',
             'a[href^="https://ads.x.com/?"]',
             'a[href="/i/premium_sign_up?referring_page=settings"]',
-            'a[href="/jobs"]'
+            'a[href="/jobs"]',
+            'aside[aria-label*="Premium"][role="complementary"]'
         ];
 
         const removeElements = () => {
