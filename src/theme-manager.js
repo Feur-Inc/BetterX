@@ -7,10 +7,25 @@ export class ThemeManager {
       this.initializeDefaultStyles();
     }
 
-    initializeDefaultStyles() {
+    async waitForBackgroundColor() {
+        return new Promise(resolve => {
+            const checkColor = () => {
+                const bgColor = this.extractBackgroundColor(document.body);
+                if (bgColor) {
+                    resolve(bgColor);
+                } else {
+                    requestAnimationFrame(checkColor);
+                }
+            };
+            checkColor();
+        });
+    }
+
+    async initializeDefaultStyles() {
+        const bodyBgColor = await this.waitForBackgroundColor();
         const defaultStyle = document.createElement('style');
         defaultStyle.id = 'betterx-default-style';
-        defaultStyle.textContent = 'body { background-color: rgb(0, 0, 0); }';
+        defaultStyle.textContent = `body { background-color: ${bodyBgColor}; }`;
         document.head.appendChild(defaultStyle);
         
         // Remove inline background-color from body
@@ -18,6 +33,17 @@ export class ThemeManager {
         
         // Remove r-kemksi class from specific div if it exists
         this.removeKemksiClass();
+    }
+
+    extractBackgroundColor(element) {
+        const style = window.getComputedStyle(element);
+        const bgColor = element.style.backgroundColor || style.backgroundColor;
+        
+        // Vérifier si c'est une couleur RGB valide
+        if (bgColor.startsWith('rgb')) {
+            return bgColor;
+        }
+        return null;
     }
 
     removeKemksiClass() {
@@ -112,16 +138,20 @@ export class ThemeManager {
         this.saveThemes();
       }
     }
-    applyTheme(theme) {
-      if (!this.styleElement) {
-        this.styleElement = document.createElement('style');
-        this.styleElement.id = 'betterx-custom-theme';
-        document.head.appendChild(this.styleElement);
-      }
-      this.styleElement.textContent = theme.css;
-      this.activeTheme = theme;
-      this.saveThemes();
-      document.body.style.removeProperty('background-color');
+    async applyTheme(theme) {
+        const bodyBgColor = await this.waitForBackgroundColor();
+        
+        if (!this.styleElement) {
+            this.styleElement = document.createElement('style');
+            this.styleElement.id = 'betterx-custom-theme';
+            document.head.appendChild(this.styleElement);
+        }
+        
+        this.styleElement.textContent = theme.css;
+        this.activeTheme = theme;
+        this.saveThemes();
+        
+        document.body.style.removeProperty('background-color');
     }
     disableTheme() {
       if (this.styleElement) {
