@@ -92,20 +92,18 @@ export class ThemeManager {
       const savedThemes = JSON.parse(localStorage.getItem('betterXThemes')) || [];
       this.themes = savedThemes;
       
-      const activeThemeId = localStorage.getItem('betterXActiveTheme');
-      if (activeThemeId) {
-        const theme = this.themes.find(t => t.id === activeThemeId);
-        if (theme) this.applyTheme(theme);
-      }
+      // Apply any enabled themes
+      this.themes.forEach(theme => {
+        if (theme.enabled) {
+          this.applyTheme(theme);
+        }
+      });
     }
+
     saveThemes() {
       localStorage.setItem('betterXThemes', JSON.stringify(this.themes));
-      if (this.activeTheme) {
-        localStorage.setItem('betterXActiveTheme', this.activeTheme.id);
-      } else {
-        localStorage.removeItem('betterXActiveTheme');
-      }
     }
+
     createTheme(name, css) {
       const theme = {
         id: Date.now().toString(),
@@ -117,48 +115,96 @@ export class ThemeManager {
       this.saveThemes();
       return theme;
     }
+
     updateTheme(id, name, css) {
       const theme = this.themes.find(t => t.id === id);
       if (theme) {
         theme.name = name;
         theme.css = css;
         this.saveThemes();
-        if (this.activeTheme && this.activeTheme.id === id) {
+        if (theme.enabled) {
           this.applyTheme(theme);
         }
       }
     }
+
     deleteTheme(id) {
       const index = this.themes.findIndex(t => t.id === id);
       if (index !== -1) {
-        if (this.activeTheme && this.activeTheme.id === id) {
-          this.disableTheme();
+        const theme = this.themes[index];
+        if (theme.enabled) {
+          this.disableTheme(theme.id);
         }
         this.themes.splice(index, 1);
         this.saveThemes();
       }
     }
+
     async applyTheme(theme) {
-        const bodyBgColor = await this.waitForBackgroundColor();
-        
         if (!this.styleElement) {
             this.styleElement = document.createElement('style');
             this.styleElement.id = 'betterx-custom-theme';
             document.head.appendChild(this.styleElement);
         }
+
+        theme.enabled = true;
+        this.saveThemes();
+
+        // Get all enabled themes in order
+        const enabledThemes = this.themes.filter(t => t.enabled);
+        const combinedCSS = enabledThemes
+          .map(t => t.css)
+          .join('\n\n');
         
-        this.styleElement.textContent = theme.css;
-        this.activeTheme = theme;
+        this.styleElement.textContent = combinedCSS;
+    }
+
+    toggleTheme(themeId, enabled) {
+      const theme = this.themes.find(t => t.id === themeId);
+      if (theme) {
+        if (enabled) {
+          this.applyTheme(theme);
+        } else {
+          this.disableTheme(themeId);
+        }
+      }
+    }
+
+    disableTheme(themeId) {
+      const theme = this.themes.find(t => t.id === themeId);
+      if (theme) {
+        theme.enabled = false;
         this.saveThemes();
         
-        document.body.style.removeProperty('background-color');
-    }
-    disableTheme() {
-      if (this.styleElement) {
-        this.styleElement.textContent = '';
+        // Reapply remaining enabled themes
+        const enabledThemes = this.themes.filter(t => t.enabled);
+        if (enabledThemes.length > 0) {
+          const combinedCSS = enabledThemes
+            .map(t => t.css)
+            .join('\n\n');
+          this.styleElement.textContent = combinedCSS;
+        } else {
+          this.styleElement.textContent = '';
+        }
       }
-      this.activeTheme = null;
+    }
+
+    reorderThemes(newOrder) {
+      const reorderedThemes = newOrder
+        .map(themeId => this.themes.find(theme => theme.id === themeId))
+        .filter(Boolean);
+      
+      this.themes = reorderedThemes;
       this.saveThemes();
+
+      // Reapply enabled themes in new order
+      const enabledThemes = this.themes.filter(t => t.enabled);
+      if (enabledThemes.length > 0) {
+        const combinedCSS = enabledThemes
+          .map(t => t.css)
+          .join('\n\n');
+        this.styleElement.textContent = combinedCSS;
+      }
     }
   }
   
