@@ -25,7 +25,18 @@ export class ThemeManager {
         const bodyBgColor = await this.waitForBackgroundColor();
         const defaultStyle = document.createElement('style');
         defaultStyle.id = 'betterx-default-style';
-        defaultStyle.textContent = `body { background-color: ${bodyBgColor}; }`;
+        defaultStyle.textContent = `
+            body { background-color: ${bodyBgColor}; }
+            
+            /* Smooth modal transitions */
+            [role="dialog"] > div {
+                transition: width 0.3s ease, height 0.3s ease !important;
+            }
+            
+            [role="dialog"] > div > div {
+                transition: width 0.3s ease, height 0.3s ease !important;
+            }
+        `;
         document.head.appendChild(defaultStyle);
         
         // Remove inline background-color from body
