@@ -23,7 +23,8 @@ export default definePlugin({
 
     // Nouvelle méthode pour vérifier la page à ignorer
     isIgnoredPage() {
-        return location.href.includes("x.com/notifications");
+        return location.href.includes("x.com/notifications") || 
+               location.href.includes("x.com/search?");
     },
 
     start() {
