@@ -220,13 +220,11 @@ export default definePlugin({
                 }
                 const timelineResult = document.querySelector(timelineSelector);
                 if (timelineResult) {
-                    console.log("ayo");
                     const buttons = timelineResult.getElementsByTagName("span");
                     if (buttons.length == 0) {
                         log("No timeline buttons");
                     }
                     else {
-                        console.log("hi");
                         if (buttons[0].textContent && buttons[0].textContent.includes("posts")) {
                             buttons[0].textContent = buttons[0].textContent.replace("posts", "tweets");
                         }
