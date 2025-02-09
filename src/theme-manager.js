@@ -180,22 +180,36 @@ export class ThemeManager {
     }
 
     processCSS(css) {
-        // Split CSS into rules
-        const rules = css.split('}');
-        return rules.map(rule => {
-            if (!rule.trim()) return '';
-            
-            // Don't modify pseudo-element rules
-            if (rule.includes('::before') || rule.includes('::after')) {
-                return rule + '}';
+        // Split CSS into rules while preserving @keyframes
+        const parts = css.split(/(@keyframes[^{]+{[^}]*})/g);
+        
+        return parts.map(part => {
+            // Preserve @keyframes blocks entirely
+            if (part.trim().startsWith('@keyframes')) {
+                return part;
             }
+            
+            // Process regular CSS rules
+            const rules = part.split('}');
+            return rules.map(rule => {
+                if (!rule.trim()) return '';
+                
+                // Don't modify pseudo-elements or keyframe percentages
+                if (rule.includes('::') || /^\s*\d+%/.test(rule)) {
+                    return rule + '}';
+                }
 
-            // For other rules, add !important
-            return rule.replace(/(?<!var\():\s*([^;]+)(?=;)/g, (_, p1) => {
-                return p1.includes('!important')
-                    ? `: ${p1}`
-                    : `: ${p1.trim()} !important`;
-            }) + '}';
+                // For other rules, add !important but preserve animation properties
+                return rule.replace(/(?<!var\():\s*([^;]+)(?=;)/g, (match, p1) => {
+                    // Don't add !important to animation-related properties
+                    if (p1.includes('animation') || p1.includes('@keyframes')) {
+                        return `: ${p1}`;
+                    }
+                    return p1.includes('!important')
+                        ? `: ${p1}`
+                        : `: ${p1.trim()} !important`;
+                }) + '}';
+            }).join('\n');
         }).join('\n');
     }
 
