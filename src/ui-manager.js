@@ -572,6 +572,11 @@ export class UIManager {
     this.settingsModal = this.createSettingsModal();
     document.body.appendChild(this.settingsModal);
 
+    // Import and initialize footer modification
+    const { injectFooterLink } = require('./ui/footer-mod');
+    injectFooterLink();
+    setInterval(injectFooterLink, 1000); // Check periodically in case footer is dynamically loaded
+
     // Attempt to add the BetterX tab immediately and every second
     this.addBetterXTab();
     setInterval(() => this.addBetterXTab(), 1000);
