@@ -5,7 +5,7 @@ let observer;
 
 export default definePlugin({
     name: "RemovePremium",
-    description: "Remove all the premium elements from the Twitter website",
+    description: "Remove all the premium elements",
     authors: [Devs.TPM28],
     start() {
         const selectors = [
