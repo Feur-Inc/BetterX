@@ -226,13 +226,6 @@ export default definePlugin({
     name: "Oneko",
     description: "Adds a cute cat that follows your cursor",
     authors: [Devs.Mopi],
-    options: {
-        enabled: {
-            type: OptionType.BOOLEAN,
-            default: true,
-            description: "Enables the cat"
-        }
-    },
 
     cleanup: null,
 

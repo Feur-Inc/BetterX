@@ -27,8 +27,6 @@ export class ThemeManager {
         const defaultStyle = document.createElement('style');
         defaultStyle.id = 'betterx-default-style';
         defaultStyle.textContent = `
-            body { background-color: ${bodyBgColor}; }
-            
             /* Smooth modal transitions */
             [role="dialog"] > div {
                 transition: width 0.3s ease, height 0.3s ease !important;
@@ -40,10 +38,12 @@ export class ThemeManager {
         `;
         document.head.appendChild(defaultStyle);
         
-        // Remove inline background-color from body
-        document.body.style.removeProperty('background-color');
+        // Don't remove background properties anymore
+        // Just remove the inline background-color if it exists
+        if (document.body.style.backgroundColor) {
+            document.body.style.removeProperty('background-color');
+        }
         
-        // Remove r-kemksi class from specific div if it exists
         this.removeKemksiClass();
     }
 
@@ -180,11 +180,23 @@ export class ThemeManager {
     }
 
     processCSS(css) {
-        return css.replace(/(?<!var\():\s*([^;]+)(?=;)/g, (_, p1) => {
-            return p1.includes('!important')
-                ? `: ${p1}`
-                : `: ${p1.trim()} !important`;
-        });
+        // Split CSS into rules
+        const rules = css.split('}');
+        return rules.map(rule => {
+            if (!rule.trim()) return '';
+            
+            // Don't modify pseudo-element rules
+            if (rule.includes('::before') || rule.includes('::after')) {
+                return rule + '}';
+            }
+
+            // For other rules, add !important
+            return rule.replace(/(?<!var\():\s*([^;]+)(?=;)/g, (_, p1) => {
+                return p1.includes('!important')
+                    ? `: ${p1}`
+                    : `: ${p1.trim()} !important`;
+            }) + '}';
+        }).join('\n');
     }
 
     async applyTheme(theme) {
