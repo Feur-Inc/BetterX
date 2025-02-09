@@ -16,7 +16,6 @@ export default definePlugin({
     observers: [],
 
     start() {
-        console.log("Bring Twitter Back extension has loaded.");
 
         // Cache settings so that we don’t repeatedly access "this.settings.store"
         const store = this.settings.store;
@@ -63,20 +62,13 @@ export default definePlugin({
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        function log(message) {
-            if (localStorage.getItem(loggingKey) === "true") {
-                console.log(message);
-            }
-        }
-
         // Remove existing favicon links and (re)create one.
         function updateFavicon(faviconPath = "icons/favicon.ico") {
             document.querySelectorAll('link[rel="shortcut icon"]').forEach(link => link.remove());
             const divElements = document.querySelectorAll('div[dir="ltr"][aria-live="polite"]');
             if (!divElements.length) {
-                return log("divElements not found");
+                return;
             }
-            log("divElements found");
             const regex = /^(\d+)\+?\sunread\sitems$/;
             for (let div of divElements) {
                 const attribute = div.getAttribute("aria-label");
@@ -94,9 +86,8 @@ export default definePlugin({
         function updateTitle() {
             const titleElement = document.querySelector("title");
             if (!titleElement) {
-                return log("titleElement not found");
+                return;
             }
-            log("titleElement found");
             let tabTitle = titleElement.textContent;
             if (tabTitle && tabTitle.includes("X")) {
                 if (tabTitle.includes(" / X")) {
@@ -117,9 +108,8 @@ export default definePlugin({
         function updateLogo() {
             const loadingLogo = document.querySelector(loadingLogoSelector);
             if (!loadingLogo) {
-                return log("loadingLogo not found");
+                return;
             }
-            log("loadingLogo found");
             loadingLogo.setAttribute("d", twitterLogoD);
         }
 
@@ -354,7 +344,6 @@ export default definePlugin({
                 if (buttons.length > 0 && buttons[0].textContent && buttons[0].textContent.includes("posts")) {
                     buttons[0].textContent = buttons[0].textContent.replace("posts", "tweets");
                 } else {
-                    log("No timeline buttons");
                 }
             }
         }
@@ -427,10 +416,8 @@ export default definePlugin({
             updateLogo();
             const loadingLogo = document.querySelector(loadingLogoSelector);
             if (loadingLogo && loadingLogo.getAttribute("d") === twitterLogoD) {
-                log("Logo is Twitter logo");
                 loadingLogoObserver.disconnect();
             } else {
-                log("Logo has no path or not updated yet");
             }
         });
 
@@ -439,7 +426,6 @@ export default definePlugin({
             if (loadingLogoElem) {
                 loadingLogoObserver.observe(loadingLogoElem, { childList: true, subtree: true });
                 logoObserverConnected = true;
-                log("Started logo observer");
             }
         }
 
@@ -448,9 +434,7 @@ export default definePlugin({
             while (!document.body) {
                 await delay(100);
             }
-            log("Document body found");
             metaObserver.observe(document.head, { childList: true, subtree: true });
-            log("Observers started");
         })();
 
         // Do some initial updates.
@@ -462,7 +446,6 @@ export default definePlugin({
     },
 
     stop() {
-        console.log("Bring Twitter Back extension has been stopped.");
         if (this.bodyObserver) this.bodyObserver.disconnect();
         if (this.notificationObserver) this.notificationObserver.disconnect();
         if (this.metaObserver) this.metaObserver.disconnect();
