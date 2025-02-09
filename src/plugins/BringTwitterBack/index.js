@@ -6,9 +6,9 @@ export default definePlugin({
     description: "Reverts X branding back to Twitter",
     authors: [Devs.Mopi, Devs.TPM28],
     options: {
-        OldColorButton: {
+        accentColorButton: {
             type: OptionType.BOOLEAN,
-            description: "Use Twitter's old accent color for Tweet buttons",
+            description: "Use Twitter's accent color for Tweet buttons",
             default: true
         }
     },
@@ -125,14 +125,33 @@ export default definePlugin({
 
         // ── Accent color support ───────────────────────────
         function findTargetColor() {
+            // Check localStorage first
+            const storedColor = localStorage.getItem('twitter-accent-color');
+            
+            // Try to find color from UI
             const container = document.querySelector('div[data-testid="ScrollSnap-List"] div[style*="background-color:"]');
             if (container) {
                 const style = window.getComputedStyle(container);
-                return style.backgroundColor;
-            } else {
-                // Default Twitter blue
-                return "rgb(29, 155, 240)";
+                const newColor = style.backgroundColor;
+                
+                // Update localStorage if we found a different color
+                if (newColor !== storedColor) {
+                    localStorage.setItem('twitter-accent-color', newColor);
+                    return newColor;
+                }
             }
+            if (!container) {
+                // Try to find X mention element if ScrollSnap not found
+                const xMention = document.querySelector('a[href="/X"][role="link"][style*="color:"]');
+                if (xMention) {
+                    const style = window.getComputedStyle(xMention);
+                    const newColor = style.color;
+                    localStorage.setItem('twitter-accent-color', newColor);
+                    return newColor;
+                }
+            }
+            // Return stored color if it exists, otherwise default Twitter blue
+            return storedColor || "rgb(29, 155, 240)";
         }
 
         function adjustColor(color) {
@@ -146,7 +165,7 @@ export default definePlugin({
         }
 
         const updateStylesheet = () => {
-            if (!store.OldColorButton) return;
+            if (!store.accentColorButton) return;
             const targetColor = findTargetColor();
             const hoverColor = adjustColor(targetColor) || targetColor;
             if (styleSheet) {
@@ -343,7 +362,7 @@ export default definePlugin({
         // Create one combined observer for the document body.
         const combinedObserver = new MutationObserver(mutations => {
             updateUI();
-            if (store.OldColorButton) {
+            if (store.accentColorButton) {
                 const shouldObserveButtons = mutations.some(mutation => {
                     return Array.from(mutation.addedNodes).some(node => {
                         return node.nodeType === 1 && (
