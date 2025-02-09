@@ -6,6 +6,9 @@ let statusInterval;
 let settingsObserver;
 let pageObserver;
 let heartbeatInterval;
+// Ajout de variables globales pour surveiller le span "UserJoinDate"
+let joinDateObserver;
+let joinDateExists = false;
 
 const STATUS_COLORS = {
     0: '#747f8d',
@@ -291,7 +294,33 @@ export default definePlugin({
         }
     },
 
+    // Mise à jour de la fonction d'observation pour le span data-testid="UserJoinDate"
+    startJoinDateObserver() {
+        if (joinDateObserver) joinDateObserver.disconnect();
+        const updateJoinDate = () => {
+            const prevExists = joinDateExists;
+            joinDateExists = !!document.querySelector('span[data-testid="UserJoinDate"]');
+            // Si le span apparaît dynamiquement, relancer la vérification
+            if (!prevExists && joinDateExists) {
+                const username = this.getCurrentUsername();
+                if (username) {
+                    this.checkUserAndInjectIcon(username);
+                }
+            }
+        };
+        joinDateObserver = new MutationObserver(updateJoinDate);
+        joinDateObserver.observe(document.body, { childList: true, subtree: true });
+        updateJoinDate();
+    },
+
     async checkUserStatus(username) {
+        if (!joinDateExists) return;
+
+        const path = window.location.pathname;
+        if (path.startsWith('/home') || path.startsWith('/explore') || path.startsWith('/notifications') || path.startsWith('/messages') || path.startsWith('/i') || path.startsWith('/jobs')) {
+            return;
+        }
+
         try {
             const response = await window.api.fetch(`https://tpm28.com/betterx/users/${username}/status`);
             const data = await response.json();
@@ -330,14 +359,21 @@ export default definePlugin({
 
     async checkUserAndInjectIcon(username) {
         try {
+            if (!joinDateExists) {
+                return;
+            }
+
+            const path = window.location.pathname;
+            if (path.startsWith('/home') || path.startsWith('/explore') || path.startsWith('/notifications') || path.startsWith('/messages') || path.startsWith('/i') || path.startsWith('/jobs')) {
+                return;
+            }
+
             const statusResponse = await window.api.fetch(`https://tpm28.com/betterx/users/${username}/status`);
             const statusData = await statusResponse.json();
-            
             const response = await window.api.fetch(`https://tpm28.com/betterx/users/${username}`);
             const data = await response.json();
             
             this.clearBetterXElements();
-            
             if (data.exists) {
                 const tryInject = () => {
                     const userNameContainer = document.querySelector('div[data-testid="UserName"]');
@@ -351,11 +387,8 @@ export default definePlugin({
                         }
                         return;
                     }
-
                     this.retryCount = 0;
-
                     this.updateProfileDot(statusData.status);
-
                     const targetSpan = userNameContainer.querySelector('.css-1jxf684.r-bcqeeo.r-1ttztb7.r-qvutc0.r-poiln3.r-1awozwy.r-xoduu5');
                     if (targetSpan && !userNameContainer.querySelector('[data-testid="icon-betterx"]')) {
                         const newDiv = document.createElement('div');
@@ -370,7 +403,6 @@ export default definePlugin({
 
                     this.startStatusInterval(username);
                 };
-
                 tryInject();
             }
         } catch (error) {
@@ -655,6 +687,8 @@ export default definePlugin({
 
         observeDOM();
         this.startSettingsObserver();
+        // Démarrer l'observateur pour le span "UserJoinDate"
+        this.startJoinDateObserver();
 
         checkPathChange();
 
