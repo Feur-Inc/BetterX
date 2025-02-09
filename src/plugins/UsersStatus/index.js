@@ -222,7 +222,6 @@ export default definePlugin({
 
     async sendHeartbeat() {
         try {
-            console.log('Sending heartbeat...');
             if (document.querySelector('.betterx-auth-popup')) {
                 return;
             }
@@ -236,7 +235,6 @@ export default definePlugin({
             }
 
             if (!username || !token) {
-                console.log('No username or token found, but still counting as heartbeat');
                 return;
             }
 

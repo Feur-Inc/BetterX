@@ -184,7 +184,6 @@ export default definePlugin({
                 });
             }
             await window.api.copyImageToClipboard(imageBuffer);
-            console.log('Copied to clipboard');
             this.showNotification("Copied to clipboard");
             await new Promise(resolve => setTimeout(resolve, 100));
             btn.style.display = '';

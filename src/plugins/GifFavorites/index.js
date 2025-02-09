@@ -142,7 +142,6 @@ export default definePlugin({
                     object_type: "item"
                 };
             });
-            console.log(items);
             return { data: { items } };
         }
 
