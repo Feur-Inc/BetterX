@@ -3,6 +3,7 @@ export class ThemeManager {
       this.themes = [];
       this.activeTheme = null;
       this.styleElement = null;
+      this.customPropertiesElement = null;
       this.loadThemes();
       this.initializeDefaultStyles();
     }
@@ -25,7 +26,18 @@ export class ThemeManager {
         const bodyBgColor = await this.waitForBackgroundColor();
         const defaultStyle = document.createElement('style');
         defaultStyle.id = 'betterx-default-style';
-        defaultStyle.textContent = `body { background-color: ${bodyBgColor}; }`;
+        defaultStyle.textContent = `
+            body { background-color: ${bodyBgColor}; }
+            
+            /* Smooth modal transitions */
+            [role="dialog"] > div {
+                transition: width 0.3s ease, height 0.3s ease !important;
+            }
+            
+            [role="dialog"] > div > div {
+                transition: width 0.3s ease, height 0.3s ease !important;
+            }
+        `;
         document.head.appendChild(defaultStyle);
         
         // Remove inline background-color from body
@@ -140,6 +152,41 @@ export class ThemeManager {
       }
     }
 
+    extractCustomProperties(css) {
+        const properties = {};
+        const regex = /--[\w-]+:\s*[^;]+/g;
+        const matches = css.match(regex) || [];
+        
+        matches.forEach(match => {
+            const [name, value] = match.split(/:\s*/);
+            properties[name] = value;
+        });
+        
+        return properties;
+    }
+
+    applyCustomProperties(properties) {
+        if (!this.customPropertiesElement) {
+            this.customPropertiesElement = document.createElement('style');
+            this.customPropertiesElement.id = 'betterx-custom-properties';
+            document.head.appendChild(this.customPropertiesElement);
+        }
+
+        const cssText = Object.entries(properties)
+            .map(([name, value]) => `${name}: ${value};`)
+            .join('\n');
+
+        this.customPropertiesElement.textContent = `:root {\n${cssText}\n}`;
+    }
+
+    processCSS(css) {
+        return css.replace(/(?<!var\():\s*([^;]+)(?=;)/g, (_, p1) => {
+            return p1.includes('!important')
+                ? `: ${p1}`
+                : `: ${p1.trim()} !important`;
+        });
+    }
+
     async applyTheme(theme) {
         if (!this.styleElement) {
             this.styleElement = document.createElement('style');
@@ -150,12 +197,18 @@ export class ThemeManager {
         theme.enabled = true;
         this.saveThemes();
 
-        // Get all enabled themes in order
         const enabledThemes = this.themes.filter(t => t.enabled);
-        const combinedCSS = enabledThemes
-          .map(t => t.css)
-          .join('\n\n');
         
+        // Extract and combine custom properties from all enabled themes
+        const allCustomProperties = {};
+        enabledThemes.forEach(theme => {
+            Object.assign(allCustomProperties, this.extractCustomProperties(theme.css));
+        });
+        this.applyCustomProperties(allCustomProperties);
+
+        // Apply regular CSS
+        let combinedCSS = enabledThemes.map(t => t.css).join('\n\n');
+        combinedCSS = this.processCSS(combinedCSS);
         this.styleElement.textContent = combinedCSS;
     }
 
@@ -176,15 +229,16 @@ export class ThemeManager {
         theme.enabled = false;
         this.saveThemes();
         
-        // Reapply remaining enabled themes
         const enabledThemes = this.themes.filter(t => t.enabled);
         if (enabledThemes.length > 0) {
-          const combinedCSS = enabledThemes
-            .map(t => t.css)
-            .join('\n\n');
+          let combinedCSS = enabledThemes.map(t => t.css).join('\n\n');
+          combinedCSS = this.processCSS(combinedCSS);
           this.styleElement.textContent = combinedCSS;
         } else {
           this.styleElement.textContent = '';
+          if (this.customPropertiesElement) {
+              this.customPropertiesElement.textContent = '';
+          }
         }
       }
     }
@@ -197,12 +251,10 @@ export class ThemeManager {
       this.themes = reorderedThemes;
       this.saveThemes();
 
-      // Reapply enabled themes in new order
       const enabledThemes = this.themes.filter(t => t.enabled);
       if (enabledThemes.length > 0) {
-        const combinedCSS = enabledThemes
-          .map(t => t.css)
-          .join('\n\n');
+        let combinedCSS = enabledThemes.map(t => t.css).join('\n\n');
+        combinedCSS = this.processCSS(combinedCSS);
         this.styleElement.textContent = combinedCSS;
       }
     }

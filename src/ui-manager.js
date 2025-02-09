@@ -500,6 +500,22 @@ export class UIManager {
     newLink.style.paddingRight = '16px';
     newLink.style.paddingLeft = '16px';
 
+    // Add hover effect styles
+    newLink.addEventListener('mouseenter', () => {
+      newLink.style.backgroundColor = 'rgb(22, 24, 28)';
+      const textDiv = newLink.querySelector('.css-146c3p1');
+      if (textDiv) textDiv.style.color = 'rgb(239, 243, 244)';
+    });
+
+    newLink.addEventListener('mouseleave', () => {
+      newLink.style.backgroundColor = 'transparent';
+      const textDiv = newLink.querySelector('.css-146c3p1');
+      if (textDiv) textDiv.style.color = 'rgb(231, 233, 234)';
+    });
+
+    // Add transition for smooth effect
+    newLink.style.transition = 'all 0.2s ease';
+
     const linkContainer = document.createElement('div');
     linkContainer.setAttribute('class', 'css-175oi2r r-1awozwy r-18u37iz r-16y2uox');
 
@@ -555,6 +571,11 @@ export class UIManager {
     // Create the settings modal
     this.settingsModal = this.createSettingsModal();
     document.body.appendChild(this.settingsModal);
+
+    // Import and initialize footer modification
+    const { injectFooterLink } = require('./ui/footer-mod');
+    injectFooterLink();
+    setInterval(injectFooterLink, 1000); // Check periodically in case footer is dynamically loaded
 
     // Attempt to add the BetterX tab immediately and every second
     this.addBetterXTab();

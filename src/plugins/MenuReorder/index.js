@@ -4,7 +4,14 @@ import definePlugin, { OptionType } from "@utils/types";
 export default definePlugin({
     name: "MenuReorder",
     description: "Allows reordering of menu items in both vertical and horizontal navigation bars",
-    authors: [Devs.TPM28],
+    authors: [Devs.TPM28, Devs.Mopi],
+    options: {
+        enableReordering: {
+            type: OptionType.BOOLEAN,
+            description: "Allow menu items to be reordered by drag and drop",
+            default: true
+        }
+    },
 
     draggedElement: null,
     menuItems: [],
@@ -92,15 +99,23 @@ export default definePlugin({
         if (this.horizontalMenuContainer) {
             this.horizontalMenuItems = Array.from(this.horizontalMenuContainer.querySelectorAll('div[role="presentation"]'));
             this.horizontalMenuItems.forEach((item, index) => {
-                item.setAttribute('draggable', 'true');
+                item.setAttribute('draggable', this.settings.store.enableReordering ? 'true' : 'false');
                 item.id = `horizontal-menu-item-${index}`;
                 item.classList.add('menu-item');
 
-                item.addEventListener('dragstart', this.horizontalDragStart.bind(this));
-                item.addEventListener('dragend', this.horizontalDragEnd.bind(this));
+                item.removeEventListener('dragstart', this.horizontalDragStart.bind(this));
+                item.removeEventListener('dragend', this.horizontalDragEnd.bind(this));
+
+                if (this.settings.store.enableReordering) {
+                    item.addEventListener('dragstart', this.horizontalDragStart.bind(this));
+                    item.addEventListener('dragend', this.horizontalDragEnd.bind(this));
+                }
             });
-            this.horizontalMenuContainer.addEventListener('dragover', this.horizontalDragOver.bind(this));
-            this.horizontalMenuContainer.addEventListener('drop', this.horizontalDrop.bind(this));
+
+            if (this.settings.store.enableReordering) {
+                this.horizontalMenuContainer.addEventListener('dragover', this.horizontalDragOver.bind(this));
+                this.horizontalMenuContainer.addEventListener('drop', this.horizontalDrop.bind(this));
+            }
         }
     },
 
@@ -339,15 +354,19 @@ export default definePlugin({
     updateMenuItems() {
         this.menuItems = Array.from(this.nav.querySelectorAll('a, button'));
         this.menuItems.forEach((item, index) => {
-            item.setAttribute('draggable', 'true');
+            item.setAttribute('draggable', this.settings.store.enableReordering ? 'true' : 'false');
             item.id = `menu-item-${index}`;
             item.classList.add('menu-item');
 
+            // Remove existing listeners
             item.removeEventListener('dragstart', this.dragStart.bind(this));
             item.removeEventListener('dragend', this.dragEnd.bind(this));
 
-            item.addEventListener('dragstart', this.dragStart.bind(this));
-            item.addEventListener('dragend', this.dragEnd.bind(this));
+            // Only add drag listeners if reordering is enabled
+            if (this.settings.store.enableReordering) {
+                item.addEventListener('dragstart', this.dragStart.bind(this));
+                item.addEventListener('dragend', this.dragEnd.bind(this));
+            }
 
             item.addEventListener('contextmenu', this.handleContextMenu.bind(this));
 
@@ -519,13 +538,5 @@ export default definePlugin({
         const testId = menuItem.getAttribute('data-testid');
         const href = menuItem.href ? this.getLastPathSegment(menuItem.href) : null;
         return testId || href || menuItem.id;
-    },
-
-    settings: {
-        enabled: {
-            type: OptionType.BOOLEAN,
-            default: true,
-            description: "Enable menu reordering"
-        }
     }
 });

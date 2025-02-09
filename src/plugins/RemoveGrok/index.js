@@ -5,7 +5,7 @@ let observer;
 
 export default definePlugin({
     name: "RemoveGrok",
-    description: "Remove all Grok elements from the Twitter website",
+    description: "Remove all Grok elements",
     authors: [Devs.TPM28],
     start() {
         const selectors = [
