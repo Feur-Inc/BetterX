@@ -126,11 +126,43 @@ export default definePlugin({
             btn.style.display = 'none';
             const container = btn.closest('.css-175oi2r.r-18u37iz.r-1h0z5md.r-1wron08');
             if (container) container.setAttribute("data-capturing", "true");
+
+            // Récupérer les coordonnées du tweet
             const tweetRect = tweet.getBoundingClientRect();
-            if (tweetRect.top < 0 || tweetRect.bottom > window.innerHeight) {
+
+            // Fonction utilitaire pour déterminer la hauteur d'éléments susceptibles de bloquer le haut de la vue
+            const getTopBlockingOffset = () => {
+                let offset = 0;
+                // Vérifie la présence d'une barre de navigation par exemple
+                const nav = document.querySelector('nav[aria-live="polite"][role="navigation"]');
+                if (nav) {
+                    const navRect = nav.getBoundingClientRect();
+                    if (navRect.bottom > offset) offset = navRect.bottom;
+                }
+                // Vérifie un élément de statut qui pourrait gêner
+                const statusDiv = document.querySelector('div[role="status"].css-175oi2r');
+                if (statusDiv) {
+                    const statusRect = statusDiv.getBoundingClientRect();
+                    if (statusRect.bottom > offset) offset = statusRect.bottom;
+                }
+                return offset;
+            };
+
+            const blockingOffset = getTopBlockingOffset();
+
+            // Si le tweet n'est pas entièrement visible ou est obstrué par un élément en haut, ajuste le défilement
+            if (tweetRect.top < blockingOffset || tweetRect.bottom > window.innerHeight) {
                 tweet.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 await new Promise(resolve => setTimeout(resolve, 300));
+
+                // Re-vérifie la position après le scroll
+                const updatedTweetRect = tweet.getBoundingClientRect();
+                if (updatedTweetRect.top < blockingOffset) {
+                    window.scrollBy(0, updatedTweetRect.top - blockingOffset);
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
             }
+
             let containerDiv = tweet.previousElementSibling;
             if (!containerDiv) containerDiv = tweet.parentElement;
             await new Promise(resolve => setTimeout(resolve, 100));
