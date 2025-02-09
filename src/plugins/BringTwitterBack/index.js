@@ -146,7 +146,7 @@ export default definePlugin({
         }
 
         const updateStylesheet = () => {
-            if (!store.accentColorButton) return;
+            if (!store.OldColorButton) return;
             const targetColor = findTargetColor();
             const hoverColor = adjustColor(targetColor) || targetColor;
             if (styleSheet) {
@@ -343,7 +343,7 @@ export default definePlugin({
         // Create one combined observer for the document body.
         const combinedObserver = new MutationObserver(mutations => {
             updateUI();
-            if (store.accentColorButton) {
+            if (store.OldColorButton) {
                 const shouldObserveButtons = mutations.some(mutation => {
                     return Array.from(mutation.addedNodes).some(node => {
                         return node.nodeType === 1 && (
