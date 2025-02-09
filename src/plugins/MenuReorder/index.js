@@ -4,7 +4,7 @@ import definePlugin, { OptionType } from "@utils/types";
 export default definePlugin({
     name: "MenuReorder",
     description: "Allows reordering of menu items in both vertical and horizontal navigation bars",
-    authors: [Devs.TPM28],
+    authors: [Devs.TPM28, Devs.Mopi],
     options: {
         enableReordering: {
             type: OptionType.BOOLEAN,
