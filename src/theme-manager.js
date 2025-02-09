@@ -3,6 +3,7 @@ export class ThemeManager {
       this.themes = [];
       this.activeTheme = null;
       this.styleElement = null;
+      this.customPropertiesElement = null;
       this.loadThemes();
       this.initializeDefaultStyles();
     }
@@ -151,12 +152,39 @@ export class ThemeManager {
       }
     }
 
+    extractCustomProperties(css) {
+        const properties = {};
+        const regex = /--[\w-]+:\s*[^;]+/g;
+        const matches = css.match(regex) || [];
+        
+        matches.forEach(match => {
+            const [name, value] = match.split(/:\s*/);
+            properties[name] = value;
+        });
+        
+        return properties;
+    }
+
+    applyCustomProperties(properties) {
+        if (!this.customPropertiesElement) {
+            this.customPropertiesElement = document.createElement('style');
+            this.customPropertiesElement.id = 'betterx-custom-properties';
+            document.head.appendChild(this.customPropertiesElement);
+        }
+
+        const cssText = Object.entries(properties)
+            .map(([name, value]) => `${name}: ${value};`)
+            .join('\n');
+
+        this.customPropertiesElement.textContent = `:root {\n${cssText}\n}`;
+    }
+
     processCSS(css) {
-      return css.replace(/:\s*([^;]+)(?=;)/g, (_, p1) => {
-        return p1.includes('!important')
-          ? `: ${p1}`
-          : `: ${p1.trim()} !important`;
-      });
+        return css.replace(/(?<!var\():\s*([^;]+)(?=;)/g, (_, p1) => {
+            return p1.includes('!important')
+                ? `: ${p1}`
+                : `: ${p1.trim()} !important`;
+        });
     }
 
     async applyTheme(theme) {
@@ -170,9 +198,17 @@ export class ThemeManager {
         this.saveThemes();
 
         const enabledThemes = this.themes.filter(t => t.enabled);
+        
+        // Extract and combine custom properties from all enabled themes
+        const allCustomProperties = {};
+        enabledThemes.forEach(theme => {
+            Object.assign(allCustomProperties, this.extractCustomProperties(theme.css));
+        });
+        this.applyCustomProperties(allCustomProperties);
+
+        // Apply regular CSS
         let combinedCSS = enabledThemes.map(t => t.css).join('\n\n');
         combinedCSS = this.processCSS(combinedCSS);
-        
         this.styleElement.textContent = combinedCSS;
     }
 
@@ -200,6 +236,9 @@ export class ThemeManager {
           this.styleElement.textContent = combinedCSS;
         } else {
           this.styleElement.textContent = '';
+          if (this.customPropertiesElement) {
+              this.customPropertiesElement.textContent = '';
+          }
         }
       }
     }
