@@ -6,9 +6,9 @@ export default definePlugin({
     description: "Reverts X branding back to Twitter",
     authors: [Devs.Mopi, Devs.TPM28],
     options: {
-        accentColorButton: {
+        OldColorButton: {
             type: OptionType.BOOLEAN,
-            description: "Use Twitter's accent color for Tweet buttons",
+            description: "Use Twitter's old accent color for Tweet buttons",
             default: true
         }
     },
