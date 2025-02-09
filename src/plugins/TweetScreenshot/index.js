@@ -115,7 +115,6 @@ export default definePlugin({
         });
         actionBar.insertBefore((() => {
             const wrapperDiv = document.createElement('div');
-            // Modification du style pour centrer le bouton
             wrapperDiv.className = 'css-175oi2r';
             wrapperDiv.style.cssText = 'display: inline-grid; justify-items: center; align-items: center;';
             wrapperDiv.appendChild(buttonContainer);
@@ -176,7 +175,6 @@ export default definePlugin({
             if (container) container.removeAttribute("data-capturing");
         }
     },
-    // Nouvelle méthode pour afficher la notification
     showNotification(message) {
         const notification = document.createElement('div');
         notification.textContent = message;
