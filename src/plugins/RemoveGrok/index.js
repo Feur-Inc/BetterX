@@ -12,7 +12,8 @@ export default definePlugin({
             'a[href="/i/grok"]',
             '[data-testid="GrokDrawer"]',
             'button[aria-label="Grok actions"]',
-            'button[data-testid="grokImgGen"]'
+            'button[data-testid="grokImgGen"]',
+            'button[aria-label="Profile Summary"]'
         ];
 
         const removeElements = () => {

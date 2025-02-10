@@ -1,7 +1,28 @@
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
-function createOneko() {
+const THEME_BASE_URL = "https://raw.githubusercontent.com/MCHAMSTERYT2/onekocord/main/onekoskins/";
+const THEMES = {
+    DEFAULT: "default",
+    ACE: "ace",
+    BLACK: "black",
+    CALICO: "calico",
+    FOX: "fox",
+    GHOST: "ghost",
+    GRAY: "gray",
+    JESS: "jess",
+    KINA: "kina",
+    LUCY: "lucy",
+    MAIA: "maia",
+    MIKE: "mike",
+    MOKA: "moka",
+    SILVER: "silver",
+    SILVERSKY: "silversky",
+    SPIRIT: "spirit",
+    VALENTINE: "valentine"
+};
+
+function createOneko(config) {
     let nekoEl = document.createElement("div");
     let nekoPosX = 32;
     let nekoPosY = 32;
@@ -14,7 +35,7 @@ function createOneko() {
     let lastFrameTimestamp;
     let animationFrameId;
 
-    const nekoSpeed = 10;
+    const nekoSpeed = 10 * (config.speed || 1);  // Modified to use speed config
     const spriteSets = {
         idle: [[-3, -3]],
         alert: [[-7, -3]],
@@ -185,7 +206,12 @@ function createOneko() {
         nekoEl.style.left = `${nekoPosX - 16}px`;
         nekoEl.style.top = `${nekoPosY - 16}px`;
         nekoEl.style.zIndex = 2147483647;
-        nekoEl.style.backgroundImage = `url(https://raw.githubusercontent.com/adryd325/oneko.js/c4ee66353b11a44e4a5b7e914a81f8d33111555e/oneko.gif)`;
+        
+        const themeUrl = config.theme === THEMES.DEFAULT 
+            ? "https://raw.githubusercontent.com/adryd325/oneko.js/c4ee66353b11a44e4a5b7e914a81f8d33111555e/oneko.gif"
+            : `${THEME_BASE_URL}${config.theme}.png`;
+        
+        nekoEl.style.backgroundImage = `url(${themeUrl})`;
 
         document.body.appendChild(nekoEl);
 
@@ -226,13 +252,35 @@ export default definePlugin({
     name: "Oneko",
     description: "Adds a cute cat that follows your cursor",
     authors: [Devs.Mopi],
+    options: {
+        speed: {
+            type: OptionType.NUMBER,
+            description: "Speed multiplier for the cat",
+            default: 1,
+            min: 0.1,
+            max: 5,
+            step: 0.1
+        },
+        theme: {
+            type: OptionType.SELECT,
+            description: "Cat theme/skin to use",
+            default: THEMES.DEFAULT,
+            options: Object.entries(THEMES).map(([key, value]) => ({
+                label: key.charAt(0) + key.slice(1).toLowerCase(),
+                value: value
+            }))
+        }
+    },
 
     cleanup: null,
 
     start() {
         const isReducedMotion = window.matchMedia(`(prefers-reduced-motion: reduce)`).matches;
         if (isReducedMotion) return;
-        this.cleanup = createOneko();
+        this.cleanup = createOneko({
+            speed: this.settings.store.speed,
+            theme: this.settings.store.theme
+        });
     },
 
     stop() {
