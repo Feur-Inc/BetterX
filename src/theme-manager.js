@@ -8,6 +8,7 @@ export class ThemeManager {
     this.loadThemeState();
     this.initializeThemes();
     this.initializeDefaultStyles();
+    this.setupThemeFileWatcher();
   }
 
   // Charger l'état des thèmes depuis le localStorage
@@ -388,6 +389,19 @@ export class ThemeManager {
       combinedCSS = this.processCSS(combinedCSS);
       this.styleElement.textContent = combinedCSS;
     }
+  }
+
+  setupThemeFileWatcher() {
+    window.api.themes.onThemeFileChanged((filename, content) => {
+      const theme = this.themes.find(t => t.id === filename);
+      if (theme) {
+        theme.css = content;
+        // If the theme is enabled, reapply it
+        if (theme.enabled) {
+          this.applyAllActiveThemes();
+        }
+      }
+    });
   }
 }
 
