@@ -200,45 +200,45 @@ export class ThemeManager {
   }
 
   removeKemksiClass() {
-      const removeIfTarget = element => {
-          if (element.classList.contains('r-kemksi')) {
-              element.classList.remove('r-kemksi');
-          }
-      };
+    const removeIfTarget = element => {
+        if (element.classList.contains('r-kemksi')) {
+            element.classList.remove('r-kemksi');
+        }
+    };
 
-      // Retirer au chargement des éléments existants
-      const initialTargets = document.querySelectorAll(
-          '.css-175oi2r.r-vacyoi.r-ttdzmv .css-175oi2r.r-1awozwy.r-aqfbo4.r-kemksi.r-18u37iz.r-1h3ijdo.r-6gpygo.r-15ysp7h.r-1xcajam.r-ipm5af.r-136ojw6.r-1hycxz'
-      );
-      initialTargets.forEach(removeIfTarget);
+    // Retirer au chargement des éléments existants
+    const initialTargets = document.querySelectorAll(
+        '.css-175oi2r.r-vacyoi.r-ttdzmv .css-175oi2r.r-1awozwy.r-aqfbo4.r-kemksi.r-18u37iz.r-1h3ijdo.r-6gpygo.r-15ysp7h.r-1xcajam.r-ipm5af.r-136ojw6.r-1hycxz'
+    );
+    initialTargets.forEach(removeIfTarget);
 
-      // Observer les modifications du DOM
-      const observer = new MutationObserver(mutations => {
-          mutations.forEach(mutation => {
-              mutation.addedNodes.forEach(node => {
-                  if (node.nodeType === Node.ELEMENT_NODE) {
-                      // Si l'élément lui-même correspond
-                      if (
-                          node.matches &&
-                          node.matches('.css-175oi2r.r-1awozwy.r-aqfbo4.r-kemksi.r-18u37iz.r-1h3ijdo.r-6gpygo.r-15ysp7h.r-1xcajam.r-ipm5af.r-136ojw6.r-1hycxz') &&
-                          node.closest('.css-175oi2r.r-vacyoi.r-ttdzmv')
-                      ) {
-                          removeIfTarget(node);
-                      }
-                      // Vérifier les descendants
-                      const targets = node.querySelectorAll(
-                          '.css-175oi2r.r-1awozwy.r-aqfbo4.r-kemksi.r-18u37iz.r-1h3ijdo.r-6gpygo.r-15ysp7h.r-1xcajam.r-ipm5af.r-136ojw6.r-1hycxz'
-                      );
-                      targets.forEach(el => {
-                          if (el.closest('.css-175oi2r.r-vacyoi.r-ttdzmv')) {
-                              removeIfTarget(el);
-                          }
-                      });
-                  }
-              });
-          });
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
+    // Observer les modifications du DOM
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Si l'élément lui-même correspond
+                    if (
+                        node.matches &&
+                        node.matches('.css-175oi2r.r-1awozwy.r-aqfbo4.r-kemksi.r-18u37iz.r-1h3ijdo.r-6gpygo.r-15ysp7h.r-1xcajam.r-ipm5af.r-136ojw6.r-1hycxz') &&
+                        node.closest('.css-175oi2r.r-vacyoi.r-ttdzmv')
+                    ) {
+                        removeIfTarget(node);
+                    }
+                    // Vérifier les descendants
+                    const targets = node.querySelectorAll(
+                        '.css-175oi2r.r-1awozwy.r-aqfbo4.r-kemksi.r-18u37iz.r-1h3ijdo.r-6gpygo.r-15ysp7h.r-1xcajam.r-ipm5af.r-136ojw6.r-1hycxz'
+                    );
+                    targets.forEach(el => {
+                        if (el.closest('.css-175oi2r.r-vacyoi.r-ttdzmv')) {
+                            removeIfTarget(el);
+                        }
+                    });
+                }
+            });
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   extractCustomProperties(css) {
