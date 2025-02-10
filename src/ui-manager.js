@@ -2,11 +2,14 @@ import { OptionType } from "@utils/types";
 import { EditorView, basicSetup } from "codemirror";
 import { css } from "@codemirror/lang-css";
 import { oneDark } from '@codemirror/theme-one-dark';
+import { ThemeManager } from './theme-manager.js'; // Ajout de l'import
 
 export class UIManager {
   constructor(pluginManager) {
     this.pluginManager = pluginManager;
     this.observer = null;
+    // Instancier ThemeManager pour gérer les thèmes
+    this.themeManager = new ThemeManager();
   }
 
   createUIElement(elementType, properties) {
@@ -84,6 +87,15 @@ export class UIManager {
     };
     // Set up tabs after a short delay to ensure DOM is ready
     setTimeout(setupTabs, 0);
+
+    // Ajout d'un écouteur pour rafraîchir la liste des thèmes lors du clic sur l'onglet "Themes"
+    const themeTabButton = modal.querySelector('button[data-tab="theme"]');
+    themeTabButton.addEventListener('click', async () => {
+      await this.themeManager.initializeThemes();
+      const themesContainer = modal.querySelector('.betterx-themes-container');
+      this.refreshThemesList(themesContainer);
+    });
+
     // Initialize theme UI
     this.initializeThemeUI(modal);
 
@@ -115,8 +127,12 @@ export class UIManager {
   initializeThemeUI(modal) {
     const themesContainer = modal.querySelector('.betterx-themes-container');
     const newThemeButton = modal.querySelector('#new-theme');
-    newThemeButton.addEventListener('click', () => {
-      this.showThemeEditor();
+    newThemeButton.addEventListener('click', async () => {
+      // Afficher l'éditeur pour créer un nouveau thème
+      await this.showThemeEditor(null);
+      // Une fois terminé, relire les thèmes et rafraîchir l'affichage
+      await this.themeManager.initializeThemes();
+      this.refreshThemesList(themesContainer);
     });
     this.refreshThemesList(themesContainer);
   }
@@ -185,9 +201,9 @@ export class UIManager {
         this.showThemeEditor(theme);
       });
 
-      themeElement.querySelector('.delete').addEventListener('click', () => {
+      themeElement.querySelector('.delete').addEventListener('click', async () => {
         if (confirm('Are you sure you want to delete this theme?')) {
-          this.themeManager.deleteTheme(theme.id);
+          await this.themeManager.deleteTheme(theme.id);
           this.refreshThemesList(container);
         }
       });
@@ -263,13 +279,14 @@ export class UIManager {
       parent: editorContainer
     });
 
-    editor.querySelector('.save').addEventListener('click', () => {
+    editor.querySelector('.save').addEventListener('click', async () => {
       const css = view.state.doc.toString();
       if (theme) {
         this.themeManager.updateTheme(theme.id, nameInput.value, css);
       } else {
         this.themeManager.createTheme(nameInput.value, css);
       }
+      await this.themeManager.initializeThemes();
       this.refreshThemesList(this.settingsModal.querySelector('.betterx-themes-container'));
       view.destroy();
       overlay.remove();
