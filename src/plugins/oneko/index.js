@@ -1,7 +1,7 @@
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
-function createOneko() {
+function createOneko(config) {
     let nekoEl = document.createElement("div");
     let nekoPosX = 32;
     let nekoPosY = 32;
@@ -14,7 +14,7 @@ function createOneko() {
     let lastFrameTimestamp;
     let animationFrameId;
 
-    const nekoSpeed = 10;
+    const nekoSpeed = 10 * (config.speed || 1);  // Modified to use speed config
     const spriteSets = {
         idle: [[-3, -3]],
         alert: [[-7, -3]],
@@ -226,13 +226,25 @@ export default definePlugin({
     name: "Oneko",
     description: "Adds a cute cat that follows your cursor",
     authors: [Devs.Mopi],
+    options: {
+        speed: {
+            type: OptionType.NUMBER,
+            description: "Speed multiplier for the cat",
+            default: 1,
+            min: 0.1,
+            max: 5,
+            step: 0.1
+        }
+    },
 
     cleanup: null,
 
     start() {
         const isReducedMotion = window.matchMedia(`(prefers-reduced-motion: reduce)`).matches;
         if (isReducedMotion) return;
-        this.cleanup = createOneko();
+        this.cleanup = createOneko({
+            speed: this.settings.store.speed
+        });
     },
 
     stop() {
