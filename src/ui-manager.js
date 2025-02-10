@@ -282,12 +282,15 @@ export class UIManager {
     editor.querySelector('.save').addEventListener('click', async () => {
       const css = view.state.doc.toString();
       if (theme) {
-        this.themeManager.updateTheme(theme.id, nameInput.value, css);
+        await this.themeManager.updateTheme(theme.id, nameInput.value, css);
       } else {
-        this.themeManager.createTheme(nameInput.value, css);
+        await this.themeManager.createTheme(nameInput.value, css);
       }
-      await this.themeManager.initializeThemes();
-      this.refreshThemesList(this.settingsModal.querySelector('.betterx-themes-container'));
+      // Mise à jour de la liste des thèmes après enregistrement
+      const themesContainer = document.querySelector('.betterx-themes-container');
+      if (themesContainer) {
+        this.refreshThemesList(themesContainer);
+      }
       view.destroy();
       overlay.remove();
     });
