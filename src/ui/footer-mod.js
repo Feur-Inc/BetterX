@@ -6,6 +6,13 @@ export function injectFooterLink() {
   const webSettingsLink = document.createElement('a');
   webSettingsLink.className = 'css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-n6v787 r-1cwl3u0 r-16dba41 r-1xuzw63 r-faml9v r-1loqt21 betterx-footer-link';
   webSettingsLink.style.color = 'rgb(113, 118, 123)';
+  webSettingsLink.style.textDecoration = 'none';
+  webSettingsLink.addEventListener('mouseenter', () => {
+    webSettingsLink.style.textDecorationLine = 'underline';
+  });
+  webSettingsLink.addEventListener('mouseleave', () => {
+    webSettingsLink.style.textDecorationLine = 'none';
+  });
   webSettingsLink.href = '#';
   webSettingsLink.setAttribute('role', 'link');
 
@@ -19,6 +26,13 @@ export function injectFooterLink() {
   const desktopSettingsLink = document.createElement('a');
   desktopSettingsLink.className = 'css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-n6v787 r-1cwl3u0 r-16dba41 r-1xuzw63 r-faml9v r-1loqt21 betterx-footer-link';
   desktopSettingsLink.style.color = 'rgb(113, 118, 123)';
+  desktopSettingsLink.style.textDecoration = 'none';
+  desktopSettingsLink.addEventListener('mouseenter', () => {
+    desktopSettingsLink.style.textDecorationLine = 'underline';
+  });
+  desktopSettingsLink.addEventListener('mouseleave', () => {
+    desktopSettingsLink.style.textDecorationLine = 'none';
+  });
   desktopSettingsLink.href = '#';
   desktopSettingsLink.setAttribute('role', 'link');
 
