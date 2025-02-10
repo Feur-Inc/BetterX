@@ -99,30 +99,36 @@ export default definePlugin({
 
         const rect = img.getBoundingClientRect();
         
-        let magnifierX = e.clientX - this.magnifierSize / 2;
-        let magnifierY = e.clientY - this.magnifierSize / 2;
-
-        magnifierX = Math.max(0, Math.min(window.innerWidth - this.magnifierSize, magnifierX));
-        magnifierY = Math.max(0, Math.min(window.innerHeight - this.magnifierSize, magnifierY));
+        // Position magnifier directly at cursor offset without window bounds clamping
+        const magnifierX = e.clientX - this.magnifierSize / 2;
+        const magnifierY = e.clientY - this.magnifierSize / 2;
         
         this.magnifier.style.left = magnifierX + 'px';
         this.magnifier.style.top = magnifierY + 'px';
         this.magnifier.style.width = this.magnifierSize + 'px';
         this.magnifier.style.height = this.magnifierSize + 'px';
 
-        // Clamp relative positions between 0 and 1
-        const relativeX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        const relativeY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        // Calculate cursor position relative to image
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
 
         const zoomedWidth = rect.width * this.zoomLevel;
         const zoomedHeight = rect.height * this.zoomLevel;
 
-        const bgX = relativeX * zoomedWidth - this.magnifierSize / 2;
-        const bgY = relativeY * zoomedHeight - this.magnifierSize / 2;
+        // Calculate background position considering out-of-bounds
+        const bgX = (cursorX * this.zoomLevel) - (this.magnifierSize / 2);
+        const bgY = (cursorY * this.zoomLevel) - (this.magnifierSize / 2);
 
         this.magnifier.style.backgroundImage = `url(${img.src})`;
         this.magnifier.style.backgroundSize = `${zoomedWidth}px ${zoomedHeight}px`;
         this.magnifier.style.backgroundPosition = `-${bgX}px -${bgY}px`;
+
+        // Add a small buffer to prevent edge content persistence
+        const buffer = 2;
+        if (cursorX < -buffer || cursorX > rect.width + buffer ||
+            cursorY < -buffer || cursorY > rect.height + buffer) {
+            this.magnifier.style.backgroundImage = 'none';
+        }
     },
 
     handleMouseDown(e) {
