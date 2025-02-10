@@ -6,7 +6,6 @@ let statusInterval;
 let settingsObserver;
 let pageObserver;
 let heartbeatInterval;
-// Ajout de variables globales pour surveiller le span "UserJoinDate"
 let joinDateObserver;
 let joinDateExists = false;
 
@@ -63,9 +62,7 @@ export default definePlugin({
         return username;
     },
 
-    // Ajout d'une méthode pour récupérer le nom d'utilisateur du profil affiché
     getProfileUsername() {
-        // Exemple : "/utilisateurAutre" => "utilisateurAutre"
         const path = window.location.pathname;
         const username = path.split('/')[1] || null;
         return username;
@@ -300,22 +297,16 @@ export default definePlugin({
         }
     },
 
-    // Mise à jour de la fonction d'observation pour le span data-testid="UserJoinDate"
     startJoinDateObserver() {
-        console.log('Starting joinDate observer');
         if (joinDateObserver) joinDateObserver.disconnect();
-        console.log('JoinDate observer disconnected');
+
         const updateJoinDate = () => {
-            console.log('Updating joinDate');
             const prevExists = joinDateExists;
             joinDateExists = !!document.querySelector('span[data-testid="UserJoinDate"]');
-            // Si le span apparaît dynamiquement, relancer la vérification
+            
             if (!prevExists && joinDateExists) {
-                console.log('UserJoinDate span appeared');
-                // Utiliser le nom du profil affiché et non celui de l'utilisateur connecté
                 const profileUsername = this.getProfileUsername();
                 if (profileUsername) {
-                    console.log('UserJoinDate span appeared, checking profile:', profileUsername);
                     this.checkUserAndInjectIcon(profileUsername);
                 }
             }
@@ -636,27 +627,18 @@ export default definePlugin({
             const currentPathname = window.location.pathname;
             const match = currentPathname.match(/^\/([^/]+)(?:\/.*)?$/);
             const newUsername = match ? match[1] : null;
-            console.log('currentUsername:', currentUsername);
-            console.log('newUsername:', newUsername);
-            console.log('currentPathname:', currentPathname);
-            console.log('lastPathname:', lastPathname);
 
             if (newUsername !== null) {
-                console.log('Path changed');
                 if (newUsername !== currentUsername || currentPathname !== lastPathname) {
-                    console.log('Username changed');
                     currentUsername = newUsername;
                     lastPathname = currentPathname;
                     this.retryCount = 0;
                     
                     if (currentUsername) {
-                        console.log('Checking user:', currentUsername);
                         if (currentPathname === `/${currentUsername}` || currentPathname.startsWith(`/${currentUsername}/`)) {
-                            console.log('Injecting icon');
                             this.checkUserAndInjectIcon(currentUsername);
                         }
                     } else {
-                        console.log('Clearing elements');
                         this.clearBetterXElements();
                     }
                 }
@@ -710,7 +692,6 @@ export default definePlugin({
 
         observeDOM();
         this.startSettingsObserver();
-        // Démarrer l'observateur pour le span "UserJoinDate"
         this.startJoinDateObserver();
 
         checkPathChange();
