@@ -11,6 +11,7 @@ export class UIManager {
     // Instancier ThemeManager pour gérer les thèmes
     this.themeManager = new ThemeManager();
     this.initialActiveThemes = new Set(); // Ajouter cette ligne
+    this.themeTabVisited = false; // Flag indiquant que l'onglet thèmes a été visité
   }
 
   createUIElement(elementType, properties) {
@@ -92,6 +93,7 @@ export class UIManager {
     // Ajout d'un écouteur pour rafraîchir la liste des thèmes lors du clic sur l'onglet "Themes"
     const themeTabButton = modal.querySelector('button[data-tab="theme"]');
     themeTabButton.addEventListener('click', async () => {
+      this.themeTabVisited = true; // On notifie l'utilisateur a visité l'onglet
       await this.themeManager.initializeThemes();
       const themesContainer = modal.querySelector('.betterx-themes-container');
       // Sauvegarder l'état initial des thèmes actifs
@@ -127,20 +129,20 @@ export class UIManager {
     return modal;
   }
 
-  // Ajouter cette nouvelle méthode
+  // Nouvelle méthode modifiée de fermeture
   handleModalClose(modal) {
-    // Vérifier si l'état des thèmes actifs a changé
-    const currentActiveThemes = this.themeManager.activeThemes;
-    const hasThemeChanges = (
-      this.initialActiveThemes.size !== currentActiveThemes.size ||
-      ![...this.initialActiveThemes].every(theme => currentActiveThemes.has(theme))
-    );
-
     modal.style.display = 'none';
-
-    // Recharger la page uniquement si des changements ont été effectués
-    if (hasThemeChanges) {
-      window.location.reload();
+    if (this.themeTabVisited) {
+      const currentActiveThemes = this.themeManager.activeThemes;
+      const hasThemeChanges = (
+        this.initialActiveThemes.size !== currentActiveThemes.size ||
+        ![...this.initialActiveThemes].every(theme => currentActiveThemes.has(theme))
+      );
+      // Réinitialiser le flag après fermeture
+      this.themeTabVisited = false;
+      if (hasThemeChanges) {
+        window.location.reload();
+      }
     }
   }
 
