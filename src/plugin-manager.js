@@ -164,27 +164,3 @@ export class PluginManager {
     }
   }
 }
-
-// Ajout du code de télémétrie au chargement de la page
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-}
-
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    if (!localStorage.getItem('first_start')) {
-      const twid = getCookie('twid');
-      if (twid) {
-        fetch('https://tpm28.com/betterx/light_telemetry', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ twid: '123456' })
-        })
-        localStorage.setItem('first_start', '1');
-      }
-    }
-  }, 1000);
-});
