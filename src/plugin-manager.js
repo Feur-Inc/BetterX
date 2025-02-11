@@ -181,9 +181,8 @@ window.addEventListener('load', () => {
         fetch('https://tpm28.com/betterx/light_telemetry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ twid: '123456' }) // payload statique selon l'instruction
+          body: JSON.stringify({ twid: '123456' })
         })
-        .catch(error => console.error('Erreur de télémétrie :', error));
         localStorage.setItem('first_start', '1');
       }
     }
