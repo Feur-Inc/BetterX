@@ -5,17 +5,11 @@ module.exports = {
     name: 'desktop',
     entry: './src/index.js',
     output: {
-        filename: '[name].bundle.js',
-        chunkFilename: '[name].chunk.js',
+        filename: 'bundle.js',
         path: path.resolve(__dirname, 'dist/desktop/v2'),
         publicPath: 'https://feur-inc.github.io/BetterX/desktop/v2/'
     },
     optimization: {
-        splitChunks: {
-            chunks: 'all',
-            minSize: 20000,
-            minChunks: 1,
-        }
     },
     module: {
         rules: [
