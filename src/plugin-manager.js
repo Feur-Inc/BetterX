@@ -101,17 +101,13 @@ export class PluginManager {
         });
       }
     } else {
-      plugin.enabled = isFirstRun && plugin.name === "UsersStatus";
+      plugin.enabled = false;
       
       if (plugin.options) {
         Object.keys(plugin.options).forEach(optionKey => {
           plugin.settings.store[optionKey] = plugin.options[optionKey].default;
         });
       }
-    }
-
-    if (plugin.enabled && plugin.name === "UsersStatus") {
-      this.safePluginCall(plugin, 'start');
     }
   }
 
