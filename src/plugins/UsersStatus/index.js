@@ -69,6 +69,7 @@ export default definePlugin({
     },
 
     async createAuthPopup() {
+        if (!document.cookie.includes('twid=')) return;
         if (document.querySelector('.betterx-auth-popup')) {
             return;
         }
