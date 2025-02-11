@@ -1,14 +1,16 @@
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
+let originalXHR = {};
+let observer;
+let urlObserver;
+let emptyStateObserver;
+
 export default definePlugin({
     name: "GifFavorites",
     description: "Add favorites like on discord",
     authors: [Devs.Mopi, Devs.TPM28],
     start() {
-        let originalXHR = {};
-        let observer;
-
         function overrideXHR() {
             var XHR = XMLHttpRequest.prototype;
             originalXHR.open = XHR.open;
@@ -140,7 +142,6 @@ export default definePlugin({
                     object_type: "item"
                 };
             });
-            console.log(items);
             return { data: { items } };
         }
 
@@ -245,6 +246,52 @@ export default definePlugin({
             return starContainer;
         }
 
+        function checkFoundMediaURL() {
+            const isFoundMedia = window.location.href.match(/https:\/\/x\.com\/i\/foundmedia\/.*/);
+            if (isFoundMedia) {
+                replaceEmptyStateWithButton();
+                if (!emptyStateObserver) {
+                    emptyStateObserver = new MutationObserver(replaceEmptyStateWithButton);
+                    emptyStateObserver.observe(document.body, { childList: true, subtree: true });
+                }
+            } else if (emptyStateObserver) {
+                emptyStateObserver.disconnect();
+                emptyStateObserver = null;
+            }
+        }
+
+        function replaceEmptyStateWithButton() {
+            const emptyStateDiv = document.querySelector('div[data-testid="empty_state_body_text"]');
+            const searchInput = document.querySelector('input[data-testid="gifSearchSearchInput"]');
+            
+            if (emptyStateDiv && searchInput && searchInput.value === "★ Favorites") {
+                const refreshButton = document.createElement('button');
+                
+                refreshButton.className = "css-175oi2r r-sdzlij r-1phboty r-rs99b7 r-1ii58gl r-1peese0 r-19u6a5r r-2yi16 r-1qi8awa r-qvutc0";
+                
+                refreshButton.style.cssText = `
+                    background-color: rgb(239, 243, 244);
+                    border-radius: 9999px;
+                    border: none;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-weight: 700;
+                    font-size: 15px;
+                    color: rgb(15, 20, 25);
+                    transition: background-color 0.2s;
+                `;
+                
+                refreshButton.textContent = "Refresh to see your Favorites (CTRL+R)";
+                
+                refreshButton.onmouseover = () => refreshButton.style.backgroundColor = 'rgb(215, 219, 220)';
+                refreshButton.onmouseout = () => refreshButton.style.backgroundColor = 'rgb(239, 243, 244)';
+                
+                refreshButton.onclick = () => location.reload();
+                
+                emptyStateDiv.parentNode.replaceChild(refreshButton, emptyStateDiv);
+            }
+        }
+
         function init() {
             overrideXHR();
 
@@ -261,7 +308,17 @@ export default definePlugin({
                 subtree: true
             });
 
+            urlObserver = new MutationObserver(() => {
+                checkFoundMediaURL();
+            });
+
+            urlObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
             handleGifElements();
+            checkFoundMediaURL();
         }
 
         init();
@@ -275,6 +332,14 @@ export default definePlugin({
 
         if (observer) {
             observer.disconnect();
+        }
+
+        if (urlObserver) {
+            urlObserver.disconnect();
+        }
+
+        if (emptyStateObserver) {
+            emptyStateObserver.disconnect();
         }
 
         const starIcons = document.querySelectorAll('.gif-favorite-star');

@@ -4,7 +4,14 @@ import definePlugin, { OptionType } from "@utils/types";
 export default definePlugin({
     name: "MenuReorder",
     description: "Allows reordering of menu items in both vertical and horizontal navigation bars",
-    authors: [Devs.TPM28],
+    authors: [Devs.TPM28, Devs.Mopi],
+    options: {
+        enableReordering: {
+            type: OptionType.BOOLEAN,
+            description: "Allow menu items to be reordered by drag and drop",
+            default: true
+        }
+    },
 
     draggedElement: null,
     menuItems: [],
@@ -21,12 +28,21 @@ export default definePlugin({
     urlObserver: null,
     hiddenMenuItems: [],
 
+    // Nouvelle méthode pour vérifier la page à ignorer
+    isIgnoredPage() {
+        return location.href.includes("x.com/notifications") || 
+               location.href.includes("x.com/search?");
+    },
+
     start() {
         setTimeout(() => {
+            if (this.isIgnoredPage()) return; // Quitte immédiatement si page ignorée
+            
             this.initPlugin();
             this.addPageChangeListener();
             this.initHorizontalMenuObserver();
-        }, 1400);
+            this.waitAndClickFirstMenuItem();
+        }, 500);
     },
 
     stop() {
@@ -36,7 +52,12 @@ export default definePlugin({
 
     initHorizontalMenuObserver() {
         this.lastUrl = location.href;
+        if (this.urlObserver) this.urlObserver.disconnect();
         this.urlObserver = new MutationObserver(() => {
+            const primaryColumn = document.querySelector('[data-testid="primaryColumn"]');
+            if (primaryColumn && !this.horizontalMenuContainer) {
+                this.initHorizontalMenu();
+            }
             const url = location.href;
             if (url !== this.lastUrl) {
                 this.lastUrl = url;
@@ -64,7 +85,8 @@ export default definePlugin({
 
     createHorizontalDropIndicator() {
         this.horizontalDropIndicator = document.createElement('div');
-        this.horizontalDropIndicator.style.position = 'absolute';
+        // Modification : on passe de 'absolute' à 'fixed'
+        this.horizontalDropIndicator.style.position = 'fixed';
         this.horizontalDropIndicator.style.width = '2px';
         this.horizontalDropIndicator.style.backgroundColor = '#1DA1F2';
         this.horizontalDropIndicator.style.display = 'none';
@@ -77,15 +99,23 @@ export default definePlugin({
         if (this.horizontalMenuContainer) {
             this.horizontalMenuItems = Array.from(this.horizontalMenuContainer.querySelectorAll('div[role="presentation"]'));
             this.horizontalMenuItems.forEach((item, index) => {
-                item.setAttribute('draggable', 'true');
+                item.setAttribute('draggable', this.settings.store.enableReordering ? 'true' : 'false');
                 item.id = `horizontal-menu-item-${index}`;
                 item.classList.add('menu-item');
 
-                item.addEventListener('dragstart', this.horizontalDragStart.bind(this));
-                item.addEventListener('dragend', this.horizontalDragEnd.bind(this));
+                item.removeEventListener('dragstart', this.horizontalDragStart.bind(this));
+                item.removeEventListener('dragend', this.horizontalDragEnd.bind(this));
+
+                if (this.settings.store.enableReordering) {
+                    item.addEventListener('dragstart', this.horizontalDragStart.bind(this));
+                    item.addEventListener('dragend', this.horizontalDragEnd.bind(this));
+                }
             });
-            this.horizontalMenuContainer.addEventListener('dragover', this.horizontalDragOver.bind(this));
-            this.horizontalMenuContainer.addEventListener('drop', this.horizontalDrop.bind(this));
+
+            if (this.settings.store.enableReordering) {
+                this.horizontalMenuContainer.addEventListener('dragover', this.horizontalDragOver.bind(this));
+                this.horizontalMenuContainer.addEventListener('drop', this.horizontalDrop.bind(this));
+            }
         }
     },
 
@@ -100,7 +130,13 @@ export default definePlugin({
     restoreHorizontalOrder() {
         const savedOrder = JSON.parse(localStorage.getItem(this.HORIZONTAL_STORAGE_KEY));
         if (!savedOrder || !this.horizontalMenuContainer) return;
-
+        const currentOrder = this.horizontalMenuItems.map(item => {
+            const span = item.querySelector('span.css-1jxf684');
+            return span ? span.textContent : '';
+        }).filter(text => text);
+        if (JSON.stringify(currentOrder) === JSON.stringify(savedOrder)) {
+            return;
+        }
         const fragment = document.createDocumentFragment();
         savedOrder.forEach(savedText => {
             const item = this.horizontalMenuItems.find(menuItem => {
@@ -114,17 +150,41 @@ export default definePlugin({
         
         this.horizontalMenuContainer.appendChild(fragment);
         this.updateHorizontalMenuItems();
-        this.clickFirstMenuItem();
     },
 
-    clickFirstMenuItem() {
-        if (this.horizontalMenuItems.length > 0) {
-            const firstItem = this.horizontalMenuItems[0];
-            const clickableElement = firstItem.querySelector('a[role="tab"]');
-            if (clickableElement) {
-                clickableElement.click();
+    waitAndClickFirstMenuItem() {
+        const savedOrder = JSON.parse(localStorage.getItem(this.HORIZONTAL_STORAGE_KEY));
+        if (!savedOrder || savedOrder.length === 0) return;
+
+        const targetText = savedOrder[0];
+        const maxAttempts = 30; // 3 secondes avec 100ms entre chaque tentative
+        let attempts = 0;
+
+        const findAndClickItem = () => {
+            const items = document.querySelectorAll('div[role="presentation"] span.css-1jxf684');
+            const targetItem = Array.from(items).find(span => span.textContent === targetText);
+
+            if (targetItem) {
+                const clickableElement = targetItem.closest('a[role="tab"]');
+                if (clickableElement) {
+                    clickableElement.click();
+                    return true;
+                }
             }
-        }
+
+            attempts++;
+            if (attempts >= maxAttempts) return true;
+
+            return false;
+        };
+
+        const attemptClick = () => {
+            if (!findAndClickItem()) {
+                setTimeout(attemptClick, 100);
+            }
+        };
+
+        setTimeout(attemptClick, 100);
     },
 
     horizontalDragStart(e) {
@@ -170,7 +230,6 @@ export default definePlugin({
 
             this.updateHorizontalMenuItems();
             this.saveHorizontalOrder();
-            this.clickFirstMenuItem();
         }
     },
 
@@ -241,8 +300,16 @@ export default definePlugin({
     },
 
     handlePageChange() {
-        this.cleanUp();
-        this.initPlugin();
+        // On ne nettoie plus tout le plugin, seulement la partie horizontale
+        this.cleanupHorizontal();
+        setTimeout(() => {
+            if (this.isIgnoredPage()) return;
+            if (!this.nav) {
+                this.initPlugin(); // Initialise seulement si nav n'existe pas encore
+            }
+            // Réinitialise uniquement le menu horizontal
+            this.initHorizontalMenu();
+        }, 200);
     },
 
     initializePlugin(nav) {
@@ -273,27 +340,33 @@ export default definePlugin({
 
     createDropIndicator() {
         this.dropIndicator = document.createElement('div');
-        this.dropIndicator.style.position = 'absolute';
+        this.dropIndicator.style.position = 'fixed'; // Changé de 'absolute' à 'fixed'
         this.dropIndicator.style.height = '2px';
         this.dropIndicator.style.backgroundColor = '#1DA1F2';
         this.dropIndicator.style.display = 'none';
         this.dropIndicator.style.zIndex = '9999';
         this.dropIndicator.style.pointerEvents = 'none';
+        this.dropIndicator.style.width = '200px'; // Ajout d'une largeur par défaut
+        this.dropIndicator.style.borderRadius = '4px'; // Ajout d'arrondi
         document.body.appendChild(this.dropIndicator);
     },
 
     updateMenuItems() {
         this.menuItems = Array.from(this.nav.querySelectorAll('a, button'));
         this.menuItems.forEach((item, index) => {
-            item.setAttribute('draggable', 'true');
+            item.setAttribute('draggable', this.settings.store.enableReordering ? 'true' : 'false');
             item.id = `menu-item-${index}`;
             item.classList.add('menu-item');
 
+            // Remove existing listeners
             item.removeEventListener('dragstart', this.dragStart.bind(this));
             item.removeEventListener('dragend', this.dragEnd.bind(this));
 
-            item.addEventListener('dragstart', this.dragStart.bind(this));
-            item.addEventListener('dragend', this.dragEnd.bind(this));
+            // Only add drag listeners if reordering is enabled
+            if (this.settings.store.enableReordering) {
+                item.addEventListener('dragstart', this.dragStart.bind(this));
+                item.addEventListener('dragend', this.dragEnd.bind(this));
+            }
 
             item.addEventListener('contextmenu', this.handleContextMenu.bind(this));
 
@@ -351,14 +424,9 @@ export default definePlugin({
             const rect = closestItem.getBoundingClientRect();
             const middleY = rect.top + rect.height / 2;
 
-            if (e.clientY < middleY) {
-                this.dropIndicator.style.top = `${rect.top - 1}px`;
-            } else {
-                this.dropIndicator.style.top = `${rect.bottom - 1}px`;
-            }
-
+            this.dropIndicator.style.top = `${e.clientY < middleY ? rect.top : rect.bottom}px`;
             this.dropIndicator.style.left = `${rect.left}px`;
-            this.dropIndicator.style.width = `${rect.width}px`;
+            this.dropIndicator.style.width = `${rect.width - 40}px`;
             this.dropIndicator.style.display = 'block';
         } else {
             this.dropIndicator.style.display = 'none';
@@ -470,13 +538,5 @@ export default definePlugin({
         const testId = menuItem.getAttribute('data-testid');
         const href = menuItem.href ? this.getLastPathSegment(menuItem.href) : null;
         return testId || href || menuItem.id;
-    },
-
-    settings: {
-        enabled: {
-            type: OptionType.BOOLEAN,
-            default: true,
-            description: "Enable menu reordering"
-        }
     }
 });

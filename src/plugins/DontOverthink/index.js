@@ -5,6 +5,7 @@ let observer;
 let checkDivId;
 let settingsCheckInterval;
 let currentDuration;
+let activeTimers = new Set();
 
 function addTimer(composerBox) {
   if (!composerBox.parentNode.querySelector("#tweet-timer")) {
@@ -33,6 +34,7 @@ function startTimerProcess(timerDiv) {
     } else {
       if (timerId) {
         clearInterval(timerId);
+        activeTimers.delete(timerId);
         timerId = null;
         timerDiv.textContent = "";
       }
@@ -47,6 +49,7 @@ function startTimerProcess(timerDiv) {
       timerDiv.textContent = `Time remaining: ${timeLeft} seconds`;
       if (timeLeft < 0) {
         clearInterval(timerId);
+        activeTimers.delete(timerId);
         timerId = null;
         timerDiv.textContent = "Time's up!";
         const tweetButton = document.querySelector(
@@ -57,9 +60,11 @@ function startTimerProcess(timerDiv) {
         }
       }
     }, 1000);
+    activeTimers.add(timerId);
   }
 
   checkDivId = setInterval(checkButtonAndStartTimer, 500);
+  activeTimers.add(checkDivId);
 }
 
 function checkAndAddTimer() {
@@ -121,6 +126,12 @@ export default definePlugin({
     if (settingsCheckInterval) {
       clearInterval(settingsCheckInterval);
     }
+    // Nettoyer tous les timers actifs
+    for (const timerId of activeTimers) {
+      clearInterval(timerId);
+    }
+    activeTimers.clear();
+    
     const timerDiv = document.querySelector("#tweet-timer");
     if (timerDiv) {
       timerDiv.remove();

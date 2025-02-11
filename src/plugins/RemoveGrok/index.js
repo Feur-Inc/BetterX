@@ -1,22 +1,19 @@
 import { Devs } from "@utils/constants";
-import definePlugin, { OptionType } from "@utils/types";
+import definePlugin from "@utils/types";
 
 let observer;
 
 export default definePlugin({
-    name: "RemovePremium",
-    description: "Remove all the premium elements",
+    name: "RemoveGrok",
+    description: "Remove all Grok elements",
     authors: [Devs.TPM28],
     start() {
         const selectors = [
-            'a[href="/i/premium_sign_up"]',
-            'a[href="/i/verified-orgs-signup"]',
-            'a[href="/i/monetization"]',
-            'a[href^="https://ads.x.com/?"]',
-            'a[href="/i/premium_sign_up?referring_page=settings"]',
-            'a[href="/jobs"]',
-            'aside[aria-label*="Premium"][role="complementary"]',
-            'div[data-testid="inlinePrompt"]'
+            'a[href="/i/grok"]',
+            '[data-testid="GrokDrawer"]',
+            'button[aria-label="Grok actions"]',
+            'button[data-testid="grokImgGen"]',
+            'button[aria-label="Profile Summary"]'
         ];
 
         const removeElements = () => {
@@ -27,23 +24,6 @@ export default definePlugin({
                     element.style.width = '0px';
                     element.style.height = '0px';
                 });
-            });
-
-            const elements = document.querySelectorAll('[role="complementary"].r-eqz5dr');
-            elements.forEach(element => {
-                const hasUlInside = element.querySelector('ul');
-                if (!hasUlInside) {
-                    const parentDiv = element.parentElement;
-                    if (parentDiv) {
-                        parentDiv.style.display = 'none';
-                        parentDiv.style.width = '0px';
-                        parentDiv.style.height = '0px';
-                    } else {
-                        element.style.display = 'none';
-                        element.style.width = '0px';
-                        element.style.height = '0px';
-                    }
-                }
             });
         };
 
