@@ -10,6 +10,7 @@ export class UIManager {
     this.observer = null;
     // Instancier ThemeManager pour gérer les thèmes
     this.themeManager = new ThemeManager();
+    this.initialActiveThemes = new Set(); // Ajouter cette ligne
   }
 
   createUIElement(elementType, properties) {
@@ -93,6 +94,8 @@ export class UIManager {
     themeTabButton.addEventListener('click', async () => {
       await this.themeManager.initializeThemes();
       const themesContainer = modal.querySelector('.betterx-themes-container');
+      // Sauvegarder l'état initial des thèmes actifs
+      this.initialActiveThemes = new Set(this.themeManager.activeThemes);
       this.refreshThemesList(themesContainer);
     });
 
@@ -103,12 +106,12 @@ export class UIManager {
     // Add event listeners for the modal
     const closeBtn = modal.querySelector('.betterx-close');
     closeBtn.onclick = () => {
-      modal.style.display = 'none';
+      this.handleModalClose(modal);
     };
 
     window.onclick = (event) => {
       if (event.target == modal) {
-        modal.style.display = 'none';
+        this.handleModalClose(modal);
       }
     };
 
@@ -122,6 +125,23 @@ export class UIManager {
     this.populatePluginList(modal.querySelector('#betterx-plugin-list-container'));
 
     return modal;
+  }
+
+  // Ajouter cette nouvelle méthode
+  handleModalClose(modal) {
+    // Vérifier si l'état des thèmes actifs a changé
+    const currentActiveThemes = this.themeManager.activeThemes;
+    const hasThemeChanges = (
+      this.initialActiveThemes.size !== currentActiveThemes.size ||
+      ![...this.initialActiveThemes].every(theme => currentActiveThemes.has(theme))
+    );
+
+    modal.style.display = 'none';
+
+    // Recharger la page uniquement si des changements ont été effectués
+    if (hasThemeChanges) {
+      window.location.reload();
+    }
   }
 
   initializeThemeUI(modal) {
