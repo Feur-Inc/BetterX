@@ -75,7 +75,7 @@ function makeResizable(element, innerElement) {
             const newWidth = startWidth + dx;
             if (newWidth <= 900 && newWidth >= 300) {
                 element.style.width = `${newWidth}px`;
-                localStorage.setItem('dmDrawerWidth', newWidth);
+                // Removed localStorage set for width during drag.
             }
         }
         
@@ -83,7 +83,7 @@ function makeResizable(element, innerElement) {
             const newHeight = startHeight + dy;
             if (newHeight <= 740 && newHeight >= 53) {
                 innerElement.style.maxHeight = `${newHeight}px`;
-                localStorage.setItem('dmDrawerHeight', newHeight);
+                // Removed localStorage set for height during drag.
             }
         }
     }
@@ -92,6 +92,11 @@ function makeResizable(element, innerElement) {
         document.removeEventListener('mousemove', doDrag, false);
         document.removeEventListener('mouseup', stopDrag, false);
         document.body.style.userSelect = '';
+        
+        // Update localStorage once after the drag ends.
+        localStorage.setItem('dmDrawerWidth', element.style.width.replace('px', ''));
+        localStorage.setItem('dmDrawerHeight', innerElement.style.maxHeight.replace('px', ''));
+        
         currentResizer = null;
     }
 

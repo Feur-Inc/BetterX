@@ -15,7 +15,8 @@ export default definePlugin({
             'a[href^="https://ads.x.com/?"]',
             'a[href="/i/premium_sign_up?referring_page=settings"]',
             'a[href="/jobs"]',
-            'aside[aria-label*="Premium"][role="complementary"]'
+            'aside[aria-label*="Premium"][role="complementary"]',
+            'div[data-testid="inlinePrompt"]'
         ];
 
         const removeElements = () => {
