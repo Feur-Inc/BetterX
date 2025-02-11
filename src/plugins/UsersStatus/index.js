@@ -6,7 +6,6 @@ let statusInterval;
 let settingsObserver;
 let pageObserver;
 let heartbeatInterval;
-// Ajout de variables globales pour surveiller le span "UserJoinDate"
 let joinDateObserver;
 let joinDateExists = false;
 
@@ -44,7 +43,7 @@ export default definePlugin({
         return localStorage.getItem('betterx_token');
     },
 
-    getCurrentUsername() {
+    getAppUsername() {
         const profileLink = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
         let username = null;
         
@@ -52,14 +51,20 @@ export default definePlugin({
             const href = profileLink.getAttribute('href');
             if (href) {
                 username = href.substring(1);
-                localStorage.setItem('betterx-username', username);
+                localStorage.setItem('betterx-app-username', username);
             }
         }
 
         if (!username) {
-            username = localStorage.getItem('betterx-username');
+            username = localStorage.getItem('betterx-app-username');
         }
 
+        return username;
+    },
+
+    getProfileUsername() {
+        const path = window.location.pathname;
+        const username = path.split('/')[1] || null;
         return username;
     },
 
@@ -188,7 +193,7 @@ export default definePlugin({
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            username: this.getCurrentUsername(),
+                            username: this.getAppUsername(),
                             token: tokenData.oauth_token
                         })
                     });
@@ -226,7 +231,7 @@ export default definePlugin({
                 return;
             }
 
-            const username = this.getCurrentUsername();
+            const username = this.getAppUsername();
             const token = this.AuthToken();
             
             if (!token) {
@@ -292,17 +297,17 @@ export default definePlugin({
         }
     },
 
-    // Mise à jour de la fonction d'observation pour le span data-testid="UserJoinDate"
     startJoinDateObserver() {
         if (joinDateObserver) joinDateObserver.disconnect();
+
         const updateJoinDate = () => {
             const prevExists = joinDateExists;
             joinDateExists = !!document.querySelector('span[data-testid="UserJoinDate"]');
-            // Si le span apparaît dynamiquement, relancer la vérification
+            
             if (!prevExists && joinDateExists) {
-                const username = this.getCurrentUsername();
-                if (username) {
-                    this.checkUserAndInjectIcon(username);
+                const profileUsername = this.getProfileUsername();
+                if (profileUsername) {
+                    this.checkUserAndInjectIcon(profileUsername);
                 }
             }
         };
@@ -427,7 +432,7 @@ export default definePlugin({
 
     async updateUserStatus(status) {
         try {
-            const username = this.getCurrentUsername();
+            const username = this.getAppUsername();
             const token = this.AuthToken();
             
             if (!username || !token) return;
@@ -623,17 +628,19 @@ export default definePlugin({
             const match = currentPathname.match(/^\/([^/]+)(?:\/.*)?$/);
             const newUsername = match ? match[1] : null;
 
-            if (newUsername !== currentUsername || currentPathname !== lastPathname) {
-                currentUsername = newUsername;
-                lastPathname = currentPathname;
-                this.retryCount = 0;
-                
-                if (currentUsername) {
-                    if (currentPathname === `/${currentUsername}` || currentPathname.startsWith(`/${currentUsername}/`)) {
-                        this.checkUserAndInjectIcon(currentUsername);
+            if (newUsername !== null) {
+                if (newUsername !== currentUsername || currentPathname !== lastPathname) {
+                    currentUsername = newUsername;
+                    lastPathname = currentPathname;
+                    this.retryCount = 0;
+                    
+                    if (currentUsername) {
+                        if (currentPathname === `/${currentUsername}` || currentPathname.startsWith(`/${currentUsername}/`)) {
+                            this.checkUserAndInjectIcon(currentUsername);
+                        }
+                    } else {
+                        this.clearBetterXElements();
                     }
-                } else {
-                    this.clearBetterXElements();
                 }
             }
         };
@@ -685,7 +692,6 @@ export default definePlugin({
 
         observeDOM();
         this.startSettingsObserver();
-        // Démarrer l'observateur pour le span "UserJoinDate"
         this.startJoinDateObserver();
 
         checkPathChange();

@@ -5,6 +5,7 @@ import { ThemeManager, applyTheme } from './theme-manager.js';
 async function initializeBetterX() {
   const pluginManager = new PluginManager();
   const themeManager = new ThemeManager();
+  themeManager.removeKemksiClass(); // Appel pour vérifier l'exécution de removeKemksiClass
   await pluginManager.loadPlugins();
 
   // Initialize and apply plugins
