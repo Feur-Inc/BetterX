@@ -8,6 +8,10 @@ export const OptionType = {
 export default function definePlugin(options) {
     return {
         ...options,
-        settings: options.settings || {}
+        settings: {
+            ...options.settings,
+            store: options.settings?.store || {},
+            onChange: options.settings?.onChange || {}
+        }
     };
 }

@@ -146,8 +146,15 @@ export class PluginManager {
   updatePluginOption(pluginName, optionId, value) {
     const plugin = this.plugins.find(p => p.name === pluginName);
     if (plugin && plugin.settings && plugin.settings.store) {
+      const oldValue = plugin.settings.store[optionId];
       plugin.settings.store[optionId] = value;
       this.savePluginData();
+      
+      // Call onChange handler if it exists in the option definition
+      const optionConfig = plugin.options?.[optionId];
+      if (optionConfig?.onChange) {
+        optionConfig.onChange.call(plugin, value, oldValue);
+      }
     }
   }
 

@@ -259,7 +259,13 @@ export default definePlugin({
             default: 1,
             min: 0.1,
             max: 5,
-            step: 0.1
+            step: 0.1,
+            onChange: function() {
+                if (this.currentOneko && this.enabled) {
+                    this.stop();
+                    this.start();
+                }
+            }
         },
         theme: {
             type: OptionType.SELECT,
@@ -268,25 +274,35 @@ export default definePlugin({
             options: Object.entries(THEMES).map(([key, value]) => ({
                 label: key.charAt(0) + key.slice(1).toLowerCase(),
                 value: value
-            }))
+            })),
+            onChange: function() {
+                if (this.currentOneko && this.enabled) {
+                    this.stop();
+                    this.start();
+                }
+            }
         }
     },
 
     cleanup: null,
+    currentOneko: null,
 
     start() {
         const isReducedMotion = window.matchMedia(`(prefers-reduced-motion: reduce)`).matches;
         if (isReducedMotion) return;
-        this.cleanup = createOneko({
+        
+        this.currentOneko = createOneko({
             speed: this.settings.store.speed,
             theme: this.settings.store.theme
         });
+        this.cleanup = this.currentOneko;
     },
 
     stop() {
         if (this.cleanup) {
             this.cleanup();
             this.cleanup = null;
+            this.currentOneko = null;
         }
     }
 });
