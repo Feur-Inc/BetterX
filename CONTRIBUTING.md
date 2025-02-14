@@ -12,15 +12,37 @@ Thank you for your interest in contributing to BetterX! This document will guide
 ## Development Setup
 
 1. Fork and clone the repository
-2. Install dependencies:
+2. Install Bun:
+   - **Linux/macOS**:
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   ```
+   - **Windows**:
+   ```powershell
+   powershell -c "irm bun.sh/install.ps1|iex"
+   ```
+3. Install dependencies:
 ```bash
-npm install -g pnpm
-pnpm install
+bun install
 ```
-3. Create a new branch for your changes:
+4. Create a new branch for your changes:
 ```bash
 git checkout -b feature/your-feature-name
 ```
+
+## Development Workflow
+
+1. Start the development server:
+```bash
+bun run watch
+```
+This enables Webpack's watch mode, which automatically rebuilds when you make changes.
+
+2. Open BetterX Desktop
+3. Make changes to the code
+4. Refresh BetterX Desktop to see your changes
+   - The bundle will automatically reload with your latest changes
+   - No need to restart the app, just refresh the page
 
 ## Plugin Development
 
@@ -41,14 +63,25 @@ import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
 export default definePlugin({
-    name: "YourPlugin",
-    description: "What your plugin does",
+    name: "YourPluginName",
+    description: "Description of your plugin",
     authors: [Devs.YourName],
     start() {
-        // Plugin code
+        // Initialization code
     },
     stop() {
         // Cleanup code
+    },
+    settings: {
+        someOption: {
+            type: OptionType.BOOLEAN,
+            default: true,
+            description: "Description of the option"
+            onChange: function() {
+                // Execute on option changed 
+                }
+            }
+        }
     }
 });
 ```

@@ -19,16 +19,26 @@ git clone https://github.com/Feur-Inc/BetterX.git
 ```
 cd BetterX
 ```
-3. Install dependencies:
+3. Install Bun:
+   - **Linux/macOS**:
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   ```
+   - **Windows**:
+   ```powershell
+   powershell -c "irm bun.sh/install.ps1|iex"
+   ```
+   
+4. Install dependencies:
 ```
-npm install -g pnpm
-pnpm install
+bun install
 ```
+
 ## Building the Project
 
 To build BetterX, run the following command:
 ```
-npm run build
+bun run build
 ```
 This will use Webpack to compile and bundle the project.
 
@@ -63,6 +73,10 @@ export default definePlugin({
             type: OptionType.BOOLEAN,
             default: true,
             description: "Description of the option"
+            onChange: function() {
+                // Execute on option changed 
+                }
+            }
         }
     }
 });
