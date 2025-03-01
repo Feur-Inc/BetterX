@@ -22,10 +22,7 @@ async function sendLightTelemetry() {
 }
 
 async function initializeBetterX() {
-  // Attendre 1 seconde
-  console.log("Waiting 1 second...");
   await new Promise(resolve => setTimeout(resolve, 1000));
-  console.log("1 second passed!");
   // Vérifier first_start et envoyer la télémétrie si nécessaire
   if (!localStorage.getItem('first_start')) {
     await sendLightTelemetry();
