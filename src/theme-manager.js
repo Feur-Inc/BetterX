@@ -304,34 +304,225 @@ export class ThemeManager {
   }
 
   async applyTheme(theme) {
-      if (!this.styleElement) {
-          this.styleElement = document.createElement('style');
-          this.styleElement.id = 'betterx-custom-theme';
-          document.head.appendChild(this.styleElement);
-      }
+    if (!this.styleElement) {
+      this.styleElement = document.createElement('style');
+      this.styleElement.id = 'betterx-custom-theme';
+      document.head.appendChild(this.styleElement);
+    }
 
-      theme.enabled = true;
-      // Remplacer saveThemes par saveThemeState
+    theme.enabled = true;
+    this.saveThemeState();
+    this.activeThemes.add(theme.id);
+
+    const enabledThemes = this.themes.filter(t => t.enabled);
+    
+    // Apply custom properties first
+    const allCustomProperties = {};
+    enabledThemes.forEach(theme => {
+      Object.assign(allCustomProperties, this.extractCustomProperties(theme.css));
+    });
+    this.applyCustomProperties(allCustomProperties);
+
+    // Split CSS into sections (preserving selectors with their rules)
+    const combinedCSS = enabledThemes.slice().reverse().map(t => t.css).join('\n\n');
+    const sections = this.splitCSSIntoSections(combinedCSS);
+    
+    // Process sections in chunks
+    const chunkSize = 20; // Process 20 rules at a time
+    for (let i = 0; i < sections.length; i += chunkSize) {
+      const chunk = sections.slice(i, i + chunkSize);
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          const processedChunk = chunk.map(section => this.processSection(section)).join('\n');
+          if (i === 0) {
+            this.styleElement.textContent = processedChunk;
+          } else {
+            this.styleElement.textContent += '\n' + processedChunk;
+          }
+          resolve();
+        });
+      });
+    }
+  }
+
+  splitCSSIntoSections(css) {
+    // Remove comments first
+    css = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    
+    const sections = [];
+    let currentSection = '';
+    let braceCount = 0;
+    let inMediaQuery = false;
+    
+    // Split into characters and process
+    const chars = css.split('');
+    
+    for (let i = 0; i < chars.length; i++) {
+      const char = chars[i];
+      currentSection += char;
+      
+      if (char === '{') {
+        braceCount++;
+        if (currentSection.includes('@media')) {
+          inMediaQuery = true;
+        }
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0 && !inMediaQuery) {
+          sections.push(currentSection.trim());
+          currentSection = '';
+        } else if (braceCount === 0 && inMediaQuery) {
+          inMediaQuery = false;
+          sections.push(currentSection.trim());
+          currentSection = '';
+        }
+      }
+    }
+    
+    return sections.filter(section => section.length > 0);
+  }
+
+  processSection(section) {
+    // Don't modify @-rules
+    if (section.trim().startsWith('@')) {
+      return section;
+    }
+
+    // Process regular CSS rules
+    return section.replace(/([^{}]+){([^{}]+)}/g, (match, selector, rules) => {
+      const processedRules = rules.split(';')
+        .map(rule => rule.trim())
+        .filter(rule => rule.length > 0)
+        .map(rule => {
+          const [prop, ...values] = rule.split(':');
+          const value = values.join(':').trim();
+          if (!value) return '';
+          
+          // Skip adding !important to certain properties
+          if (prop.includes('animation') || prop.includes('transition')) {
+            return `${prop}: ${value}`;
+          }
+          
+          return `${prop}: ${value}${value.includes('!important') ? '' : ' !important'}`;
+        })
+        .filter(rule => rule.length > 0)
+        .join(';\n  ');
+
+      return `${selector.trim()} {\n  ${processedRules}\n}`;
+    });
+  }
+
+  async applyProcessedCSSInChunks(css, chunkSize = 1000) {
+    // Split CSS into manageable chunks while preserving rules
+    const rules = css.match(/{[^}]*}/g) || [];
+    const chunks = [];
+    let currentChunk = [];
+    let currentSize = 0;
+
+    for (const rule of rules) {
+      currentSize += rule.length;
+      currentChunk.push(rule);
+      
+      if (currentSize >= chunkSize) {
+        chunks.push(currentChunk.join(''));
+        currentChunk = [];
+        currentSize = 0;
+      }
+    }
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.join(''));
+    }
+
+    // Process and apply chunks with delays
+    for (let i = 0; i < chunks.length; i++) {
+      const processedChunk = this.processCSS(chunks[i]);
+      
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          if (i === 0) {
+            this.styleElement.textContent = processedChunk;
+          } else {
+            this.styleElement.textContent += processedChunk;
+          }
+          setTimeout(resolve, 0); // Give UI thread a chance to breathe
+        });
+      });
+
+      // Every few chunks, let's refresh the UI
+      if (i % 5 === 0) {
+        await this.refreshUIWithDebounce();
+      }
+    }
+
+    // Final UI refresh
+    await this.refreshUIWithDebounce();
+  }
+
+  // Debounced version of refreshUIElements
+  refreshUIWithDebounce() {
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+    }
+
+    return new Promise(resolve => {
+      this.refreshTimeout = setTimeout(async () => {
+        const elements = document.querySelectorAll(
+          '[role="button"], [role="tab"], [role="dialog"], .css-175oi2r'
+        );
+
+        // Process elements in chunks
+        const chunkSize = 10;
+        for (let i = 0; i < elements.length; i += chunkSize) {
+          const chunk = Array.from(elements).slice(i, i + chunkSize);
+          await new Promise(resolve => {
+            requestAnimationFrame(() => {
+              chunk.forEach(element => {
+                if (element.style.display !== 'none') {
+                  const originalDisplay = window.getComputedStyle(element).display;
+                  element.style.display = 'none';
+                  element.offsetHeight; // Force reflow
+                  element.style.display = originalDisplay;
+                }
+              });
+              resolve();
+            });
+          });
+        }
+
+        resolve();
+      }, 100); // Debounce for 100ms
+    });
+  }
+
+  async disableTheme(themeId) {
+    const theme = this.themes.find(t => t.id === themeId);
+    if (theme) {
+      theme.enabled = false;
+      this.activeThemes.delete(themeId);
       this.saveThemeState();
 
-      const enabledThemes = this.themes.filter(t => t.enabled);
-      
-      // Extract and combine custom properties from all enabled themes
-      const allCustomProperties = {};
-      enabledThemes.forEach(theme => {
-          Object.assign(allCustomProperties, this.extractCustomProperties(theme.css));
-      });
-      this.applyCustomProperties(allCustomProperties);
-
-      // Apply regular CSS
-      let combinedCSS = enabledThemes.slice().reverse().map(t => t.css).join('\n\n');
-      combinedCSS = this.processCSS(combinedCSS);
-      this.styleElement.textContent = combinedCSS;
+      // Use activeThemes instead of theme.enabled to determine which themes are active
+      const enabledThemes = this.themes.filter(t => this.activeThemes.has(t.id));
+      if (enabledThemes.length > 0) {
+        const combinedCSS = enabledThemes.slice().reverse().map(t => t.css).join('\n\n');
+        const sections = this.splitCSSIntoSections(combinedCSS);
+        const processedCSS = sections.map(section => this.processSection(section)).join('\n');
+        this.styleElement.textContent = processedCSS;
+      } else {
+        this.styleElement.textContent = '';
+        if (this.customPropertiesElement) {
+          this.customPropertiesElement.textContent = '';
+        }
+      }
+    }
   }
 
   toggleTheme(themeId, enabled) {
     const theme = this.themes.find(t => t.id === themeId);
     if (theme) {
+      // Ensure theme.enabled and activeThemes stay in sync
+      theme.enabled = enabled;
+      
       if (enabled) {
         this.activeThemes.add(themeId);
         this.applyTheme(theme);
@@ -343,32 +534,10 @@ export class ThemeManager {
     }
   }
 
-  disableTheme(themeId) {
-    const theme = this.themes.find(t => t.id === themeId);
-    if (theme) {
-      theme.enabled = false;
-      // Remplacer saveThemes par saveThemeState
-      this.saveThemeState();
-      
-      const enabledThemes = this.themes.filter(t => t.enabled);
-      if (enabledThemes.length > 0) {
-        let combinedCSS = enabledThemes.slice().reverse().map(t => t.css).join('\n\n');
-        combinedCSS = this.processCSS(combinedCSS);
-        this.styleElement.textContent = combinedCSS;
-      } else {
-        this.styleElement.textContent = '';
-        if (this.customPropertiesElement) {
-            this.customPropertiesElement.textContent = '';
-        }
-      }
-    }
-  }
-
   reorderThemes(newOrder) {
     this.themeOrder = newOrder;
     this.saveThemeState();
     
-    // Réorganiser les thèmes selon le nouvel ordre
     this.themes.sort((a, b) => {
       const indexA = this.themeOrder.indexOf(a.id);
       const indexB = this.themeOrder.indexOf(b.id);
@@ -378,11 +547,18 @@ export class ThemeManager {
       return indexA - indexB;
     });
 
-    // Réappliquer les thèmes actifs dans le bon ordre
-    this.applyAllActiveThemes();
+    // Use activeThemes consistently here too
+    const enabledThemes = this.themes.filter(t => this.activeThemes.has(t.id));
+    if (enabledThemes.length > 0) {
+      const combinedCSS = enabledThemes.slice().reverse().map(t => t.css).join('\n\n');
+      const sections = this.splitCSSIntoSections(combinedCSS);
+      const processedCSS = sections.map(section => this.processSection(section)).join('\n');
+      this.styleElement.textContent = processedCSS;
+    }
   }
 
   applyAllActiveThemes() {
+    // Use activeThemes consistently here too
     const enabledThemes = this.themes.filter(t => this.activeThemes.has(t.id));
     if (enabledThemes.length > 0) {
       let combinedCSS = enabledThemes.slice().reverse().map(t => t.css).join('\n\n');

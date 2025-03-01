@@ -16,17 +16,34 @@ export default definePlugin({
             'a[href="/i/premium_sign_up?referring_page=settings"]',
             'a[href="/jobs"]',
             'aside[aria-label*="Premium"][role="complementary"]',
-            'div[data-testid="inlinePrompt"]'
+            'div[data-testid="inlinePrompt"]',
+            'a[href="/i/account_analytics"]'
         ];
 
         const removeElements = () => {
             selectors.forEach(selector => {
                 const elements = document.querySelectorAll(selector);
                 elements.forEach(element => {
+                    const parent = element.closest('.r-1ifxtd0');
+                    if (parent) {
+                        parent.style.display = 'none';
+                        parent.style.width = '0px';
+                        parent.style.height = '0px';
+                    } else {
+                        element.style.display = 'none';
+                        element.style.width = '0px';
+                        element.style.height = '0px';
+                    }
+                });
+            });
+
+            // Handle analytics promotion
+            document.querySelectorAll('.r-1ifxtd0').forEach(element => {
+                if (element.textContent.includes('Access your post analytics')) {
                     element.style.display = 'none';
                     element.style.width = '0px';
                     element.style.height = '0px';
-                });
+                }
             });
 
             const elements = document.querySelectorAll('[role="complementary"].r-eqz5dr');

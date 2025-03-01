@@ -12,6 +12,7 @@ export class UIManager {
     this.themeManager = new ThemeManager();
     this.initialActiveThemes = new Set(); // Ajouter cette ligne
     this.themeTabVisited = false; // Flag indiquant que l'onglet thèmes a été visité
+    this.initialPluginStates = new Map(); // Add this line
   }
 
   createUIElement(elementType, properties) {
@@ -107,13 +108,11 @@ export class UIManager {
 
     // Add event listeners for the modal
     const closeBtn = modal.querySelector('.betterx-close');
-    closeBtn.onclick = () => {
-      this.handleModalClose(modal);
-    };
-
+    const handleClose = () => this.handleModalClose(modal);
+    closeBtn.onclick = handleClose;
     window.onclick = (event) => {
       if (event.target == modal) {
-        this.handleModalClose(modal);
+        handleClose();
       }
     };
 
@@ -126,23 +125,118 @@ export class UIManager {
     // Populate plugin list using the new container
     this.populatePluginList(modal.querySelector('#betterx-plugin-list-container'));
 
+    // Add this near the start of the function, after modal creation
+    this.captureInitialPluginStates();
+
     return modal;
+  }
+
+  captureInitialPluginStates() {
+    this.initialPluginStates.clear();
+    this.pluginManager.plugins.forEach(plugin => {
+      this.initialPluginStates.set(plugin.name, {
+        enabled: plugin.enabled,
+        settings: JSON.stringify(plugin.settings.store)
+      });
+    });
+  }
+
+  getChangedPlugins() {
+    const changedPlugins = [];
+    this.pluginManager.plugins.forEach(plugin => {
+      const initial = this.initialPluginStates.get(plugin.name);
+      if (!initial) return;
+
+      const currentSettings = JSON.stringify(plugin.settings.store);
+      if (initial.enabled !== plugin.enabled || initial.settings !== currentSettings) {
+        changedPlugins.push(plugin.name);
+      }
+    });
+    return changedPlugins;
+  }
+
+  createRestartDialog(changedPlugins) {
+    const dialog = this.createUIElement('div', {
+      className: 'betterx-restart-dialog',
+      innerHTML: `
+        <div class="betterx-restart-content">
+          <h3>These plugins require a restart:</h3>
+          <ul class="betterx-changed-plugins">
+            ${changedPlugins.map(name => `<li>${name}</li>`).join('')}
+          </ul>
+          <div class="betterx-restart-buttons">
+            <button class="betterx-button secondary close">Close</button>
+            <button class="betterx-button primary restart">Restart Now</button>
+          </div>
+        </div>
+      `
+    });
+
+    document.body.appendChild(dialog);
+
+    // Add event listeners
+    dialog.querySelector('.close').addEventListener('click', () => {
+      dialog.remove();
+    });
+
+    dialog.querySelector('.restart').addEventListener('click', () => {
+      window.location.reload();
+    });
+
+    // Add styles
+    const styles = this.createUIElement('style', {
+      textContent: `
+        .betterx-restart-dialog {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.85);
+          z-index: 10002;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          backdrop-filter: blur(5px);
+        }
+        .betterx-restart-content {
+          background: #15202b;
+          padding: 20px;
+          border-radius: 12px;
+          border: 1px solid #38444d;
+          width: 90%;
+          max-width: 400px;
+        }
+        .betterx-restart-content h3 {
+          margin: 0 0 15px 0;
+          color: #fff;
+        }
+        .betterx-changed-plugins {
+          margin: 0 0 20px 0;
+          padding: 0 0 0 20px;
+          color: #8899a6;
+        }
+        .betterx-changed-plugins li {
+          margin: 5px 0;
+        }
+        .betterx-restart-buttons {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+        }
+      `
+    });
+    document.head.appendChild(styles);
   }
 
   // Nouvelle méthode modifiée de fermeture
   handleModalClose(modal) {
+    const changedPlugins = this.getChangedPlugins();
     modal.style.display = 'none';
-    if (this.themeTabVisited) {
-      const currentActiveThemes = this.themeManager.activeThemes;
-      const hasThemeChanges = (
-        this.initialActiveThemes.size !== currentActiveThemes.size ||
-        ![...this.initialActiveThemes].every(theme => currentActiveThemes.has(theme))
-      );
-      // Réinitialiser le flag après fermeture
-      this.themeTabVisited = false;
-      if (hasThemeChanges) {
-        window.location.reload();
-      }
+    this.themeTabVisited = false;
+
+    if (changedPlugins.length > 0) {
+      this.createRestartDialog(changedPlugins);
     }
   }
 
@@ -638,7 +732,29 @@ export class UIManager {
     // Add styles
     const styles = this.createUIElement('style', {
       textContent: `
+        @font-face {
+          font-family: "chirp";
+          src: url("https://abs.twimg.com/responsive-web/client-web/chirp-regular-web.708173b5.woff2") format("woff2");
+          font-weight: 400;
+          font-style: normal;
+        }
+        
+        @font-face {
+          font-family: "chirp";
+          src: url("https://abs.twimg.com/responsive-web/client-web/chirp-medium-web.f8e2739a.woff2") format("woff2");
+          font-weight: 500;
+          font-style: normal;
+        }
+        
+        @font-face {
+          font-family: "chirp";
+          src: url("https://abs.twimg.com/responsive-web/client-web/chirp-bold-web.ebb56aba.woff2") format("woff2");
+          font-weight: 700;
+          font-style: normal;
+        }
+        
         .betterx-modal {
+          font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           display: none;
           position: fixed;
           z-index: 10000;
@@ -705,6 +821,8 @@ export class UIManager {
           flex-grow: 1;
         }
         .betterx-plugin-info h3 {
+          font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-weight: 700;
           margin: 0 0 5px 0;
           font-size: 16px;
         }
@@ -787,6 +905,8 @@ export class UIManager {
           margin-top: 10px;
         }
         .betterx-option-label {
+          font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-weight: 500;
           display: block;
           margin-bottom: 5px;
           font-weight: bold;
@@ -798,6 +918,7 @@ export class UIManager {
         }
         .betterx-select,
         .betterx-input {
+          font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           width: 100%;
           padding: 8px;
           border-radius: 4px;
@@ -845,6 +966,8 @@ export class UIManager {
         }
         
         .betterx-tab {
+          font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-weight: 500;
           background: none;
           border: none;
           color: #8899a6;
@@ -926,6 +1049,8 @@ export class UIManager {
         }
         
         .betterx-button {
+          font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-weight: 500;
           background: #1da1f2;
           color: white;
           border: none;
