@@ -24,6 +24,7 @@ const STATUS_LABELS = {
 export default definePlugin({
     name: "UsersStatus",
     description: "Shows BetterX badge and status dot on user profiles",
+    requiresRestart: true,
     authors: [Devs.TPM28],
 
     retryCount: 0,

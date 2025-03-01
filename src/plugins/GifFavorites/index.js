@@ -9,6 +9,7 @@ let emptyStateObserver;
 export default definePlugin({
     name: "GifFavorites",
     description: "Add favorites like on discord",
+    requiresRestart: true,
     authors: [Devs.Mopi, Devs.TPM28],
     start() {
         function overrideXHR() {

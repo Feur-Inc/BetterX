@@ -93,6 +93,7 @@ function initializePlugin() {
 export default definePlugin({
   name: "DontOverthink",
   description: "Adds a timer to automatically send tweets after a customizable duration",
+  requiresRestart: true,
   authors: [Devs.Mopi, Devs.TPM28],
   options: {
     timerDuration: {
