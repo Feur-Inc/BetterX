@@ -53,6 +53,27 @@ Available option types:
 ## Plugin Properties
 - `needsRestart`: Set to `false` if your plugin can be enabled/disabled without requiring a page reload. Defaults to `true` for backward compatibility.
 
+## Using the Notification API
+BetterX provides a notification system that plugins can use to display messages to users:
+
+```javascript
+import { notifications } from "@api";
+
+// Show a simple notification
+notifications.showInfo("This is an informational message");
+
+// Show a success notification
+notifications.showSuccess("Operation completed successfully");
+
+// Show a warning notification
+notifications.showWarning("Something might need attention");
+
+// Show an error notification
+notifications.showError("An error occurred");
+```
+
+See the [Notification API documentation](/docs/api/notification-api.md) for more details.
+
 ## Best Practices
 1. Always clean up in the `stop()` method
 2. Use meaningful option names
@@ -60,3 +81,4 @@ Available option types:
 4. Access settings via `this.settings.store`
 5. Test both enable/disable functionality
 6. Set `needsRestart: false` if your plugin properly cleans up in the `stop()` method
+7. Use the notification system for user feedback instead of console logs

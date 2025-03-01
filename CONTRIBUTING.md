@@ -46,6 +46,8 @@ This enables Webpack's watch mode, which automatically rebuilds when you make ch
 
 ## Plugin Development
 
+[README.md](src/plugins/README.md) contains a detailed plugin development guide with comprehensive information about the plugin system, available APIs, and best practices. Make sure to review this guide before developing plugins.
+
 ### Official Plugins
 Official plugins belong in the `src/plugins` directory. These are distributed with BetterX and undergo thorough review.
 
@@ -66,8 +68,7 @@ export default definePlugin({
     name: "YourPluginName",
     description: "Description of your plugin",
     authors: [Devs.YourName],
-    // Set to false if your plugin can be enabled/disabled without requiring a page reload
-    needsRestart: false,
+    needsRestart: false, // Set to false if your plugin can be enabled/disabled without requiring a page reload
     start() {
         // Initialization code
     },
