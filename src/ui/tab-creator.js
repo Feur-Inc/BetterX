@@ -1,0 +1,79 @@
+export function createBetterXTab() {
+  const newDiv = document.createElement('div');
+  newDiv.setAttribute('class', 'css-175oi2r');
+  newDiv.setAttribute('data-testid', 'BetterX');
+
+  const newLink = document.createElement('a');
+  newLink.setAttribute('href', '#');
+  newLink.setAttribute('role', 'tab');
+  newLink.setAttribute('aria-selected', 'false');
+  newLink.setAttribute('class', 'css-175oi2r r-1wtj0ep r-16x9es5 r-1mmae3n r-o7ynqc r-6416eg r-1ny4l3l r-1loqt21');
+  newLink.style.paddingRight = '16px';
+  newLink.style.paddingLeft = '16px';
+
+  // Add hover effect styles
+  newLink.addEventListener('mouseenter', () => {
+    newLink.style.backgroundColor = 'rgb(22, 24, 28)';
+    const textDiv = newLink.querySelector('.css-146c3p1');
+    if (textDiv) textDiv.style.color = 'rgb(239, 243, 244)';
+  });
+
+  newLink.addEventListener('mouseleave', () => {
+    newLink.style.backgroundColor = 'transparent';
+    const textDiv = newLink.querySelector('.css-146c3p1');
+    if (textDiv) textDiv.style.color = 'rgb(231, 233, 234)';
+  });
+
+  // Add transition for smooth effect
+  newLink.style.transition = 'all 0.2s ease';
+
+  const linkContainer = document.createElement('div');
+  linkContainer.setAttribute('class', 'css-175oi2r r-1awozwy r-18u37iz r-16y2uox');
+
+  const textContainer = document.createElement('div');
+  textContainer.setAttribute('class', 'css-175oi2r r-16y2uox r-1wbh5a2');
+
+  const textDiv = document.createElement('div');
+  textDiv.setAttribute('dir', 'ltr');
+  textDiv.setAttribute('class', 'css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-a023e6 r-rjixqe r-16dba41');
+  textDiv.style.textOverflow = 'unset';
+  textDiv.style.color = 'rgb(231, 233, 234)';
+
+  const textSpan = document.createElement('span');
+  textSpan.setAttribute('class', 'css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3');
+  textSpan.style.textOverflow = 'unset';
+  textSpan.textContent = 'BetterX';
+
+  const svgIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svgIcon.setAttribute('viewBox', '0 0 24 24');
+  svgIcon.setAttribute('aria-hidden', 'true');
+  svgIcon.setAttribute('class', 'r-4qtqp9 r-yyyyoo r-1xvli5t r-dnmrzs r-bnwqim r-lrvibr r-m6rgpd r-1bwzh9t r-1q142lx r-2dysd3');
+
+  const svgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  svgPath.setAttribute('d', 'M14.586 12L7.543 4.96l1.414-1.42L17.414 12l-8.457 8.46-1.414-1.42L14.586 12z');
+
+  svgIcon.appendChild(svgPath);
+  textDiv.appendChild(textSpan);
+  textContainer.appendChild(textDiv);
+  linkContainer.appendChild(textContainer);
+  linkContainer.appendChild(svgIcon);
+  newLink.appendChild(linkContainer);
+  newDiv.appendChild(newLink);
+
+  return newDiv;
+}
+
+export function addBetterXTab(uiManager) {
+  const activeRouteContainer = document.querySelector('div[class="css-175oi2r"][role="tablist"]');
+
+  if (activeRouteContainer && !document.querySelector('[data-testid="BetterX"]')) {
+    const betterXTab = uiManager.createBetterXTab();
+    activeRouteContainer.appendChild(betterXTab);
+
+    // Add click event to the BetterX tab to open the modal
+    betterXTab.querySelector('a').addEventListener('click', (e) => {
+      e.preventDefault();
+      uiManager.settingsModal.style.display = 'block';
+    });
+  }
+}
