@@ -24,42 +24,8 @@ export function populateDeveloperSettings(container, uiManager) {
         </div>
       </div>
       <div class="betterx-plugin-details" style="display: block; margin-top: 10px;">
-        <p><strong>BetterX Version:</strong> <span id="betterx-version">Loading...</span></p>
+        <p><strong>BetterX Desktop Version:</strong> <span id="betterx-version">Loading...</span></p>
         <p><strong>Build Date:</strong> <span id="betterx-build-date">Loading...</span></p>
-      </div>
-    </div>
-
-    <div class="betterx-plugin-item">
-      <div class="betterx-plugin-header">
-        <div class="betterx-plugin-info">
-          <h3>Debug Logging</h3>
-          <p>Control console logging levels for debugging.</p>
-        </div>
-      </div>
-      <div class="betterx-plugin-details" style="display: block; margin-top: 10px;">
-        <div class="betterx-option-wrapper">
-          <label class="betterx-switch">
-            <input type="checkbox" id="betterx-log-debug">
-            <span class="betterx-slider"></span>
-          </label>
-          <span class="betterx-option-label" style="display: inline-block; margin-left: 10px;">Debug Logs</span>
-        </div>
-        
-        <div class="betterx-option-wrapper" style="margin-top: 10px;">
-          <label class="betterx-switch">
-            <input type="checkbox" id="betterx-log-verbose" checked>
-            <span class="betterx-slider"></span>
-          </label>
-          <span class="betterx-option-label" style="display: inline-block; margin-left: 10px;">Verbose Logs</span>
-        </div>
-        
-        <div class="betterx-option-wrapper" style="margin-top: 10px;">
-          <label class="betterx-switch">
-            <input type="checkbox" id="betterx-log-plugins" checked>
-            <span class="betterx-slider"></span>
-          </label>
-          <span class="betterx-option-label" style="display: inline-block; margin-left: 10px;">Plugin Logs</span>
-        </div>
       </div>
     </div>
   `;
@@ -69,7 +35,20 @@ export function populateDeveloperSettings(container, uiManager) {
   const buildDate = document.getElementById('betterx-build-date');
   
   try {
-    version.textContent = window.betterX?.version || 'Unknown';
+    // Get the desktop version using the Promise API
+    if (window.BetterX && typeof window.BetterX.getDesktopVersion === 'function') {
+      window.BetterX.getDesktopVersion()
+        .then(desktopVersion => {
+          version.textContent = desktopVersion || 'Not available';
+        })
+        .catch(err => {
+          console.error('Error getting desktop version', err);
+          version.textContent = 'Error';
+        });
+    } else {
+      version.textContent = 'Not available';
+    }
+    
     buildDate.textContent = window.betterX?.buildDate || new Date().toLocaleDateString();
   } catch (e) {
     console.error('Error setting version information', e);
@@ -86,32 +65,6 @@ export function populateDeveloperSettings(container, uiManager) {
     
     uiManager.settingsModal.style.display = 'none';
     uiManager.notificationTesterModal.style.display = 'flex';
-  });
-
-  // Setup logging checkboxes
-  const debugLog = document.getElementById('betterx-log-debug');
-  const verboseLog = document.getElementById('betterx-log-verbose');
-  const pluginLogs = document.getElementById('betterx-log-plugins');
-
-  // Set initial values
-  debugLog.checked = localStorage.getItem('betterx-log-debug') === 'true';
-  verboseLog.checked = localStorage.getItem('betterx-log-verbose') !== 'false'; // Default on
-  pluginLogs.checked = localStorage.getItem('betterx-log-plugins') !== 'false'; // Default on
-
-  // Add event listeners
-  debugLog.addEventListener('change', () => {
-    localStorage.setItem('betterx-log-debug', debugLog.checked);
-    window.betterX.debugging = debugLog.checked;
-  });
-
-  verboseLog.addEventListener('change', () => {
-    localStorage.setItem('betterx-log-verbose', verboseLog.checked);
-    window.betterX.verbose = verboseLog.checked;
-  });
-
-  pluginLogs.addEventListener('change', () => {
-    localStorage.setItem('betterx-log-plugins', pluginLogs.checked);
-    window.betterX.pluginLogs = pluginLogs.checked;
   });
 }
 
