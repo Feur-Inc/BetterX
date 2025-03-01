@@ -3,10 +3,12 @@ import { EditorView, basicSetup } from "codemirror";
 import { css } from "@codemirror/lang-css";
 import { oneDark } from '@codemirror/theme-one-dark';
 import { ThemeManager } from './theme-manager.js';
+import { NotificationManager } from './notification-manager.js';
 import { createSettingsModal } from './ui/settings-modal.js';
 import { createBetterXTab, addBetterXTab } from './ui/tab-creator.js';
 import { createThemeEditor, formatCSS } from './ui/theme-editor.js';
 import { populatePluginList, createOptionElement } from './ui/plugin-list.js';
+import { populateDeveloperSettings, createNotificationTester } from './ui/developer-settings.js';
 import { injectFooterLink } from './ui/footer-mod.js';
 import { injectUIStyles } from './ui/styles.js';
 
@@ -16,10 +18,14 @@ export class UIManager {
     this.observer = null;
     // Instancier ThemeManager pour gérer les thèmes
     this.themeManager = new ThemeManager();
+    // Initialize the notification manager
+    this.notifications = new NotificationManager();
     this.initialActiveThemes = new Set();
     this.themeTabVisited = false;
+    this.developerTabVisited = false;
     this.initialPluginStates = new Map();
     this.createBetterXTab = createBetterXTab;
+    this.notificationTesterModal = null;
   }
 
   createUIElement(elementType, properties) {
@@ -68,30 +74,25 @@ export class UIManager {
   }
 
   createRestartDialog(changedPlugins) {
-    const dialog = this.createUIElement('div', {
-      className: 'betterx-restart-dialog',
-      innerHTML: `
-        <div class="betterx-restart-content">
-          <h3>These plugins require a restart:</h3>
-          <ul class="betterx-changed-plugins">
-            ${changedPlugins.map(name => `<li>${name}</li>`).join('')}
-          </ul>
-          <div class="betterx-restart-buttons">
-            <button class="betterx-button secondary close">Close</button>
-            <button class="betterx-button primary restart">Restart Now</button>
-          </div>
-        </div>
-      `
-    });
-
-    document.body.appendChild(dialog);
-
-    dialog.querySelector('.close').addEventListener('click', () => {
-      dialog.remove();
-    });
-
-    dialog.querySelector('.restart').addEventListener('click', () => {
-      window.location.reload();
+    // Instead of creating a custom dialog, use our notification system
+    this.notifications.createNotification({
+      title: 'Restart Required',
+      message: `These plugins require a restart: ${changedPlugins.join(', ')}`,
+      type: 'warning',
+      duration: 0, // Stay until dismissed
+      actions: [
+        { 
+          label: 'Later',
+          callback: () => {},
+          autoClose: true
+        },
+        {
+          label: 'Restart Now',
+          callback: () => {
+            window.location.reload();
+          }
+        }
+      ]
     });
   }
 
@@ -247,6 +248,84 @@ export class UIManager {
     addBetterXTab(this);
   }
 
+  /**
+   * Show a notification
+   * @param {Object} options Notification options
+   * @returns {string} Notification ID
+   */
+  notify(options = {}) {
+    return this.notifications.createNotification(options);
+  }
+
+  /**
+   * Show an info notification
+   * @param {string} message The message to show
+   * @param {Object} options Additional options
+   * @returns {string} Notification ID
+   */
+  notifyInfo(message, options = {}) {
+    return this.notifications.info(message, options);
+  }
+
+  /**
+   * Show a success notification
+   * @param {string} message The message to show
+   * @param {Object} options Additional options
+   * @returns {string} Notification ID
+   */
+  notifySuccess(message, options = {}) {
+    return this.notifications.success(message, options);
+  }
+
+  /**
+   * Show a warning notification
+   * @param {string} message The message to show
+   * @param {Object} options Additional options
+   * @returns {string} Notification ID
+   */
+  notifyWarning(message, options = {}) {
+    return this.notifications.warning(message, options);
+  }
+
+  /**
+   * Show an error notification
+   * @param {string} message The message to show
+   * @param {Object} options Additional options
+   * @returns {string} Notification ID
+   */
+  notifyError(message, options = {}) {
+    return this.notifications.error(message, options);
+  }
+
+  /**
+   * Update an existing notification
+   * @param {string} id Notification ID
+   * @param {Object} options New options
+   * @returns {boolean} Success
+   */
+  updateNotification(id, options = {}) {
+    return this.notifications.updateNotification(id, options);
+  }
+
+  /**
+   * Remove a notification
+   * @param {string} id Notification ID
+   * @returns {boolean} Success
+   */
+  removeNotification(id) {
+    return this.notifications.removeNotification(id);
+  }
+
+  /**
+   * Initialize the developer tab UI
+   * @param {HTMLElement} modal - The settings modal
+   */
+  initializeDeveloperUI(modal) {
+    const developerContainer = modal.querySelector('#betterx-developer-tab');
+    populateDeveloperSettings(developerContainer, this);
+    this.developerTabVisited = true;
+  }
+
   injectBetterXUI() {
     // Create the settings modal
     this.settingsModal = this.createSettingsModal();
@@ -272,7 +351,25 @@ export class UIManager {
     // Start observing the body for changes
     this.observer.observe(document.body, { childList: true, subtree: true });
 
+    // Make BetterX instance accessible globally for debugging and plugins
+    if (window.betterX) {
+      // If betterX already exists in the global scope, extend it
+      window.betterX.uiManager = this;
+    } else {
+      // Create the global betterX object
+      window.betterX = { 
+        uiManager: this,
+        version: "1.0.0",
+        buildDate: new Date().toLocaleDateString(),
+        debugging: false,
+        verbose: true,
+        pluginLogs: true
+      };
+    }
+
     // Add styles
     injectUIStyles();
+    
+    // Welcome notification
   }
 }
