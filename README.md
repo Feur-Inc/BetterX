@@ -56,12 +56,14 @@ To create a new plugin, use the following template:
 
 ```javascript
 import { Devs } from "@utils/constants";
-import definePlugin, { OptionType } from "@utils/types";
+import definePlugin, { OptionType } from "@utils/types;
 
 export default definePlugin({
     name: "YourPluginName",
     description: "Description of your plugin",
     authors: [Devs.YourName],
+    // Set to false if your plugin can be enabled/disabled without a restart
+    needsRestart: false,
     start() {
         // Initialization code
     },
@@ -96,3 +98,4 @@ This project is licensed under the GNU GPL. See the [LICENSE](LICENSE) file for 
 - Thanks to Vencord for the inspiration
 
 ---
+````

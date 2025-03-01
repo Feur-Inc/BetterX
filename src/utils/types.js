@@ -8,6 +8,8 @@ export const OptionType = {
 export default function definePlugin(options) {
     return {
         ...options,
+        // Default to true for backward compatibility
+        needsRestart: options.needsRestart !== undefined ? options.needsRestart : false,
         settings: {
             ...options.settings,
             store: options.settings?.store || {},

@@ -5,6 +5,7 @@ export default definePlugin({
     name: "BringTwitterBack",
     description: "Reverts X branding back to Twitter",
     authors: [Devs.Mopi, Devs.TPM28],
+    needsRestart: true,
     options: {
         accentColorButton: {
             type: OptionType.BOOLEAN,

@@ -149,7 +149,18 @@ export class UIManager {
 
       const currentSettings = JSON.stringify(plugin.settings.store);
       if (initial.enabled !== plugin.enabled || initial.settings !== currentSettings) {
-        changedPlugins.push(plugin.name);
+        // Only add plugins that need a restart
+        if (plugin.needsRestart) {
+          changedPlugins.push(plugin.name);
+        } else if (initial.enabled !== plugin.enabled) {
+          // If the plugin was toggled but doesn't need restart,
+          // trigger the start/stop method directly
+          if (plugin.enabled) {
+            this.pluginManager.safePluginCall(plugin, 'start');
+          } else {
+            this.pluginManager.safePluginCall(plugin, 'stop');
+          }
+        }
       }
     });
     return changedPlugins;

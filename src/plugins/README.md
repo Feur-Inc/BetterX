@@ -9,6 +9,7 @@ A basic plugin consists of:
 - Author information
 - Optional settings configuration
 - Start and stop methods
+- Optional restart requirement flag
 
 ## Creating a Plugin
 Create a new directory in the `plugins` folder with an `index.js` file. Use the following template:
@@ -21,6 +22,8 @@ export default definePlugin({
     name: "MyPlugin",
     description: "Description of what your plugin does",
     authors: [Devs.YourName],
+    // Set to false if your plugin can be enabled/disabled without a page reload
+    needsRestart: false,
     options: {
         // Optional settings
         myOption: {
@@ -47,9 +50,13 @@ Available option types:
 - `OptionType.STRING` - Text input
 - `OptionType.NUMBER` - Numeric input
 
+## Plugin Properties
+- `needsRestart`: Set to `false` if your plugin can be enabled/disabled without requiring a page reload. Defaults to `true` for backward compatibility.
+
 ## Best Practices
 1. Always clean up in the `stop()` method
 2. Use meaningful option names
 3. Store DOM references for cleanup
 4. Access settings via `this.settings.store`
 5. Test both enable/disable functionality
+6. Set `needsRestart: false` if your plugin properly cleans up in the `stop()` method
