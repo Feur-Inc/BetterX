@@ -63,7 +63,7 @@ export default definePlugin({
     description: "Description of your plugin",
     authors: [Devs.YourName],
     // Set to false if your plugin can be enabled/disabled without a restart
-    needsRestart: false,
+    requiresRestart: false,
     start() {
         // Initialization code
     },

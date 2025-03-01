@@ -25,7 +25,7 @@ export function populateDeveloperSettings(container, uiManager) {
       </div>
       <div class="betterx-plugin-details" style="display: block; margin-top: 10px;">
         <p><strong>BetterX Desktop Version:</strong> <span id="betterx-version">Loading...</span></p>
-        <p><strong>Build Date:</strong> <span id="betterx-build-date">Loading...</span></p>
+        <p><strong>BetetrX Bundle Build Date:</strong> <span id="betterx-build-date">Loading...</span></p>
       </div>
     </div>
   `;

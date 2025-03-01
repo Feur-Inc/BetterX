@@ -32,6 +32,9 @@ export function createSettingsModal(uiManager) {
     `
   });
 
+  // Capture initial plugin states when modal is created, not just on tab click
+  uiManager.captureInitialPluginStates();
+
   // Add event listeners for the modal
   const closeBtn = modal.querySelector('.betterx-close');
   closeBtn.onclick = () => uiManager.handleModalClose(modal);

@@ -23,7 +23,7 @@ export default definePlugin({
     description: "Description of what your plugin does",
     authors: [Devs.YourName],
     // Set to false if your plugin can be enabled/disabled without a page reload
-    needsRestart: false,
+    requiresRestart: false,
     options: {
         // Optional settings
         myOption: {
@@ -51,7 +51,7 @@ Available option types:
 - `OptionType.NUMBER` - Numeric input
 
 ## Plugin Properties
-- `needsRestart`: Set to `false` if your plugin can be enabled/disabled without requiring a page reload. Defaults to `true` for backward compatibility.
+- `requiresRestart`: Set to `false` if your plugin can be enabled/disabled without requiring a page reload. Defaults to `true` for backward compatibility.
 
 ## Using the Notification API
 BetterX provides a notification system that plugins can use to display messages to users:
@@ -80,5 +80,5 @@ See the [Notification API documentation](/docs/api/notification-api.md) for more
 3. Store DOM references for cleanup
 4. Access settings via `this.settings.store`
 5. Test both enable/disable functionality
-6. Set `needsRestart: false` if your plugin properly cleans up in the `stop()` method
+6. Set `requiresRestart: false` if your plugin properly cleans up in the `stop()` method
 7. Use the notification system for user feedback instead of console logs

@@ -9,7 +9,7 @@ export default function definePlugin(options) {
     return {
         ...options,
         // Default to true for backward compatibility
-        needsRestart: options.needsRestart !== undefined ? options.needsRestart : false,
+        requiresRestart: options.requiresRestart !== undefined ? options.requiresRestart : false,
         settings: {
             ...options.settings,
             store: options.settings?.store || {},

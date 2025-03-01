@@ -57,7 +57,7 @@ export class UIManager {
       const currentSettings = JSON.stringify(plugin.settings.store);
       if (initial.enabled !== plugin.enabled || initial.settings !== currentSettings) {
         // Only add plugins that need a restart
-        if (plugin.needsRestart) {
+        if (plugin.requiresRestart) {
           changedPlugins.push(plugin.name);
         } else if (initial.enabled !== plugin.enabled) {
           // If the plugin was toggled but doesn't need restart,
@@ -74,12 +74,23 @@ export class UIManager {
   }
 
   createRestartDialog(changedPlugins) {
-    // Instead of creating a custom dialog, use our notification system
+    // Add debugging to ensure we're reaching this point
+    console.log('Creating restart dialog for plugins:', changedPlugins);
+    
+    // Ensure notifications manager is initialized
+    if (!this.notifications) {
+      console.error('Notification manager not initialized');
+      return;
+    }
+
+    // Create notification with higher visibility
     this.notifications.createNotification({
       title: 'Restart Required',
-      message: `These plugins require a restart: ${changedPlugins.join(', ')}`,
+      message: `The following plugins require a restart to apply changes: <strong>${changedPlugins.join(', ')}</strong>`,
       type: 'warning',
       duration: 0, // Stay until dismissed
+      html: true, // Allow HTML in message
+      progress: false,
       actions: [
         { 
           label: 'Later',
@@ -97,12 +108,18 @@ export class UIManager {
   }
 
   handleModalClose(modal) {
+    // Get changed plugins that require restart
     const changedPlugins = this.getChangedPlugins();
+    console.log('Changed plugins requiring restart:', changedPlugins);
+    
+    // Hide the modal
     modal.style.display = 'none';
     this.themeTabVisited = false;
 
+    // Show restart dialog if necessary
     if (changedPlugins.length > 0) {
-      this.createRestartDialog(changedPlugins);
+      // Small delay to ensure modal closing animation completes first
+      setTimeout(() => this.createRestartDialog(changedPlugins), 100);
     }
   }
 

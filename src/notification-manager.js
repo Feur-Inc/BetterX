@@ -50,6 +50,12 @@ export class NotificationManager {
     html = false // Whether to parse message as HTML
   } = {}) {
     const id = `betterx-notification-${++this.idCounter}`;
+    
+    // Ensure container exists
+    if (!this.container) {
+      this.initContainer();
+    }
+    
     const notificationEl = document.createElement('div');
     
     notificationEl.id = id;
@@ -164,10 +170,16 @@ export class NotificationManager {
       });
     }
     
-    // Add entrance animation class
+    // Add entrance animation class with a slightly longer delay
+    // to ensure the notification is properly rendered
     setTimeout(() => {
       notificationEl.classList.add('betterx-notification-show');
-    }, 10);
+      // Force a repaint to ensure the animation happens
+      void notificationEl.offsetWidth;
+    }, 50);
+    
+    // Log for debugging
+    console.log(`Notification created: ${id}`, { type, title, message });
     
     return id;
   }
