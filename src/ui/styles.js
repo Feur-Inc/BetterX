@@ -574,11 +574,12 @@ export function injectUIStyles() {
     }
     
     .betterx-notification {
+      /* Use CSS variables for theme compatibility */
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #15202b; /* Match modal background */
-      color: #ffffff;
+      background-color: var(--ctp-base, #15202b);
+      color: var(--ctp-text, #ffffff);
       border-radius: 8px;
-      border: 1px solid #38444d; /* Match modal border */
+      border: 1px solid var(--ctp-surface0, #38444d);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       padding: 12px;
       transform: translateX(120%);
@@ -628,7 +629,7 @@ export function injectUIStyles() {
       font-size: 16px;
       font-weight: 700;
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #ffffff; /* Match modal text color */
+      color: var(--ctp-text, #ffffff);
     }
     
     .betterx-notification-message {
@@ -636,20 +637,19 @@ export function injectUIStyles() {
       word-break: break-word;
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 400;
-      color: #ffffff;
+      color: var(--ctp-text, #ffffff);
     }
     
     .betterx-notification-source {
       margin-top: 4px;
       font-size: 12px;
-      color: #8899a6; /* Match plugin-info p color */
+      color: var(--ctp-subtext0, #8899a6);
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 400;
     }
     
     .betterx-notification-close {
-      /* Match betterx-close styling */
-      color: #8899a6;
+      color: var(--ctp-subtext0, #8899a6);
       font-size: 18px;
       font-weight: bold;
       cursor: pointer;
@@ -662,7 +662,7 @@ export function injectUIStyles() {
     }
     
     .betterx-notification-close:hover {
-      color: #ffffff;
+      color: var(--ctp-text, #ffffff);
       background-color: rgba(239, 243, 244, 0.1);
     }
     
@@ -674,13 +674,12 @@ export function injectUIStyles() {
     }
     
     .betterx-notification-action {
-      /* Match betterx-button.secondary styling */
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 500;
       background: transparent;
-      border: 1px solid #38444d;
+      border: 1px solid var(--ctp-surface0, #38444d);
       border-radius: 4px;
-      color: #fff;
+      color: var(--ctp-text, #fff);
       cursor: pointer;
       font-size: 13px;
       padding: 5px 10px;
@@ -689,7 +688,7 @@ export function injectUIStyles() {
     
     .betterx-notification-action:hover {
       background: rgba(29, 161, 242, 0.1);
-      border-color: #1da1f2;
+      border-color: var(--accent, #1da1f2);
     }
     
     .betterx-notification-progress-container {
@@ -710,96 +709,42 @@ export function injectUIStyles() {
       left: 0;
       height: 100%;
       width: 100%;
-      background: #1da1f2; /* Use BetterX primary blue */
+      background: var(--accent, #1da1f2);
       will-change: width;
     }
     
-    /* Notification Types - use consistent indicator colors */
+    /* Notification Types */
     .betterx-notification-info {
-      border-left: 4px solid #1da1f2; /* BetterX primary blue */
+      border-left: 4px solid var(--accent, #1da1f2);
     }
     
     .betterx-notification-success {
-      border-left: 4px solid #17bf63; /* Twitter green */
+      border-left: 4px solid var(--ctp-mocha-green, #17bf63);
     }
     
     .betterx-notification-warning {
-      border-left: 4px solid #ffad1f; /* Twitter orange/yellow */
+      border-left: 4px solid var(--ctp-mocha-yellow, #ffad1f);
     }
     
     .betterx-notification-error {
-      border-left: 4px solid #e0245e; /* Twitter red */
+      border-left: 4px solid var(--ctp-mocha-red, #e0245e);
     }
     
     /* Progress bar color variations */
     .betterx-notification-info .betterx-notification-progress {
-      background-color: #1da1f2; /* BetterX primary blue */
+      background-color: var(--accent, #1da1f2);
     }
     
     .betterx-notification-success .betterx-notification-progress {
-      background-color: #17bf63;
+      background-color: var(--ctp-mocha-green, #17bf63);
     }
     
     .betterx-notification-warning .betterx-notification-progress {
-      background-color: #ffad1f;
+      background-color: var(--ctp-mocha-yellow, #ffad1f);
     }
     
     .betterx-notification-error .betterx-notification-progress {
-      background-color: #e0245e;
-    }
-    
-    /* Light mode adjustments - match modal light mode styles */
-    html:not(.theme-dark) .betterx-notification {
-      background-color: #ffffff;
-      color: #0f1419;
-      border: 1px solid #eff3f4;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-    
-    html:not(.theme-dark) .betterx-notification-title {
-      color: #0f1419;
-    }
-    
-    html:not(.theme-dark) .betterx-notification-message {
-      color: #0f1419;
-    }
-    
-    html:not(.theme-dark) .betterx-notification-source {
-      color: #536471; /* Match light mode secondary text color */
-    }
-    
-    html:not(.theme-dark) .betterx-notification-close {
-      color: #536471;
-    }
-    
-    html:not(.theme-dark) .betterx-notification-close:hover {
-      color: #0f1419;
-      background-color: rgba(15, 20, 25, 0.1);
-    }
-    
-    html:not(.theme-dark) .betterx-notification-action {
-      border-color: #eff3f4;
-      color: #0f1419;
-    }
-    
-    html:not(.theme-dark) .betterx-notification-action:hover {
-      background-color: rgba(29, 161, 242, 0.1);
-      border-color: #1da1f2;
-    }
-    
-    /* Mobile Responsiveness */
-    @media (max-width: 768px) {
-      .betterx-notification-container {
-        width: calc(100% - 32px);
-        right: 0;
-        left: 0;
-        margin: 0 auto;
-      }
-      
-      .betterx-notification {
-        max-width: 480px;
-        margin: 0 auto;
-      }
+      background-color: var(--ctp-mocha-red, #e0245e);
     }
 
     /* Developer Tab Styles */
@@ -857,17 +802,6 @@ export function injectUIStyles() {
     
     .betterx-log-option input {
       margin-right: 6px;
-    }
-    
-    /* Light mode adjustments */
-    html:not(.theme-dark) .betterx-developer-section {
-      background-color: #f7f9f9;
-      border: 1px solid #eff3f4;
-    }
-    
-    html:not(.theme-dark) .betterx-developer-description,
-    html:not(.theme-dark) .betterx-version-info {
-      color: #536471;
     }
   `;
   document.head.appendChild(styles);
