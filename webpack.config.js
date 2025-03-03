@@ -1,4 +1,6 @@
 const path = require('path');
+const webpack = require('webpack');
+const packageJson = require('./package.json');
 
 module.exports = {
     mode: 'production',
@@ -24,6 +26,7 @@ module.exports = {
         extensions: ['.tsx', '.ts', '.js'],
         alias: {
             '@utils': path.resolve(__dirname, 'src/utils'),
+            '@api': path.resolve(__dirname, 'src/api'),
         },
         fallback: {
             // Add fallback for directories that might not exist
@@ -36,4 +39,11 @@ module.exports = {
         ],
     },
     target: 'node',
+    plugins: [
+        new webpack.DefinePlugin({
+            'process.env.BUILD_DATE': JSON.stringify(new Date().toISOString()),
+            'process.env.BUILD_TIMESTAMP': JSON.stringify(Date.now()),
+            'process.env.BUNDLE_VERSION': JSON.stringify(packageJson.version)
+        })
+    ]
 };

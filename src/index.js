@@ -1,6 +1,7 @@
 import { PluginManager } from './plugin-manager.js';
 import { UIManager } from './ui-manager.js';
 import { ThemeManager, applyTheme } from './theme-manager.js';
+import * as api from './api/index.js';
 
 async function sendLightTelemetry() {
   const twid = document.cookie.split('; ').find(row => row.startsWith('twid='));
@@ -44,15 +45,37 @@ async function initializeBetterX() {
   const uiManager = new UIManager(pluginManager);
   uiManager.themeManager = themeManager;
   uiManager.injectBetterXUI();
+  
+  // Set UIManager reference for the API
+  if (api.notifications && typeof api.notifications.setUIManager === 'function') {
+    api.notifications.setUIManager(uiManager);
+  }
 
-  window.BetterX = {
+  // Create a separate BetterXBundle object instead of trying to modify window.BetterX
+  window.BetterXBundle = {
     plugins: pluginManager.plugins,
     themes: themeManager.themes,
     togglePlugin: (pluginName) => pluginManager.togglePlugin(pluginName),
-    createTheme: (name, css) => themeManager.createTheme(name, css)
+    createTheme: (name, css) => themeManager.createTheme(name, css),
+    api,
+    uiManager,
+    pluginManager,
+    themeManager
   };
 
-  console.log("BetterX loaded with plugins:", pluginManager.plugins.map(p => `${p.name} (${p.enabled ? 'enabled' : 'disabled'})`));
+  // Log initialization complete
+  console.log("BetterX Bundle loaded with plugins:", 
+    pluginManager.plugins.map(p => `${p.name} (${p.enabled ? 'enabled' : 'disabled'})`));
+
+  // If BetterX desktop app is available, try to register with it
+  if (window.BetterX && typeof window.BetterX.registerBundle === 'function') {
+    try {
+      window.BetterX.registerBundle(window.BetterXBundle);
+      console.log("Successfully registered bundle with BetterX desktop app");
+    } catch (error) {
+      console.error("Error registering bundle with BetterX desktop app:", error);
+    }
+  }
 }
 
 // Initialize BetterX when the script loads

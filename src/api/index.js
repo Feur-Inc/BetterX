@@ -8,10 +8,15 @@ import * as notifications from './notifications.js';
 
 export { notifications };
 
-// Expose the API globally for easy access from plugins
+// Export a convenience method for getting the BetterX instance
+export function getBetterX() {
+  return window.BetterX || window.BetterXBundle || null;
+}
+
+// Always create our own API object
 window.BetterXAPI = {
-  notifications
+  notifications,
+  getBetterX
 };
 
-// Log that the API is available
-console.log('[BetterX] API initialized and available via window.BetterXAPI');
+console.log('[BetterX] API initialized and available via window.BetterXAPI or @api import');

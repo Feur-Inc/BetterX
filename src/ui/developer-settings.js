@@ -1,3 +1,6 @@
+import { getBuildInfo, getTimeSinceBuild, getBundleVersion } from '../utils/build-info';
+import { getDesktopVersion } from '../utils/compatibility';
+
 /**
  * Create and populate the developer settings panel
  * @param {HTMLElement} container - The container element to populate
@@ -25,35 +28,44 @@ export function populateDeveloperSettings(container, uiManager) {
       </div>
       <div class="betterx-plugin-details" style="display: block; margin-top: 10px;">
         <p><strong>BetterX Desktop Version:</strong> <span id="betterx-version">Loading...</span></p>
-        <p><strong>BetetrX Bundle Build Date:</strong> <span id="betterx-build-date">Loading...</span></p>
+        <p><strong>BetterX Bundle Version:</strong> <span id="betterx-bundle-version">Loading...</span></p>
+        <p><strong>BetterX Bundle Build Date:</strong> <span id="betterx-build-date">Loading...</span></p>
+        <p><strong>Time Since Build:</strong> <span id="betterx-build-age">Loading...</span></p>
       </div>
     </div>
   `;
 
   // Set version info
   const version = document.getElementById('betterx-version');
+  const bundleVersion = document.getElementById('betterx-bundle-version');
   const buildDate = document.getElementById('betterx-build-date');
+  const buildAge = document.getElementById('betterx-build-age');
   
   try {
-    // Get the desktop version using the Promise API
-    if (window.BetterX && typeof window.BetterX.getDesktopVersion === 'function') {
-      window.BetterX.getDesktopVersion()
-        .then(desktopVersion => {
-          version.textContent = desktopVersion || 'Not available';
-        })
-        .catch(err => {
-          console.error('Error getting desktop version', err);
-          version.textContent = 'Error';
-        });
-    } else {
-      version.textContent = 'Not available';
-    }
+    // Get the desktop version using the compatibility utility
+    getDesktopVersion().then(desktopVersion => {
+      version.textContent = desktopVersion || 'Not available';
+    }).catch(err => {
+      console.error('Error getting desktop version', err);
+      version.textContent = 'Error';
+    });
     
-    buildDate.textContent = window.betterX?.buildDate || new Date().toLocaleDateString();
+    // Get build info from our utility
+    const buildInfo = getBuildInfo();
+    bundleVersion.textContent = buildInfo.version;
+    buildDate.textContent = buildInfo.formatted;
+    buildAge.textContent = getTimeSinceBuild();
+    
+    // Update the time since build every minute
+    setInterval(() => {
+      buildAge.textContent = getTimeSinceBuild();
+    }, 60000);
   } catch (e) {
     console.error('Error setting version information', e);
     version.textContent = 'Error';
+    bundleVersion.textContent = 'Error';
     buildDate.textContent = 'Error';
+    buildAge.textContent = 'Error';
   }
 
   // Setup notification tester button

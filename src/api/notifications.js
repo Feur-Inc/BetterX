@@ -4,6 +4,18 @@
  * This API provides a simplified interface for plugins to use the notification system.
  */
 
+// Store a reference to the UIManager
+let uiManagerRef = null;
+
+/**
+ * Set the UIManager reference for the API to use
+ * @param {Object} uiManager The UIManager instance
+ */
+export function setUIManager(uiManager) {
+  uiManagerRef = uiManager;
+  console.log('[BetterX API] UIManager reference set for notifications API');
+}
+
 /**
  * Show a notification
  * @param {Object} options Notification options
@@ -97,14 +109,32 @@ export function clearAllNotifications() {
  * @returns {Object|null} UIManager instance or null if not found
  */
 function getBetterXUIManager() {
-  // Try to get the UIManager through various paths
-  if (window.betterX?.uiManager) {
-    return window.betterX.uiManager;
+  // First check if we have a direct reference
+  if (uiManagerRef) {
+    return uiManagerRef;
   }
   
-  // Check if there's a BetterX plugin with an instance
-  if (window.betterX?.plugins?.pluginManager?.plugins) {
-    const betterXPlugin = window.betterX.plugins.pluginManager.plugins.find(p => p.name === "BetterX");
+  // First try our own BetterXBundle
+  if (window.BetterXBundle?.uiManager) {
+    return window.BetterXBundle.uiManager;
+  }
+  
+  // Then try the desktop app's BetterX object
+  if (window.BetterX?.uiManager) {
+    return window.BetterX.uiManager;
+  }
+  
+  // Check plugins in BetterXBundle
+  if (window.BetterXBundle?.plugins) {
+    const betterXPlugin = window.BetterXBundle.plugins.find(p => p.name === "BetterX");
+    if (betterXPlugin?.instance?.uiManager) {
+      return betterXPlugin.instance.uiManager;
+    }
+  }
+  
+  // Check plugins in desktop BetterX
+  if (window.BetterX?.plugins?.pluginManager?.plugins) {
+    const betterXPlugin = window.BetterX.plugins.pluginManager.plugins.find(p => p.name === "BetterX");
     if (betterXPlugin?.instance?.uiManager) {
       return betterXPlugin.instance.uiManager;
     }
