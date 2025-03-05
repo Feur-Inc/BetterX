@@ -1,5 +1,6 @@
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
+import { notifications } from "@api";
 
 const normalButtonHTML = `
     <button aria-label="Screenshot" role="button" class="css-175oi2r r-1777fci r-bt1l66 r-bztko3 r-lrvibr r-1loqt21 r-1ny4l3l" data-testid="screenshot" type="button">
@@ -184,7 +185,7 @@ export default definePlugin({
                 });
             }
             await window.api.copyImageToClipboard(imageBuffer);
-            this.showNotification("Copied to clipboard");
+            await notifications.showInfo("Screenshot copied to clipboard", { duration: 3000 });
             await new Promise(resolve => setTimeout(resolve, 100));
             btn.style.display = '';
             if (container) {
@@ -205,24 +206,6 @@ export default definePlugin({
             const container = btn.closest('.css-175oi2r.r-18u37iz.r-1h0z5md.r-1wron08');
             if (container) container.removeAttribute("data-capturing");
         }
-    },
-    showNotification(message) {
-        const notification = document.createElement('div');
-        notification.textContent = message;
-        notification.style.position = 'fixed';
-        notification.style.left = '50%';
-        notification.style.bottom = '10px';
-        notification.style.transform = 'translateX(-50%)';
-        notification.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        notification.style.color = 'white';
-        notification.style.padding = '5px 10px';
-        notification.style.borderRadius = '4px';
-        notification.style.fontSize = '12px';
-        notification.style.zIndex = '9999';
-        document.body.appendChild(notification);
-        setTimeout(() => {
-            document.body.removeChild(notification);
-        }, 1000);
     },
     settings: {
         enabled: {
