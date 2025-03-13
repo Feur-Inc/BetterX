@@ -347,6 +347,13 @@ export class UIManager {
     // Create the settings modal
     this.settingsModal = this.createSettingsModal();
     document.body.appendChild(this.settingsModal);
+    
+    // Add escape key event listener to close modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.settingsModal.style.display === 'block') {
+        this.handleModalClose(this.settingsModal);
+      }
+    });
 
     // Initialize the footer link
     injectFooterLink();

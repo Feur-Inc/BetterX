@@ -803,6 +803,40 @@ export function injectUIStyles() {
     .betterx-log-option input {
       margin-right: 6px;
     }
+
+    /* Emoji Preview Styles */
+    .betterx-emoji-preview {
+      position: absolute;
+      background-color: #15202b;
+      border: 1px solid #38444d;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 10000;
+      max-width: 300px;
+      overflow: hidden;
+    }
+    
+    .betterx-emoji-item {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .betterx-emoji-item:hover {
+      background-color: rgba(29, 161, 242, 0.1);
+    }
+    
+    .betterx-emoji {
+      font-size: 18px;
+      margin-right: 8px;
+    }
+    
+    .betterx-emoji-name {
+      color: #8899a6;
+      font-size: 14px;
+    }
   `;
   document.head.appendChild(styles);
 }
