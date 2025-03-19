@@ -73,7 +73,7 @@ async function initializeBetterX() {
   };
 
   // Log initialization complete
-  logger.success("${Name} Bundle loaded with plugins:", 
+  logger.success(`${Name} Bundle loaded with plugins:`, 
     pluginManager.plugins.map(p => `${p.name} (${p.enabled ? 'enabled' : 'disabled'})`));
 
   // If BetterX desktop app is available, try to register with it
@@ -81,7 +81,7 @@ async function initializeBetterX() {
     try {
       window.BetterX.registerBundle(window.BetterXBundle);
     } catch (error) {
-      logger.error("Error registering bundle with ${Name} desktop app:", error);
+      logger.error(`Error registering bundle with ${Name} desktop app:`, error);
     }
   }
 }
