@@ -637,7 +637,7 @@ export function injectUIStyles() {
       font-size: 16px;
       font-weight: 700;
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: var(--ctp-text, #ffffff);
+      color: var(--betterx-textColor);
     }
     
     .betterx-notification-message {
@@ -645,19 +645,19 @@ export function injectUIStyles() {
       word-break: break-word;
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 400;
-      color: var(--ctp-text, #ffffff);
+      color: var(--betterx-textColor);
     }
     
     .betterx-notification-source {
       margin-top: 4px;
       font-size: 12px;
-      color: var(--ctp-subtext0, #8899a6);
+      color: var(--betterx-textColorSecondary);
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 400;
     }
     
     .betterx-notification-close {
-      color: var(--ctp-subtext0, #8899a6);
+      color: var(--betterx-textColorSecondary);
       font-size: 18px;
       font-weight: bold;
       cursor: pointer;
@@ -670,8 +670,8 @@ export function injectUIStyles() {
     }
     
     .betterx-notification-close:hover {
-      color: var(--ctp-text, #ffffff);
-      background-color: rgba(239, 243, 244, 0.1);
+      color: var(--betterx-textColor);
+      background-color: var(--betterx-hoverBg);
     }
     
     .betterx-notification-actions {
@@ -685,9 +685,9 @@ export function injectUIStyles() {
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 500;
       background: transparent;
-      border: 1px solid var(--ctp-surface0, #38444d);
+      border: 1px solid var(--betterx-borderColor);
       border-radius: 4px;
-      color: var(--ctp-text, #fff);
+      color: var(--betterx-textColor);
       cursor: pointer;
       font-size: 13px;
       padding: 5px 10px;
@@ -695,8 +695,8 @@ export function injectUIStyles() {
     }
     
     .betterx-notification-action:hover {
-      background: rgba(29, 161, 242, 0.1);
-      border-color: var(--accent, #1da1f2);
+      background: var(--betterx-hoverBg);
+      border-color: var(--betterx-accentColor);
     }
     
     .betterx-notification-progress-container {
