@@ -1,5 +1,6 @@
 import { Devs } from "@utils/constants";
 import definePlugin from "@utils/types";
+import { Name } from "@utils/constants";
 
 let observer;
 let statusInterval;
@@ -110,7 +111,7 @@ export default definePlugin({
 
             popup.innerHTML = `
                 <h2 style="color: rgb(247, 249, 249); margin-bottom: 20px; font-family: TwitterChirp, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
-                    BetterX Authentication Required
+                    ${Name} Authentication Required
                 </h2>
                 <button id="openAuth" style="
                     width: 100%;
@@ -219,7 +220,7 @@ export default definePlugin({
             console.error('Error creating auth popup:', error);
             popup.innerHTML = `
                 <p style="color: rgb(244, 33, 46); text-align: center;">
-                    An error occurred while connecting to BetterX
+                    An error occurred while connecting to ${Name}
                 </p>
             `;
             overlay.appendChild(popup);
@@ -399,7 +400,7 @@ export default definePlugin({
                         const newDiv = document.createElement('div');
                         newDiv.className = 'css-175oi2r r-xoduu5';
                         newDiv.innerHTML = `
-                            <svg viewBox="0 0 22 22" aria-label="BetterX" role="img" class="r-4qtqp9 r-yyyyoo r-1xvli5t r-bnwqim r-lrvibr r-m6rgpd r-1cvl2hr r-f9ja8p r-og9te1" data-testid="icon-betterx" style="border: 1px solid white;border-radius: 4px;margin-left: 8px;top: 2px;">
+                            <svg viewBox="0 0 22 22" aria-label="${Name}" role="img" class="r-4qtqp9 r-yyyyoo r-1xvli5t r-bnwqim r-lrvibr r-m6rgpd r-1cvl2hr r-f9ja8p r-og9te1" data-testid="icon-betterx" style="border: 1px solid white;border-radius: 4px;margin-left: 8px;top: 2px;">
                                 <image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAGnUExURQAAAAAAAAAAACEhIUtLS0dHR0lJSUhISEFBQS4uLhMTEwICAjs7O7+/v/j4+Pf39+fn5+Tk5O7u7vn5+fb29vr6+v39/ebm5tHR0d7e3tLS0o6OjigoKB8fH9TU1Ojo6EVFRSYmJpKSkvv7+319fVRUVGtra66urtzc3HR0dD09PYeHh+rq6tXV1TQ0NAMDAzw8PAcHB4ODg1BQUPDw8KurqwEBAaenp+Xl5SIiIqioqAUFBaysrOnp6ScnJw0NDcvLy8zMzA4ODoaGhhAQENDQ0MfHxwwMDJGRkfPz8zIyMpeXlxISEsjIyBYWFuPj4zU1NYGBgXFxcXx8fGxsbEBAQGFhYbm5udfX12hoaEpKSqqqqoKCggsLC/////Hx8YWFhfz8/I+Pj21tbYmJiTk5OZqampaWlp2dne/v73V1dYqKigQEBLq6uiwsLBgYGHh4eFtbW2ZmZtvb2xcXF35+flpaWhQUFMXFxevr6wYGBnl5eUNDQxEREZSUlCAgIJOTk4CAgFZWVmpqavT09Hd2dsrKyqSkpMDAwN/f37S0tEZGRh0dHaWWml4AAAACdFJOU/79P6CPqgAAAAFiS0dEXgTWYbsAAAAJcEhZcwAALiMAAC4jAXilP3YAAAAHdElNRQfoCgsRCRUKiToKAAABUklEQVQ4y2Ngwg8YGAaPAmYWVlY2NnZWdnZWVlYOTi5udAU8vHz8AoJCwvwiomLiEpJS0jLoVsjKySsoKimrqKqpa2hqaevo6qEp0FcXlGVS4TNgYjI00mFlMjYxNURVYGZuAVKgBWRaClrpW9vY2uFUYO/g6MTkzMeDU4GLq5s7k4enHk4FXkLeTD6+cn5YFQAd6WPuH2AYKBLEhEVBsGhIaFh4RGRUtGBMLFYFccLCcfFBCYLCCe5MWBUkJiWnONgGp6bJp/sw4XKDX0Ymu34Wf7Y+7oCStMlxz7XNw6lAX10jn6kgrhCnAqYMcWamojg1nAq4TYtLmErjynAqKNE11S+vqOTEFd1V1eI1tXVidTmoCuqBCcauQbmxqTm6xaa1ja89Hy3JdfCLiAsK8fGLCCeKyHd2FdqjhWR9VHc3MMF2gwCHXo8h6cmepgoIAEYAdQJPWDoMAEsAAAAOZVhJZk1NACoAAAAIAAAAAAAAANJTkwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyNC0xMC0xMVQxNzowOToyMSswMDowMOSvVEsAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjQtMTAtMTFUMTc6MDk6MjErMDA6MDCV8uz3AAAAKHRFWHRkYXRlOnRpbWVzdGFtcAAyMDI0LTEwLTExVDE3OjA5OjIxKzAwOjAwwufNKAAAAABJRU5ErkJggg==" width="22" height="22"></image>
                             </svg>
                         `;

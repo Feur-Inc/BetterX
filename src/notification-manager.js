@@ -178,9 +178,6 @@ export class NotificationManager {
       void notificationEl.offsetWidth;
     }, 50);
     
-    // Log for debugging
-    console.log(`Notification created: ${id}`, { type, title, message });
-    
     return id;
   }
   

@@ -42,7 +42,6 @@ export function watchThemeChanges(callback) {
   const intervalId = setInterval(() => {
     const newTheme = getCurrentThemeMode();
     if (newTheme !== currentTheme) {
-      console.log(`BetterX: Twitter theme changed from ${currentTheme} to ${newTheme}`);
       currentTheme = newTheme;
       callback(currentTheme, currentAccentColor);
     }
@@ -59,7 +58,6 @@ export function watchThemeChanges(callback) {
     if (document.visibilityState === 'visible') {
       const newTheme = getCurrentThemeMode();
       if (newTheme !== currentTheme) {
-        console.log(`BetterX: Twitter theme changed to ${newTheme} after visibility change`);
         currentTheme = newTheme;
         callback(currentTheme, currentAccentColor);
       }
@@ -170,8 +168,6 @@ export function applyThemeColors(themeMode, accentColor) {
     colors = THEME_COLORS.dim;
     themeName = 'dim';
   }
-  
-  console.log(`BetterX: Applying ${themeName} theme (mode: ${themeMode}) with accent color: ${accentColor?.color || 'default'}`);
   
   // Apply colors to CSS variables
   const root = document.documentElement;

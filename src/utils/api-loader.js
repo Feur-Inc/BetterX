@@ -9,7 +9,6 @@
  */
 export async function ensureAPI() {
   if (!window.BetterX || !window.BetterX.api) {
-    console.log("[BetterX] API not found, waiting for initialization...");
     
     // Wait for API to be initialized
     await new Promise(resolve => {

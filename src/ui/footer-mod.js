@@ -1,3 +1,4 @@
+import { Name } from '../utils/constants.js';
 import { getCurrentThemeMode } from '../utils/theme-detector.js';
 
 export function injectFooterLink() {
@@ -25,7 +26,7 @@ export function injectFooterLink() {
 
   const webSpan = document.createElement('span');
   webSpan.className = 'css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3';
-  webSpan.textContent = 'BetterX';
+  webSpan.textContent = `${Name}`;
 
   webSettingsLink.appendChild(webSpan);
 
@@ -46,7 +47,7 @@ export function injectFooterLink() {
 
   const desktopSpan = document.createElement('span');
   desktopSpan.className = 'css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3';
-  desktopSpan.textContent = 'BetterX Desktop';
+  desktopSpan.textContent = Name + ' Desktop';
 
   desktopSettingsLink.appendChild(desktopSpan);
 

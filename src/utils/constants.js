@@ -4,3 +4,5 @@ export const Devs = {
     IHateSpawn: { name: "KwiatekMiki", handle: "IHateSpawn" },
     Ayaz: { name: "Ayaz", handle: "ayazqv" }
 };
+
+export const Name = "BetterX";

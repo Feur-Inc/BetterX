@@ -1,5 +1,6 @@
 import { getBuildInfo, getTimeSinceBuild, getBundleVersion } from '../utils/build-info';
 import { getDesktopVersion } from '../utils/compatibility';
+import { Name } from '@utils/constants';
 
 /**
  * Create and populate the developer settings panel
@@ -12,7 +13,7 @@ export function populateDeveloperSettings(container, uiManager) {
       <div class="betterx-plugin-header">
         <div class="betterx-plugin-info">
           <h3>Notification System</h3>
-          <p>Tools to test and debug the BetterX notification system.</p>
+          <p>Tools to test and debug the ${Name} notification system.</p>
         </div>
         <div class="betterx-plugin-controls">
           <button id="betterx-open-notification-tester" class="betterx-button">Open Tester</button>
@@ -27,9 +28,9 @@ export function populateDeveloperSettings(container, uiManager) {
         </div>
       </div>
       <div class="betterx-plugin-details" style="display: block; margin-top: 10px;">
-        <p><strong>BetterX Desktop Version:</strong> <span id="betterx-version">Loading...</span></p>
-        <p><strong>BetterX Bundle Version:</strong> <span id="betterx-bundle-version">Loading...</span></p>
-        <p><strong>BetterX Bundle Build Date:</strong> <span id="betterx-build-date">Loading...</span></p>
+        <p><strong>${Name} Desktop Version:</strong> <span id="betterx-version">Loading...</span></p>
+        <p><strong>${Name} Bundle Version:</strong> <span id="betterx-bundle-version">Loading...</span></p>
+        <p><strong>${Name} Bundle Build Date:</strong> <span id="betterx-build-date">Loading...</span></p>
         <p><strong>Time Since Build:</strong> <span id="betterx-build-age">Loading...</span></p>
       </div>
     </div>
@@ -144,7 +145,7 @@ export function createNotificationTester(uiManager) {
         
         <div class="betterx-option-wrapper" style="margin-top: 10px;">
           <label for="notif-message" class="betterx-option-label">Message</label>
-          <textarea id="notif-message" placeholder="Notification Message" class="betterx-input" style="width: 100%; box-sizing: border-box; min-height: 80px; resize: vertical;">This is a test notification from BetterX</textarea>
+          <textarea id="notif-message" placeholder="Notification Message" class="betterx-input" style="width: 100%; box-sizing: border-box; min-height: 80px; resize: vertical;">This is a test notification from ${Name}</textarea>
         </div>
       </div>
     </div>

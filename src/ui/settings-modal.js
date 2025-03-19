@@ -1,3 +1,5 @@
+import { Name } from "../utils/constants";
+
 export function createSettingsModal(uiManager) {
   const modal = uiManager.createUIElement('div', {
     id: 'betterx-settings-modal',
@@ -5,7 +7,7 @@ export function createSettingsModal(uiManager) {
     innerHTML: `
       <div class="betterx-modal-content">
         <div class="betterx-modal-header">
-          <h2>BetterX Settings</h2>
+          <h2>${Name} Settings</h2>
           <span class="betterx-close">&times;</span>
         </div>
         <div class="betterx-tabs">

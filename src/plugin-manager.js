@@ -1,7 +1,10 @@
+import { logger } from './utils/logger.js';
+
 export class PluginManager {
   constructor() {
     this.plugins = [];
     this.uiElements = {};
+    this.logger = logger.scope('PluginManager');
   }
 
   async loadPlugins() {
@@ -15,12 +18,12 @@ export class PluginManager {
         const userPluginContext = require.context('./userplugins', true, /index\.(js|ts)$/);
         await this.loadPluginsFromContext(userPluginContext, true);
       } catch (error) {
-        console.debug('No user plugins found - this is normal if none are installed');
+        this.logger.debug('No user plugins found - this is normal if none are installed');
       }
 
       this.loadPluginData();
     } catch (error) {
-      console.error('Failed to load plugins, but UI will still be available:', error);
+      this.logger.error('Failed to load plugins, but UI will still be available:', error);
       // Ensure plugins array is initialized even if everything fails
       this.plugins = this.plugins || [];
     }
@@ -34,7 +37,7 @@ export class PluginManager {
           // Validate and normalize the authors field for user plugins
           if (isUserPlugin) {
             if (!plugin.default.authors) {
-              console.warn(`User plugin ${plugin.default.name} is missing authors field`);
+              this.logger.warn(`User plugin ${plugin.default.name} is missing authors field`);
               continue;
             }
             plugin.default.authors = this.normalizeAuthors(plugin.default.authors);
@@ -42,10 +45,10 @@ export class PluginManager {
           
           plugin.default.isUserPlugin = isUserPlugin;
           this.plugins.push(plugin.default);
-          console.log(`${isUserPlugin ? 'User plugin' : 'Plugin'} ${plugin.default.name} loaded`);
+          this.logger.plugin(plugin.default.name, `${isUserPlugin ? 'User plugin' : 'Plugin'} loaded successfully`);
         }
       } catch (error) {
-        console.error(`Failed to load plugin from ${key}:`, error);
+        this.logger.error(`Failed to load plugin from ${key}:`, error);
       }
     }
   }
@@ -70,7 +73,7 @@ export class PluginManager {
         try {
           this.initializePlugin(plugin, savedData, isFirstRun);
         } catch (error) {
-          console.error(`Failed to initialize plugin ${plugin.name}:`, error);
+          this.logger.error(`Failed to initialize plugin ${plugin.name}:`, error);
           plugin.enabled = false;
         }
       });
@@ -79,7 +82,7 @@ export class PluginManager {
         this.savePluginData();
       }
     } catch (error) {
-      console.error('Failed to load plugin data:', error);
+      this.logger.error('Failed to load plugin data:', error);
     }
   }
 
@@ -131,13 +134,15 @@ export class PluginManager {
       // Vérifier la persistance
       const saved = JSON.parse(localStorage.getItem('betterXPluginStates') || '{}');
       if (saved[pluginName]?.enabled !== plugin.enabled) {
-        console.error(`État non persisté pour ${pluginName}`);
+        this.logger.error(`État non persisté pour ${pluginName}`);
         this.savePluginData(); // Deuxième tentative
       }
       
       if (plugin.enabled) {
+        this.logger.plugin(plugin.name, 'Enabling plugin');
         this.safePluginCall(plugin, 'start');
       } else {
+        this.logger.plugin(plugin.name, 'Disabling plugin');
         this.safePluginCall(plugin, 'stop');
       }
     }
@@ -164,7 +169,7 @@ export class PluginManager {
     try {
       return plugin[methodName](...args);
     } catch (error) {
-      console.error(`Plugin ${plugin.name} errored in ${methodName}:`, error);
+      this.logger.error(`Plugin ${plugin.name} errored in ${methodName}:`, error);
       // Disable problematic plugins automatically
       plugin.enabled = false;
       this.savePluginData();
@@ -187,7 +192,7 @@ export class PluginManager {
       plugin.renderSettings(container);
       return true;
     } catch (error) {
-      console.error(`Plugin ${plugin.name} failed to render custom settings:`, error);
+      this.logger.error(`Plugin ${plugin.name} failed to render custom settings:`, error);
       // Show error in the container
       container.innerHTML = `
         <div class="betterx-settings-error">

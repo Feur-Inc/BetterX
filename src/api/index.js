@@ -19,4 +19,3 @@ window.BetterXAPI = {
   getBetterX
 };
 
-console.log('[BetterX] API initialized and available via window.BetterXAPI or @api import');

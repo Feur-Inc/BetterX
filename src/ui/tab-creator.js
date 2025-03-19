@@ -1,5 +1,7 @@
 import { getCurrentThemeMode } from '../utils/theme-detector.js';
 import { getAccentColor } from '../utils/accent-color.js';
+import { Logger } from '../utils/logger.js';
+import { Name } from '../utils/constants.js';
 
 // Create the BetterX tab element - Returns a DOM element directly
 export function createBetterXTab() {
@@ -87,7 +89,7 @@ export function createBetterXTab() {
         if (textDiv) textDiv.style.color = textColor;
       });
     }).catch(err => {
-      console.error('Error applying accent color to BetterX tab:', err);
+      Logger.error("Error applying accent color to " + Name + "tab:", err);
     });
   }, 0);
 
@@ -128,10 +130,10 @@ export function addBetterXTab(uiManager) {
         // Now append the tab
         activeRouteContainer.appendChild(betterXTab);
       } else {
-        console.error('BetterX tab creation failed: not an Element', typeof betterXTab);
+        Logger.error(Name + ' tab creation failed: not an Element', typeof betterXTab);
       }
     } catch (error) {
-      console.error('Error adding BetterX tab:', error);
+      Logger.error("Error adding " + Name + " tab:", error);
     }
   }
 }

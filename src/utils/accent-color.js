@@ -121,7 +121,6 @@ export function watchAccentColorChanges(callback) {
       const { color, primary, hover } = await getAccentColor();
       if (currentColor !== color) {
         if (currentColor !== null) {
-          console.log(`BetterX: Twitter accent color changed from ${currentColor} to ${color}`);
         }
         currentColor = color;
         callback({ color, primary, hover });

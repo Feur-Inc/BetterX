@@ -13,7 +13,6 @@ let uiManagerRef = null;
  */
 export function setUIManager(uiManager) {
   uiManagerRef = uiManager;
-  console.log('[BetterX API] UIManager reference set for notifications API');
 }
 
 /**

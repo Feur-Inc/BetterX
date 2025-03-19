@@ -77,7 +77,6 @@ export class UIManager {
 
   createRestartDialog(changedPlugins) {
     // Add debugging to ensure we're reaching this point
-    console.log('Creating restart dialog for plugins:', changedPlugins);
     
     // Ensure notifications manager is initialized
     if (!this.notifications) {
@@ -112,7 +111,6 @@ export class UIManager {
   handleModalClose(modal) {
     // Get changed plugins that require restart
     const changedPlugins = this.getChangedPlugins();
-    console.log('Changed plugins requiring restart:', changedPlugins);
     
     // Hide the modal
     modal.style.display = 'none';
