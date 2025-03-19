@@ -1,11 +1,17 @@
+import { getCurrentThemeMode } from '../utils/theme-detector.js';
+
 export function injectFooterLink() {
   const footer = document.querySelector('nav[aria-label="Footer"]');
   if (!footer || footer.querySelector('.betterx-footer-link')) return;
 
+  // Get theme-appropriate colors
+  const themeMode = getCurrentThemeMode();
+  const textColor = themeMode === 0 ? 'rgb(83, 100, 113)' : 'rgb(113, 118, 123)';
+  
   // Web settings link
   const webSettingsLink = document.createElement('a');
   webSettingsLink.className = 'css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-n6v787 r-1cwl3u0 r-16dba41 r-1xuzw63 r-faml9v r-1loqt21 betterx-footer-link';
-  webSettingsLink.style.color = 'rgb(113, 118, 123)';
+  webSettingsLink.style.color = textColor;
   webSettingsLink.style.textDecoration = 'none';
   webSettingsLink.addEventListener('mouseenter', () => {
     webSettingsLink.style.textDecorationLine = 'underline';
@@ -15,6 +21,7 @@ export function injectFooterLink() {
   });
   webSettingsLink.href = '#';
   webSettingsLink.setAttribute('role', 'link');
+  webSettingsLink.setAttribute('data-betterx-footer', 'true');
 
   const webSpan = document.createElement('span');
   webSpan.className = 'css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3';
@@ -25,7 +32,7 @@ export function injectFooterLink() {
   // Desktop settings link
   const desktopSettingsLink = document.createElement('a');
   desktopSettingsLink.className = 'css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-n6v787 r-1cwl3u0 r-16dba41 r-1xuzw63 r-faml9v r-1loqt21 betterx-footer-link';
-  desktopSettingsLink.style.color = 'rgb(113, 118, 123)';
+  desktopSettingsLink.style.color = textColor;
   desktopSettingsLink.style.textDecoration = 'none';
   desktopSettingsLink.addEventListener('mouseenter', () => {
     desktopSettingsLink.style.textDecorationLine = 'underline';
@@ -35,6 +42,7 @@ export function injectFooterLink() {
   });
   desktopSettingsLink.href = '#';
   desktopSettingsLink.setAttribute('role', 'link');
+  desktopSettingsLink.setAttribute('data-betterx-footer', 'true');
 
   const desktopSpan = document.createElement('span');
   desktopSpan.className = 'css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3';
@@ -65,4 +73,34 @@ export function injectFooterLink() {
     e.preventDefault();
     await window.api.openSettings();
   });
+}
+
+// Function to update the color of the footer links when theme changes
+export function updateFooterLinkColors() {
+  const footerLinks = document.querySelectorAll('.betterx-footer-link');
+  if (footerLinks.length === 0) return;
+  
+  const themeMode = getCurrentThemeMode();
+  // Use the correct color for each theme mode
+  let textColor;
+  if (themeMode === 0) {
+    textColor = 'rgb(83, 100, 113)'; // Light theme
+  } else if (themeMode === 1) {
+    textColor = 'rgb(139, 152, 165)'; // Dim theme - corrected color
+  } else {
+    textColor = 'rgb(113, 118, 123)'; // Dark theme
+  }
+  
+  footerLinks.forEach(link => {
+    link.style.color = textColor;
+  });
+}
+
+// Add the update function to the UI manager to be called when theme changes
+export function registerFooterThemeUpdater(uiManager) {
+  if (uiManager.themeChangeCallbacks) {
+    uiManager.themeChangeCallbacks.push(updateFooterLinkColors);
+  } else {
+    uiManager.themeChangeCallbacks = [updateFooterLinkColors];
+  }
 }

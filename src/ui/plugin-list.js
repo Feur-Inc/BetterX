@@ -88,11 +88,16 @@ export function createOptionElement(plugin, option, pluginManager) {
 
 export function populatePluginList(container, uiManager) {
   container.innerHTML = '';
-  const searchInput = document.getElementById('betterx-plugin-search');
-  const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+  const searchInput = document.getElementById('plugin-search');
+  const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
   
   uiManager.pluginManager.plugins.forEach(plugin => {
-    if (!plugin.name.toLowerCase().includes(searchTerm)) return;
+    // Check if plugin name or description contains search term
+    if (searchTerm && 
+        !plugin.name.toLowerCase().includes(searchTerm) && 
+        !plugin.description?.toLowerCase().includes(searchTerm)) {
+      return; // Skip this plugin if it doesn't match search
+    }
     
     const authorNames = uiManager.getAuthorNames(plugin.authors);
 
@@ -233,6 +238,10 @@ function renderMixedSettings(plugin, container, uiManager) {
           }
         }
       });
+      
+      // Ensure theme-related classes are properly applied
+      const theme = document.body.getAttribute('data-betterx-theme') || 'dim';
+      groupContainer.classList.add(`betterx-theme-${theme}`);
       
       container.appendChild(groupContainer);
     }

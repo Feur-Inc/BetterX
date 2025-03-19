@@ -22,6 +22,33 @@ export function injectUIStyles() {
       font-style: normal;
     }
     
+    /* Root CSS Variables - Will be set dynamically */
+    :root {
+      --betterx-bg: rgba(91, 112, 131, 0.4);
+      --betterx-modalBg: #15202b;
+      --betterx-contentBg: #192734;
+      --betterx-borderColor: #38444d;
+      --betterx-textColor: #ffffff;
+      --betterx-textColorSecondary: #8899a6;
+      --betterx-accentColor: #1da1f2;
+      --betterx-accentHoverColor: #1a91da;
+      --betterx-hoverBg: rgba(239, 243, 244, 0.1);
+      --betterx-switchBg: #38444d;
+      --betterx-pluginDetailsBg: #192734;
+      --betterx-tabsBg: #15202b;
+      --betterx-searchBarBg: #273340;
+      --betterx-searchBarBorderColor: #38444d;
+      --betterx-searchBarPlaceholderColor: #8899a6;
+      --betterx-searchBarHoverBg: #1c2732;
+      --betterx-closeButtonHoverBg: rgba(239, 243, 244, 0.1);
+      --betterx-notificationBg: #15202b;
+      --betterx-notificationBorder: #38444d;
+      --betterx-emojiPreviewBg: #15202b;
+      --betterx-emojiPreviewBorder: #38444d;
+      --betterx-themeItemBg: #192734;
+      --betterx-editorMainBg: #192734;
+    }
+    
     .betterx-modal {
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       display: none;
@@ -31,9 +58,10 @@ export function injectUIStyles() {
       top: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(91, 112, 131, 0.4);
+      background-color: var(--betterx-bg);
       font-family: "Segoe UI", Arial, sans-serif;
       overflow-y: auto;
+      overflow-x: hidden; /* Prevent horizontal scrolling */
       scrollbar-width: none; /* Firefox */
       -ms-overflow-style: none; /* IE and Edge */
     }
@@ -45,41 +73,48 @@ export function injectUIStyles() {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background-color: #15202b;
-      border: 1px solid #38444d;
+      background-color: var(--betterx-modalBg);
+      border: 1px solid var(--betterx-borderColor);
       border-radius: 16px;
       width: 90%;
       max-width: 600px;
       max-height: 90vh;
-      overflow-y: auto;
-      color: #ffffff;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+      display: flex;
+      flex-direction: column;
+      color: var(--betterx-textColor);
       z-index: 10001;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       transform-origin: center center;
       will-change: transform, height;
-    }
-    .betterx-modal-content::-webkit-scrollbar {
-      display: none;
+      overflow: hidden; /* Hide any overflow */
     }
     .betterx-modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      position: sticky;
-      top: 0;
-      background-color: #15202b;
+      background-color: var(--betterx-modalBg);
       padding: 20px;
-      border-bottom: 1px solid #38444d;
-      z-index: 2;
+      border-bottom: 1px solid var(--betterx-borderColor);
+      z-index: 3; /* Increased z-index to stay above tabs */
+      flex-shrink: 0; /* Prevent header from shrinking */
     }
     .betterx-modal-body {
       padding: 20px;
+      overflow-x: hidden; /* Prevent horizontal scrolling */
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 0; /* Remove the excessive margin */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE and Edge */
+    }
+    .betterx-modal-body::-webkit-scrollbar {
+      display: none; /* Chrome, Safari and Opera */
     }
     .betterx-plugin-item {
-      border-bottom: 1px solid #38444d;
+      border-bottom: 1px solid var(--betterx-borderColor);
       padding: 15px 0;
+      max-width: 100%; /* Ensure content doesn't exceed container width */
+      word-wrap: break-word; /* Break long words if needed */
     }
     .betterx-plugin-header {
       display: flex;
@@ -98,7 +133,7 @@ export function injectUIStyles() {
     .betterx-plugin-info p {
       margin: 0;
       font-size: 14px;
-      color: #8899a6;
+      color: var(--betterx-textColorSecondary);
     }
     .betterx-plugin-controls {
       display: flex;
@@ -124,7 +159,7 @@ export function injectUIStyles() {
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: #38444d;
+      background-color: var(--betterx-switchBg);
       transition: .4s;
       border-radius: 24px;
     }
@@ -135,12 +170,12 @@ export function injectUIStyles() {
       width: 18px;
       left: 3px;
       bottom: 3px;
-      background-color: #15202b;
+      background-color: var(--betterx-modalBg);
       transition: .4s;
       border-radius: 50%;
     }
     input:checked + .betterx-slider {
-      background-color: #1da1f2;
+      background-color: var(--betterx-accentColor);
     }
     input:checked + .betterx-slider:before {
       transform: translateX(24px);
@@ -154,7 +189,7 @@ export function injectUIStyles() {
     .betterx-arrow-icon {
       width: 24px;
       height: 24px;
-      fill: #8899a6;
+      fill: var(--betterx-textColorSecondary);
       transition: transform 0.3s ease;
     }
     .betterx-details-toggle.rotated .betterx-arrow-icon {
@@ -163,8 +198,10 @@ export function injectUIStyles() {
     .betterx-plugin-details {
       margin-top: 10px;
       padding: 10px;
-      background-color: #192734;
+      background-color: var(--betterx-pluginDetailsBg);
       border-radius: 8px;
+      overflow-x: hidden; /* Prevent horizontal scrolling */
+      word-wrap: break-word; /* Break long words if needed */
     }
     .betterx-plugin-details p {
       margin: 5px 0;
@@ -182,7 +219,7 @@ export function injectUIStyles() {
     }
     .betterx-option-description {
       font-size: 12px;
-      color: #8899a6;
+      color: var(--betterx-textColorSecondary);
       margin-bottom: 5px;
     }
     .betterx-select,
@@ -191,15 +228,15 @@ export function injectUIStyles() {
       width: 100%;
       padding: 8px;
       border-radius: 4px;
-      border: 1px solid #38444d;
-      background-color: #192734;
-      color: #ffffff;
+      border: 1px solid var(--betterx-borderColor);
+      background-color: var(--betterx-contentBg);
+      color: var(--betterx-textColor);
       font-size: 14px;
     }
     .betterx-select:focus,
     .betterx-input:focus {
       outline: none;
-      border-color: #1da1f2;
+      border-color: var(--betterx-accentColor);
     }
 
     .betterx-restart-dialog {
@@ -264,13 +301,13 @@ export function injectUIStyles() {
     }
     .betterx-tabs {
       display: flex;
-      position: sticky;
-      top: 65px;
-      z-index: 2;
-      background-color: #15202b;
-      margin: -20px -20px 20px -20px;
+      background-color: var(--betterx-tabsBg);
       padding: 0 20px;
-      border-bottom: 1px solid #38444d;
+      border-bottom: 1px solid var(--betterx-borderColor);
+      width: 100%;
+      box-sizing: border-box;
+      z-index: 2;
+      flex-shrink: 0; /* Prevent tabs from shrinking */
     }
     
     .betterx-tab {
@@ -298,6 +335,7 @@ export function injectUIStyles() {
       display: none;
       opacity: 0;
       transition: opacity 0.3s ease-out;
+      padding-top: 10px; /* Add a small amount of padding at the top */
     }
     
     .betterx-tab-content.active {
@@ -306,7 +344,7 @@ export function injectUIStyles() {
     }
     
     .betterx-theme-item {
-      background: #192734;
+      background: var(--betterx-themeItemBg);
       border-radius: 8px;
       padding: 15px;
       margin-bottom: 10px;
@@ -359,7 +397,7 @@ export function injectUIStyles() {
     .betterx-button {
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 500;
-      background: #1da1f2;
+      background: var(--betterx-accentColor);
       color: white;
       border: none;
       padding: 8px 16px;
@@ -368,7 +406,7 @@ export function injectUIStyles() {
     }
     
     .betterx-button:hover {
-      background: #1a91da;
+      background: var(--betterx-accentHoverColor);
     }
     
     .betterx-editor-overlay {
@@ -386,7 +424,7 @@ export function injectUIStyles() {
     }
     
     .betterx-theme-editor {
-      background: #15202b;
+      background-color: var(--betterx-modalBg);
       padding: 20px;
       border-radius: 12px;
       width: 90%;
@@ -395,7 +433,7 @@ export function injectUIStyles() {
       display: flex;
       flex-direction: column;
       box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      border: 1px solid #38444d;
+      border: 1px solid var(--betterx-borderColor);
     }
     
     .betterx-editor-header {
@@ -413,17 +451,17 @@ export function injectUIStyles() {
     .betterx-editor-title h3 {
       margin: 0 0 10px 0;
       font-size: 18px;
-      color: #fff;
+      color: var(--betterx-textColor);
     }
 
     .betterx-editor-main {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #192734;
+      background: var(--betterx-editorMainBg);
       border-radius: 8px;
       overflow: hidden;
-      border: 1px solid #38444d;
+      border: 1px solid var(--betterx-borderColor);
     }
 
     .betterx-editor-toolbar {
@@ -431,42 +469,16 @@ export function injectUIStyles() {
       justify-content: space-between;
       align-items: center;
       padding: 8px 12px;
-      background: #22303c;
-      border-bottom: 1px solid #38444d;
+      background-color: var(--betterx-contentBg);
+      border-bottom: 1px solid var(--betterx-borderColor);
     }
 
     .betterx-editor-info {
       font-size: 12px;
-      color: #8899a6;
+      color: var(--betterx-textColorSecondary);
       font-weight: 500;
     }
 
-    .betterx-editor-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .betterx-button.primary {
-      background: #1da1f2;
-    }
-
-    .betterx-button.secondary {
-      background: transparent;
-      border: 1px solid #38444d;
-    }
-
-    .betterx-button.mini {
-      padding: 4px 8px;
-      font-size: 12px;
-      background: transparent;
-      border: 1px solid #38444d;
-    }
-
-    .betterx-button.mini:hover {
-      background: rgba(29, 161, 242, 0.1);
-      border-color: #1da1f2;
-    }
-    
     .betterx-codemirror-wrapper {
       flex: 1;
       overflow: hidden;
@@ -517,15 +529,15 @@ export function injectUIStyles() {
       transition: background-color 0.2s;
     }
     .betterx-close:hover {
-      color: #ffffff;
-      background-color: rgba(239, 243, 244, 0.1);
+      color: var(--betterx-textColor);
+      background-color: var(--betterx-closeButtonHoverBg);
     }
     .betterx-theme-controls {
       margin-bottom: 20px;
     }
     .betterx-input.search-bar {
-      background-color: #273340;
-      border: 1px solid #38444d;
+      background-color: var(--betterx-searchBarBg);
+      border: 1px solid var(--betterx-searchBarBorderColor);
       border-radius: 20px;
       padding: 8px 16px;
       margin-bottom: 15px;
@@ -537,14 +549,14 @@ export function injectUIStyles() {
     }
 
     .betterx-input.search-bar:focus {
-      background-color: #15202b;
-      border-color: #1da1f2;
+      background-color: var(--betterx-modalBg);
+      border-color: var(--betterx-accentColor);
       outline: none;
       box-shadow: 0 0 0 1px rgba(29, 161, 242, 0.3);
     }
 
     .betterx-input.search-bar::placeholder {
-      color: #8899a6;
+      color: var(--betterx-searchBarPlaceholderColor);
     }
     #betterx-plugin-list {
       padding: 0 16px;
@@ -576,10 +588,10 @@ export function injectUIStyles() {
     .betterx-notification {
       /* Use CSS variables for theme compatibility */
       font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--ctp-base, #15202b);
-      color: var(--ctp-text, #ffffff);
+      background-color: var(--betterx-notificationBg);
+      color: var(--betterx-textColor);
       border-radius: 8px;
-      border: 1px solid var(--ctp-surface0, #38444d);
+      border: 1px solid var(--betterx-notificationBorder);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       padding: 12px;
       transform: translateX(120%);
@@ -807,8 +819,8 @@ export function injectUIStyles() {
     /* Emoji Preview Styles */
     .betterx-emoji-preview {
       position: absolute;
-      background-color: #15202b;
-      border: 1px solid #38444d;
+      background-color: var(--betterx-emojiPreviewBg);
+      border: 1px solid var(--betterx-emojiPreviewBorder);
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       z-index: 10000;
@@ -834,7 +846,7 @@ export function injectUIStyles() {
     }
     
     .betterx-emoji-name {
-      color: #8899a6;
+      color: var(--betterx-textColorSecondary);
       font-size: 14px;
     }
   `;

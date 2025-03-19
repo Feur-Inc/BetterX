@@ -9,16 +9,15 @@ import { createBetterXTab, addBetterXTab } from './ui/tab-creator.js';
 import { createThemeEditor, formatCSS } from './ui/theme-editor.js';
 import { populatePluginList, createOptionElement } from './ui/plugin-list.js';
 import { populateDeveloperSettings, createNotificationTester } from './ui/developer-settings.js';
-import { injectFooterLink } from './ui/footer-mod.js';
+import { injectFooterLink, registerFooterThemeUpdater, updateFooterLinkColors } from './ui/footer-mod.js';
 import { injectUIStyles } from './ui/styles.js';
+import { watchThemeChanges, applyThemeColors } from './utils/theme-detector.js';
 
 export class UIManager {
   constructor(pluginManager) {
     this.pluginManager = pluginManager;
     this.observer = null;
-    // Instancier ThemeManager pour gérer les thèmes
     this.themeManager = new ThemeManager();
-    // Initialize the notification manager
     this.notifications = new NotificationManager();
     this.initialActiveThemes = new Set();
     this.themeTabVisited = false;
@@ -26,6 +25,8 @@ export class UIManager {
     this.initialPluginStates = new Map();
     this.createBetterXTab = createBetterXTab;
     this.notificationTesterModal = null;
+    this.themeObserver = null;
+    this.themeChangeCallbacks = [];
   }
 
   createUIElement(elementType, properties) {
@@ -259,6 +260,15 @@ export class UIManager {
 
   populatePluginList(container) {
     populatePluginList(container, this);
+    
+    // Ensure search input event listener is attached
+    const searchInput = document.getElementById('plugin-search');
+    if (searchInput && !searchInput.dataset.listenerAttached) {
+      searchInput.addEventListener('input', () => {
+        this.populatePluginList(container);
+      });
+      searchInput.dataset.listenerAttached = 'true';
+    }
   }
 
   addBetterXTab() {
@@ -344,6 +354,34 @@ export class UIManager {
   }
 
   injectBetterXUI() {
+    // Add styles first
+    injectUIStyles();
+    
+    // Initialize theme detection and apply the appropriate theme
+    this.themeObserver = watchThemeChanges((themeMode) => {
+      applyThemeColors(themeMode);
+      
+      // Call all registered theme change callbacks
+      this.themeChangeCallbacks.forEach(callback => {
+        try {
+          callback(themeMode);
+        } catch (e) {
+          console.error('Error in theme change callback:', e);
+        }
+      });
+    });
+    
+    // Register footer theme updater
+    registerFooterThemeUpdater(this);
+    
+    // Initialize the footer link
+    injectFooterLink();
+    updateFooterLinkColors(); // Apply colors immediately
+    setInterval(() => {
+      injectFooterLink();
+      updateFooterLinkColors(); // Check colors periodically as well
+    }, 1000);
+    
     // Create the settings modal
     this.settingsModal = this.createSettingsModal();
     document.body.appendChild(this.settingsModal);
@@ -390,10 +428,20 @@ export class UIManager {
         pluginLogs: true
       };
     }
-
-    // Add styles
-    injectUIStyles();
     
     // Welcome notification
+  }
+  
+  // Clean up resources when BetterX is disabled
+  cleanup() {
+    if (this.themeObserver) {
+      this.themeObserver(); // Call the cleanup function
+    }
+    
+    if (this.observer) {
+      this.observer.disconnect();
+    }
+    
+    // ...existing code...
   }
 }

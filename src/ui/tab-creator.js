@@ -1,3 +1,5 @@
+import { getCurrentThemeMode } from '../utils/theme-detector.js';
+
 export function createBetterXTab() {
   const newDiv = document.createElement('div');
   newDiv.setAttribute('class', 'css-175oi2r');
@@ -11,17 +13,23 @@ export function createBetterXTab() {
   newLink.style.paddingRight = '16px';
   newLink.style.paddingLeft = '16px';
 
+  // Get current theme and set appropriate hover colors
+  const themeMode = getCurrentThemeMode();
+  const hoverBgColor = themeMode === 0 ? 'rgba(15, 20, 25, 0.1)' : (themeMode === 2 ? 'rgb(22, 24, 28)' : 'rgba(29, 161, 242, 0.1)');
+  const textColor = themeMode === 0 ? 'rgb(15, 20, 25)' : 'rgb(231, 233, 234)';
+  const hoverTextColor = themeMode === 0 ? 'rgb(15, 20, 25)' : 'rgb(239, 243, 244)';
+
   // Add hover effect styles
   newLink.addEventListener('mouseenter', () => {
-    newLink.style.backgroundColor = 'rgb(22, 24, 28)';
+    newLink.style.backgroundColor = hoverBgColor;
     const textDiv = newLink.querySelector('.css-146c3p1');
-    if (textDiv) textDiv.style.color = 'rgb(239, 243, 244)';
+    if (textDiv) textDiv.style.color = hoverTextColor;
   });
 
   newLink.addEventListener('mouseleave', () => {
     newLink.style.backgroundColor = 'transparent';
     const textDiv = newLink.querySelector('.css-146c3p1');
-    if (textDiv) textDiv.style.color = 'rgb(231, 233, 234)';
+    if (textDiv) textDiv.style.color = textColor;
   });
 
   // Add transition for smooth effect
@@ -37,7 +45,7 @@ export function createBetterXTab() {
   textDiv.setAttribute('dir', 'ltr');
   textDiv.setAttribute('class', 'css-146c3p1 r-bcqeeo r-1ttztb7 r-qvutc0 r-37j5jr r-a023e6 r-rjixqe r-16dba41');
   textDiv.style.textOverflow = 'unset';
-  textDiv.style.color = 'rgb(231, 233, 234)';
+  textDiv.style.color = textColor;
 
   const textSpan = document.createElement('span');
   textSpan.setAttribute('class', 'css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3');

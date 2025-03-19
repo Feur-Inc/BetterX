@@ -1,8 +1,13 @@
 import { EditorView, basicSetup } from "codemirror";
 import { css } from "@codemirror/lang-css";
 import { oneDark } from '@codemirror/theme-one-dark';
+import { getCurrentThemeMode } from '../utils/theme-detector.js';
 
 export function createThemeEditor(theme, uiManager) {
+  // Get current Twitter theme
+  const themeMode = getCurrentThemeMode();
+  const isLightTheme = themeMode === 0;
+  
   const editorElement = uiManager.createUIElement('div', {
     className: 'betterx-theme-editor',
     innerHTML: `
@@ -29,23 +34,48 @@ export function createThemeEditor(theme, uiManager) {
     `
   });
 
+  // Apply theme-specific styles directly to the editor modal
+  editorElement.style.backgroundColor = `var(--betterx-modalBg)`;
+  editorElement.style.borderColor = `var(--betterx-borderColor)`;
+  
+  const editorTitle = editorElement.querySelector('.betterx-editor-title h3');
+  if (editorTitle) {
+    editorTitle.style.color = `var(--betterx-textColor)`;
+  }
+
+  // Style the toolbar to match the theme
+  const editorToolbar = editorElement.querySelector('.betterx-editor-toolbar');
+  if (editorToolbar) {
+    editorToolbar.style.backgroundColor = isLightTheme ? '#e6e7e7' : '#22303c';
+    editorToolbar.style.borderBottomColor = `var(--betterx-borderColor)`;
+  }
+  
+  const editorInfo = editorElement.querySelector('.betterx-editor-info');
+  if (editorInfo) {
+    editorInfo.style.color = `var(--betterx-textColorSecondary)`;
+  }
+
   return {
     element: editorElement,
     initialize: function() {
       const nameInput = editorElement.querySelector('input');
       const editorContainer = editorElement.querySelector('.betterx-codemirror-wrapper');
       
-      // Initialize CodeMirror
+      // Initialize CodeMirror with theme-appropriate settings
+      const editorTheme = isLightTheme ? [] : [oneDark];
+      
       const view = new EditorView({
         doc: theme?.css || '',
         extensions: [
           basicSetup,
           css(),
-          oneDark,
+          ...editorTheme,
           EditorView.theme({
             "&": {
               height: "100%",
-              fontSize: "14px"
+              fontSize: "14px",
+              backgroundColor: isLightTheme ? "#ffffff" : undefined,
+              color: isLightTheme ? "#0f1419" : undefined
             },
             ".cm-content": {
               fontFamily: "monospace"
@@ -53,6 +83,17 @@ export function createThemeEditor(theme, uiManager) {
             ".cm-line": {
               padding: "0 3px",
               lineHeight: "1.6"
+            },
+            ".cm-gutters": {
+              backgroundColor: isLightTheme ? "#f7f9f9" : undefined,
+              color: isLightTheme ? "#536471" : undefined,
+              borderRight: isLightTheme ? "1px solid #eff3f4" : undefined
+            },
+            ".cm-activeLineGutter": {
+              backgroundColor: isLightTheme ? "#e6e7e7" : undefined
+            },
+            ".cm-activeLine": {
+              backgroundColor: isLightTheme ? "rgba(15, 20, 25, 0.05)" : undefined
             }
           })
         ],
@@ -67,7 +108,7 @@ export function createThemeEditor(theme, uiManager) {
         } else {
           await uiManager.themeManager.createTheme(nameInput.value, css);
         }
-        // Mise à jour de la liste des thèmes après enregistrement
+        // Update theme list after saving
         const themesContainer = document.querySelector('.betterx-themes-container');
         if (themesContainer) {
           uiManager.refreshThemesList(themesContainer);
