@@ -1,5 +1,7 @@
 import { getCurrentThemeMode } from '../utils/theme-detector.js';
+import { getAccentColor } from '../utils/accent-color.js';
 
+// Create the BetterX tab element - Returns a DOM element directly
 export function createBetterXTab() {
   const newDiv = document.createElement('div');
   newDiv.setAttribute('class', 'css-175oi2r');
@@ -13,17 +15,20 @@ export function createBetterXTab() {
   newLink.style.paddingRight = '16px';
   newLink.style.paddingLeft = '16px';
 
-  // Get current theme and set appropriate hover colors
+  // Get current theme
   const themeMode = getCurrentThemeMode();
-  const hoverBgColor = themeMode === 0 ? 'rgba(15, 20, 25, 0.1)' : (themeMode === 2 ? 'rgb(22, 24, 28)' : 'rgba(29, 161, 242, 0.1)');
   const textColor = themeMode === 0 ? 'rgb(15, 20, 25)' : 'rgb(231, 233, 234)';
-  const hoverTextColor = themeMode === 0 ? 'rgb(15, 20, 25)' : 'rgb(239, 243, 244)';
+  
+  // Initially use standard hover colors based on theme (will be updated with accent later)
+  const hoverBgColor = themeMode === 0 
+    ? 'rgba(29, 155, 240, 0.1)' 
+    : (themeMode === 2 ? 'rgb(22, 24, 28)' : 'rgba(29, 155, 240, 0.1)');
 
-  // Add hover effect styles
+  // Set up element with initial styling
   newLink.addEventListener('mouseenter', () => {
     newLink.style.backgroundColor = hoverBgColor;
     const textDiv = newLink.querySelector('.css-146c3p1');
-    if (textDiv) textDiv.style.color = hoverTextColor;
+    if (textDiv) textDiv.style.color = textColor;
   });
 
   newLink.addEventListener('mouseleave', () => {
@@ -68,20 +73,65 @@ export function createBetterXTab() {
   newLink.appendChild(linkContainer);
   newDiv.appendChild(newLink);
 
+  // Apply accent color asynchronously after the element is already created
+  setTimeout(() => {
+    getAccentColor().then(accentColor => {
+      const updatedHoverBgColor = themeMode === 0 
+        ? `rgba(${hexToRgb(accentColor.primary)}, 0.1)` 
+        : (themeMode === 2 ? 'rgb(22, 24, 28)' : `rgba(${hexToRgb(accentColor.primary)}, 0.1)`);
+      
+      // Update the event listener with the accent color
+      newLink.addEventListener('mouseenter', () => {
+        newLink.style.backgroundColor = updatedHoverBgColor;
+        const textDiv = newLink.querySelector('.css-146c3p1');
+        if (textDiv) textDiv.style.color = textColor;
+      });
+    }).catch(err => {
+      console.error('Error applying accent color to BetterX tab:', err);
+    });
+  }, 0);
+
   return newDiv;
+}
+
+// Helper function to convert hex to RGB for rgba values
+function hexToRgb(hex) {
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+  
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result 
+    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+    : '29, 155, 240'; // Default Twitter blue
 }
 
 export function addBetterXTab(uiManager) {
   const activeRouteContainer = document.querySelector('div[class="css-175oi2r"][role="tablist"]');
 
   if (activeRouteContainer && !document.querySelector('[data-testid="BetterX"]')) {
-    const betterXTab = uiManager.createBetterXTab();
-    activeRouteContainer.appendChild(betterXTab);
-
-    // Add click event to the BetterX tab to open the modal
-    betterXTab.querySelector('a').addEventListener('click', (e) => {
-      e.preventDefault();
-      uiManager.settingsModal.style.display = 'block';
-    });
+    try {
+      // We need to ensure we're getting a DOM element back
+      const betterXTab = createBetterXTab(); // Use the function directly
+      
+      if (betterXTab instanceof Element) {
+        // Add click event to the BetterX tab to open the modal
+        const link = betterXTab.querySelector('a');
+        if (link) {
+          link.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (uiManager && uiManager.settingsModal) {
+              uiManager.settingsModal.style.display = 'block';
+            }
+          });
+        }
+        
+        // Now append the tab
+        activeRouteContainer.appendChild(betterXTab);
+      } else {
+        console.error('BetterX tab creation failed: not an Element', typeof betterXTab);
+      }
+    } catch (error) {
+      console.error('Error adding BetterX tab:', error);
+    }
   }
 }

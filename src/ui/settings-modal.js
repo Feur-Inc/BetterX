@@ -45,18 +45,46 @@ export function createSettingsModal(uiManager) {
     }
   };
 
-  // Initialize the tabs
+  // Initialize the tabs with dynamic color handling
   const tabs = modal.querySelectorAll('.betterx-tab');
   const tabContents = modal.querySelectorAll('.betterx-tab-content');
+  
+  // Function to update tab colors based on accent color
+  const updateTabColors = () => {
+    const activeColor = getComputedStyle(document.documentElement).getPropertyValue('--betterx-accentColor').trim();
+    
+    tabs.forEach(tab => {
+      if (tab.classList.contains('active')) {
+        tab.style.color = activeColor;
+        tab.style.borderBottomColor = activeColor;
+      } else {
+        tab.style.color = '';
+        tab.style.borderBottomColor = 'transparent';
+      }
+    });
+  };
+  
+  // Add to theme change callbacks to update when accent changes
+  if (uiManager.themeChangeCallbacks) {
+    uiManager.themeChangeCallbacks.push(() => {
+      setTimeout(updateTabColors, 0);
+    });
+  }
   
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const tabName = tab.getAttribute('data-tab');
       
-      tabs.forEach(t => t.classList.remove('active'));
+      tabs.forEach(t => {
+        t.classList.remove('active');
+        t.style.color = '';
+        t.style.borderBottomColor = 'transparent';
+      });
+      
       tabContents.forEach(c => c.classList.remove('active'));
       
       tab.classList.add('active');
+      updateTabColors(); // Update colors when tab changes
       
       const activeContentId = `betterx-${tabName}-tab`;
       const activeContent = modal.querySelector(`#${activeContentId}`);
@@ -81,6 +109,9 @@ export function createSettingsModal(uiManager) {
       }
     });
   });
+  
+  // Initial tab color setup
+  setTimeout(updateTabColors, 0);
 
   // Attach search event listener to filter plugins
   const searchInput = modal.querySelector('#plugin-search');

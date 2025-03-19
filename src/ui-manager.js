@@ -12,6 +12,7 @@ import { populateDeveloperSettings, createNotificationTester } from './ui/develo
 import { injectFooterLink, registerFooterThemeUpdater, updateFooterLinkColors } from './ui/footer-mod.js';
 import { injectUIStyles } from './ui/styles.js';
 import { watchThemeChanges, applyThemeColors } from './utils/theme-detector.js';
+import { getAccentColor } from './utils/accent-color.js';
 
 export class UIManager {
   constructor(pluginManager) {
@@ -23,7 +24,7 @@ export class UIManager {
     this.themeTabVisited = false;
     this.developerTabVisited = false;
     this.initialPluginStates = new Map();
-    this.createBetterXTab = createBetterXTab;
+    this.createBetterXTab = createBetterXTab; // Reference the function directly
     this.notificationTesterModal = null;
     this.themeObserver = null;
     this.themeChangeCallbacks = [];
@@ -353,18 +354,21 @@ export class UIManager {
     this.developerTabVisited = true;
   }
 
-  injectBetterXUI() {
+  async injectBetterXUI() {
     // Add styles first
     injectUIStyles();
     
+    // Get initial accent color
+    const accentColor = await getAccentColor();
+    
     // Initialize theme detection and apply the appropriate theme
-    this.themeObserver = watchThemeChanges((themeMode) => {
-      applyThemeColors(themeMode);
+    this.themeObserver = watchThemeChanges((themeMode, accentColor) => {
+      applyThemeColors(themeMode, accentColor);
       
       // Call all registered theme change callbacks
       this.themeChangeCallbacks.forEach(callback => {
         try {
-          callback(themeMode);
+          callback(themeMode, accentColor);
         } catch (e) {
           console.error('Error in theme change callback:', e);
         }

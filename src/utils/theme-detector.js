@@ -5,6 +5,8 @@
  * night_mode=2: Lights out mode (black)
  */
 
+import { getAccentColor, watchAccentColorChanges } from './accent-color.js';
+
 export function getCurrentThemeMode() {
   // Get the night_mode cookie value
   const cookies = document.cookie.split(';');
@@ -25,9 +27,16 @@ export function getCurrentThemeMode() {
 
 export function watchThemeChanges(callback) {
   let currentTheme = getCurrentThemeMode();
+  let currentAccentColor = null;
   
   // Call callback immediately with initial theme
-  callback(currentTheme);
+  const initializeTheme = async () => {
+    const accentColor = await getAccentColor();
+    currentAccentColor = accentColor;
+    callback(currentTheme, accentColor);
+  };
+  
+  initializeTheme();
   
   // Check for theme changes periodically
   const intervalId = setInterval(() => {
@@ -35,9 +44,15 @@ export function watchThemeChanges(callback) {
     if (newTheme !== currentTheme) {
       console.log(`BetterX: Twitter theme changed from ${currentTheme} to ${newTheme}`);
       currentTheme = newTheme;
-      callback(currentTheme);
+      callback(currentTheme, currentAccentColor);
     }
   }, 1000); // Check every second
+  
+  // Watch for accent color changes
+  const accentColorWatcher = watchAccentColorChanges((accentColor) => {
+    currentAccentColor = accentColor;
+    callback(currentTheme, accentColor);
+  });
   
   // Also watch for cookie changes and page visibility changes
   document.addEventListener('visibilitychange', () => {
@@ -46,12 +61,15 @@ export function watchThemeChanges(callback) {
       if (newTheme !== currentTheme) {
         console.log(`BetterX: Twitter theme changed to ${newTheme} after visibility change`);
         currentTheme = newTheme;
-        callback(currentTheme);
+        callback(currentTheme, currentAccentColor);
       }
     }
   });
   
-  return () => clearInterval(intervalId); // Return cleanup function
+  return () => {
+    clearInterval(intervalId);
+    accentColorWatcher(); // Clean up accent color watcher
+  };
 }
 
 export const THEME_COLORS = {
@@ -137,7 +155,7 @@ export const THEME_COLORS = {
   }
 };
 
-export function applyThemeColors(themeMode) {
+export function applyThemeColors(themeMode, accentColor) {
   let colors;
   let themeName;
   
@@ -153,7 +171,7 @@ export function applyThemeColors(themeMode) {
     themeName = 'dim';
   }
   
-  console.log(`BetterX: Applying ${themeName} theme (mode: ${themeMode})`);
+  console.log(`BetterX: Applying ${themeName} theme (mode: ${themeMode}) with accent color: ${accentColor?.color || 'default'}`);
   
   // Apply colors to CSS variables
   const root = document.documentElement;
@@ -161,6 +179,12 @@ export function applyThemeColors(themeMode) {
   Object.entries(colors).forEach(([key, value]) => {
     root.style.setProperty(`--betterx-${key}`, value);
   });
+  
+  // Apply accent color if provided
+  if (accentColor) {
+    root.style.setProperty('--betterx-accentColor', accentColor.primary);
+    root.style.setProperty('--betterx-accentHoverColor', accentColor.hover);
+  }
   
   // Also update body attribute for potential CSS selectors
   document.body.setAttribute('data-betterx-theme', themeName);

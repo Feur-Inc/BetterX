@@ -1,25 +1,21 @@
 export function injectUIStyles() {
   const styles = document.createElement('style');
   styles.textContent = `
-    @font-face {
-      font-family: "chirp";
-      src: url("https://abs.twimg.com/responsive-web/client-web/chirp-regular-web.708173b5.woff2") format("woff2");
-      font-weight: 400;
-      font-style: normal;
-    }
-    
-    @font-face {
-      font-family: "chirp";
-      src: url("https://abs.twimg.com/responsive-web/client-web/chirp-medium-web.f8e2739a.woff2") format("woff2");
-      font-weight: 500;
-      font-style: normal;
-    }
-    
-    @font-face {
-      font-family: "chirp";
-      src: url("https://abs.twimg.com/responsive-web/client-web/chirp-bold-web.ebb56aba.woff2") format("woff2");
-      font-weight: 700;
-      font-style: normal;
+    /* Use system fonts instead of loading remote fonts with CORS issues */
+    .betterx-modal,
+    .betterx-button,
+    .betterx-tab,
+    .betterx-plugin-info h3,
+    .betterx-option-label,
+    .betterx-select,
+    .betterx-input,
+    .betterx-notification,
+    .betterx-notification-title,
+    .betterx-notification-message,
+    .betterx-notification-source,
+    .betterx-notification-action,
+    .betterx-developer-heading {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
     /* Root CSS Variables - Will be set dynamically */
@@ -311,11 +307,11 @@ export function injectUIStyles() {
     }
     
     .betterx-tab {
-      font-family: "chirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 500;
       background: none;
       border: none;
-      color: #8899a6;
+      color: var(--betterx-textColorSecondary);
       padding: 10px 20px;
       cursor: pointer;
       border-bottom: 2px solid transparent;
@@ -323,12 +319,12 @@ export function injectUIStyles() {
     }
     
     .betterx-tab:hover {
-      color: #1da1f2;
+      color: var(--betterx-accentColor);
     }
     
     .betterx-tab.active {
-      color: #1da1f2;
-      border-bottom-color: #1da1f2;
+      color: var(--betterx-accentColor);
+      border-bottom-color: var(--betterx-accentColor);
     }
     
     .betterx-tab-content {
