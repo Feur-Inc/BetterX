@@ -6,7 +6,7 @@ on:
     branches: [ "main", "dev" ]
 jobs:
   build-and-deploy:
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
@@ -23,7 +23,7 @@ jobs:
           npm install -g pnpm
           pnpm install
           npx webpack
-      
+          
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
