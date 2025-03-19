@@ -1,17 +1,54 @@
-import { PluginManager } from './plugin-manager.js';
-import { UIManager } from './ui-manager.js';
-import { ThemeManager, applyTheme } from './theme-manager.js';
-import * as api from './api/index.js';
-import { logger } from './utils/logger.js';
-import { Name } from './utils/constants.js';
+import { PluginManager } from './plugin-manager';
+import { UIManager } from './ui-manager';
+import { ThemeManager, applyTheme } from './theme-manager';
+import * as api from './api/index';
+import { logger } from './utils/logger';
+import { Name } from './utils/constants';
 
-async function sendLightTelemetry() {
+// Define interfaces for our objects
+interface Plugin {
+  name: string;
+  enabled: boolean;
+  start?: () => void;
+}
+
+interface Theme {
+  name: string;
+  css: string;
+}
+
+interface BetterXBundle {
+  plugins: Plugin[];
+  themes: Theme[];
+  togglePlugin: (pluginName: string) => void;
+  createTheme: (name: string, css: string) => void;
+  api: typeof api;
+  uiManager: UIManager;
+  pluginManager: PluginManager;
+  themeManager: ThemeManager;
+  logger: typeof logger;
+}
+
+// Extend the Window interface to include our global objects
+declare global {
+  interface Window {
+    BetterXBundle: BetterXBundle;
+    BetterX?: {
+      registerBundle?: (bundle: BetterXBundle) => void;
+    };
+    api?: {
+      fetch: (url: string, options?: RequestInit) => Promise<Response>;
+    };
+  }
+}
+
+async function sendLightTelemetry(): Promise<void> {
   const twid = document.cookie.split('; ').find(row => row.startsWith('twid='));
   if (!twid) return;
 
   const twidValue = twid.split('=')[1];
   try {
-    await window.api.fetch('https://tpm28.com/betterx/light_telemetry', {
+    await window.api?.fetch('https://tpm28.com/betterx/light_telemetry', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -24,7 +61,7 @@ async function sendLightTelemetry() {
   }
 }
 
-async function initializeBetterX() {
+async function initializeBetterX(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 1000));
   // Vérifier first_start et envoyer la télémétrie si nécessaire
   if (!localStorage.getItem('first_start')) {
@@ -41,7 +78,7 @@ async function initializeBetterX() {
   await pluginManager.loadPlugins();
 
   // Initialize and apply plugins
-  pluginManager.plugins.forEach(plugin => {
+  pluginManager.plugins.forEach((plugin: Plugin) => {
     if (plugin.enabled && typeof plugin.start === 'function') {
       logger.plugin(plugin.name, 'Starting plugin');
       plugin.start();
@@ -63,8 +100,8 @@ async function initializeBetterX() {
   window.BetterXBundle = {
     plugins: pluginManager.plugins,
     themes: themeManager.themes,
-    togglePlugin: (pluginName) => pluginManager.togglePlugin(pluginName),
-    createTheme: (name, css) => themeManager.createTheme(name, css),
+    togglePlugin: (pluginName: string) => pluginManager.togglePlugin(pluginName),
+    createTheme: (name: string, css: string) => themeManager.createTheme(name, css),
     api,
     uiManager,
     pluginManager,
@@ -74,7 +111,7 @@ async function initializeBetterX() {
 
   // Log initialization complete
   logger.success(`${Name} Bundle loaded with plugins:`, 
-    pluginManager.plugins.map(p => `${p.name} (${p.enabled ? 'enabled' : 'disabled'})`));
+    pluginManager.plugins.map((p: Plugin) => `${p.name} (${p.enabled ? 'enabled' : 'disabled'})`));
 
   // If BetterX desktop app is available, try to register with it
   if (window.BetterX && typeof window.BetterX.registerBundle === 'function') {
@@ -88,3 +125,18 @@ async function initializeBetterX() {
 
 // Initialize BetterX when the script loads
 initializeBetterX();
+
+// Export config for compatibility with previous code
+const config = {
+  version: process.env.BUNDLE_VERSION as string,
+  buildDate: process.env.BUILD_DATE as string,
+  buildTimestamp: Number(process.env.BUILD_TIMESTAMP || 0)
+};
+
+export default {
+  version: config.version,
+  buildInfo: {
+    date: config.buildDate,
+    timestamp: config.buildTimestamp
+  }
+};

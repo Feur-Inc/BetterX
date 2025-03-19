@@ -5,7 +5,7 @@ const packageJson = require('./package.json');
 module.exports = {
     mode: 'production',
     name: 'desktop',
-    entry: './src/index.js',
+    entry: './src/index.ts',
     output: {
         filename: 'bundle.js',
         path: path.resolve(__dirname, 'dist/desktop/v2'),
@@ -20,6 +20,17 @@ module.exports = {
                 use: 'ts-loader',
                 exclude: /node_modules/,
             },
+            {
+                test: /\.js$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'ts-loader',
+                    options: {
+                        transpileOnly: true,
+                        allowTsInNodeModules: false,
+                    }
+                }
+            }
         ],
     },
     resolve: {
