@@ -6,6 +6,8 @@ export const OptionType = {
   };
 
 export default function definePlugin(options) {
+    // Add documentation for the renderSettings method
+    // options.renderSettings = optional function to render custom settings UI
     return {
         ...options,
         // Default to true for backward compatibility

@@ -21,6 +21,7 @@
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/theme-one-dark": "^6.1.2",
     "codemirror": "^6.0.1",
-    "copy-webpack-plugin": "^12.0.2"
+    "copy-webpack-plugin": "^12.0.2",
+    "node-emoji": "^1.11.0"
   }
 }

@@ -130,21 +130,111 @@ export function populatePluginList(container, uiManager) {
 
     const detailsToggle = pluginElement.querySelector('.betterx-details-toggle');
     const detailsSection = pluginElement.querySelector('.betterx-plugin-details');
+    
+    // Variable to track if custom settings have been rendered
+    let customSettingsRendered = false;
+    
     detailsToggle.addEventListener('click', () => {
-      detailsSection.style.display = detailsSection.style.display === 'none' ? 'block' : 'none';
+      const isExpanding = detailsSection.style.display === 'none';
+      detailsSection.style.display = isExpanding ? 'block' : 'none';
       detailsToggle.classList.toggle('rotated');
+      
+      // Render settings when expanding for the first time
+      if (isExpanding && !customSettingsRendered) {
+        customSettingsRendered = true;
+        
+        // Get the options container
+        const optionsContainer = pluginElement.querySelector('.betterx-plugin-options');
+        
+        // Check if the plugin has custom settings sections
+        if (plugin.customSettingsSections && Array.isArray(plugin.customSettingsSections)) {
+          renderMixedSettings(plugin, optionsContainer, uiManager);
+        } else {
+          // Fallback to standard options rendering
+          renderStandardOptions(plugin, optionsContainer, uiManager);
+          
+          // Add custom settings container at the end if plugin has renderSettings method
+          if (typeof plugin.renderSettings === 'function') {
+            const customContainer = document.createElement('div');
+            customContainer.className = 'betterx-custom-settings-container';
+            optionsContainer.appendChild(customContainer);
+            uiManager.pluginManager.renderCustomSettings(plugin, customContainer);
+          }
+        }
+      }
     });
 
-    const optionsContainer = pluginElement.querySelector('.betterx-plugin-options');
-    if (plugin.options && typeof plugin.options === 'object') {
-      Object.entries(plugin.options).forEach(([optionId, option]) => {
-        const optionElement = uiManager.createOptionElement(plugin, { id: optionId, ...option });
+    container.appendChild(pluginElement);
+  });
+}
+
+// Helper function to render standard options
+function renderStandardOptions(plugin, container, uiManager) {
+  if (plugin.options && typeof plugin.options === 'object') {
+    Object.entries(plugin.options).forEach(([optionId, option]) => {
+      const optionElement = uiManager.createOptionElement(plugin, { id: optionId, ...option });
+      if (optionElement) {
+        container.appendChild(optionElement);
+      }
+    });
+  }
+}
+
+// Helper function to render mixed settings (standard options interspersed with custom UI)
+function renderMixedSettings(plugin, container, uiManager) {
+  // Process each section in order
+  plugin.customSettingsSections.forEach(section => {
+    if (section.type === 'custom' && section.id) {
+      // Create container for this custom section
+      const sectionContainer = document.createElement('div');
+      sectionContainer.className = `betterx-custom-section ${section.className || ''}`;
+      sectionContainer.dataset.sectionId = section.id;
+      container.appendChild(sectionContainer);
+      
+      // Render this specific section
+      try {
+        if (typeof plugin.renderSettingsSection === 'function') {
+          plugin.renderSettingsSection(section.id, sectionContainer);
+        }
+      } catch (error) {
+        console.error(`Error rendering custom section ${section.id}:`, error);
+        sectionContainer.innerHTML = `<div class="betterx-settings-error">Error rendering section: ${error.message}</div>`;
+      }
+    } else if (section.type === 'option' && section.id) {
+      // Render a standard option
+      if (plugin.options && plugin.options[section.id]) {
+        const optionElement = uiManager.createOptionElement(plugin, { 
+          id: section.id, 
+          ...plugin.options[section.id] 
+        });
         if (optionElement) {
-          optionsContainer.appendChild(optionElement);
+          container.appendChild(optionElement);
+        }
+      }
+    } else if (section.type === 'group' && section.options) {
+      // Render a group of standard options
+      const groupContainer = document.createElement('div');
+      groupContainer.className = `betterx-options-group ${section.className || ''}`;
+      if (section.name) {
+        const groupHeader = document.createElement('h4');
+        groupHeader.className = 'betterx-group-header';
+        groupHeader.textContent = section.name;
+        groupContainer.appendChild(groupHeader);
+      }
+      
+      section.options.forEach(optionId => {
+        if (plugin.options && plugin.options[optionId]) {
+          const optionElement = uiManager.createOptionElement(plugin, { 
+            id: optionId, 
+            ...plugin.options[optionId] 
+          });
+          if (optionElement) {
+            groupContainer.appendChild(optionElement);
+          }
         }
       });
+      
+      container.appendChild(groupContainer);
     }
-
-    container.appendChild(pluginElement);
   });
 }

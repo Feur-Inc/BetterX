@@ -170,4 +170,31 @@ export class PluginManager {
       this.savePluginData();
     }
   }
+  
+  /**
+   * Safely renders custom settings UI for a plugin
+   * @param {Object} plugin - The plugin object
+   * @param {HTMLElement} container - The container to render settings into
+   * @returns {boolean} - Whether custom settings were rendered
+   */
+  renderCustomSettings(plugin, container) {
+    if (!plugin || !plugin.renderSettings || typeof plugin.renderSettings !== 'function') {
+      return false;
+    }
+    
+    try {
+      // Call the plugin's renderSettings method, passing the container
+      plugin.renderSettings(container);
+      return true;
+    } catch (error) {
+      console.error(`Plugin ${plugin.name} failed to render custom settings:`, error);
+      // Show error in the container
+      container.innerHTML = `
+        <div class="betterx-settings-error">
+          <p>Error rendering custom settings: ${error.message}</p>
+        </div>
+      `;
+      return false;
+    }
+  }
 }
