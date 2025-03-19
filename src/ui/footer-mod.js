@@ -1,4 +1,5 @@
-import { Name } from '../utils/constants.js';
+// Change the import to use .ts extension or no extension
+import { Devs, Name } from '../utils/constants';
 import { getCurrentThemeMode } from '../utils/theme-detector.js';
 
 export function injectFooterLink() {

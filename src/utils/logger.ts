@@ -1,4 +1,4 @@
-import { Name } from '../utils/constants.js';
+import { Name } from '../utils/constants';
 
 /**
  * BetterX Logger - Enhanced console logging with CSS styling

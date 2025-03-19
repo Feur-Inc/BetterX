@@ -1,7 +1,7 @@
 import { getCurrentThemeMode } from '../utils/theme-detector.js';
 import { getAccentColor } from '../utils/accent-color.js';
 import { logger } from '../utils/logger.ts';
-import { Name } from '../utils/constants.js';
+import { Name } from '../utils/constants';
 
 // Create the BetterX tab element - Returns a DOM element directly
 export function createBetterXTab() {
