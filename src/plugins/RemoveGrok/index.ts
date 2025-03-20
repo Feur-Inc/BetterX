@@ -14,7 +14,9 @@ export default definePlugin({
             '[data-testid="GrokDrawer"]',
             'button[aria-label="Grok actions"]',
             'button[data-testid="grokImgGen"]',
-            'button[aria-label="Profile Summary"]'
+            'button[aria-label="Profile Summary"]',
+            'div[role="button"] svg[viewBox="0 0 33 32"]',
+            'div.css-175oi2r.r-1777fci.r-1wzrnnt button[role="button"]'
         ];
 
         const removeElements = (): void => {
