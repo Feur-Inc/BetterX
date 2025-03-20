@@ -1,10 +1,15 @@
-import { getCurrentThemeMode } from '../utils/theme-detector.js';
-import { getAccentColor } from '../utils/accent-color.js';
-import { logger } from '../utils/logger.ts';
+import { getCurrentThemeMode } from '../utils/theme-detector';
+import { getAccentColor } from '../utils/accent-color';
+import { logger } from '../utils/logger';
 import { Name } from '../utils/constants';
 
+// Define interface for UI Manager
+interface UIManager {
+  settingsModal?: HTMLElement;
+}
+
 // Create the BetterX tab element - Returns a DOM element directly
-export function createBetterXTab() {
+export function createBetterXTab(): HTMLDivElement {
   const newDiv = document.createElement('div');
   newDiv.setAttribute('class', 'css-175oi2r');
   newDiv.setAttribute('data-testid', 'BetterX');
@@ -18,24 +23,24 @@ export function createBetterXTab() {
   newLink.style.paddingLeft = '16px';
 
   // Get current theme
-  const themeMode = getCurrentThemeMode();
-  const textColor = themeMode === 0 ? 'rgb(15, 20, 25)' : 'rgb(231, 233, 234)';
+  const themeMode: number = getCurrentThemeMode();
+  const textColor: string = themeMode === 0 ? 'rgb(15, 20, 25)' : 'rgb(231, 233, 234)';
   
   // Initially use standard hover colors based on theme (will be updated with accent later)
-  const hoverBgColor = themeMode === 0 
+  const hoverBgColor: string = themeMode === 0 
     ? 'rgba(29, 155, 240, 0.1)' 
     : (themeMode === 2 ? 'rgb(22, 24, 28)' : 'rgba(29, 155, 240, 0.1)');
 
   // Set up element with initial styling
-  newLink.addEventListener('mouseenter', () => {
+  newLink.addEventListener('mouseenter', (): void => {
     newLink.style.backgroundColor = hoverBgColor;
-    const textDiv = newLink.querySelector('.css-146c3p1');
+    const textDiv = newLink.querySelector('.css-146c3p1') as HTMLElement | null;
     if (textDiv) textDiv.style.color = textColor;
   });
 
-  newLink.addEventListener('mouseleave', () => {
+  newLink.addEventListener('mouseleave', (): void => {
     newLink.style.backgroundColor = 'transparent';
-    const textDiv = newLink.querySelector('.css-146c3p1');
+    const textDiv = newLink.querySelector('.css-146c3p1') as HTMLElement | null;
     if (textDiv) textDiv.style.color = textColor;
   });
 
@@ -76,19 +81,19 @@ export function createBetterXTab() {
   newDiv.appendChild(newLink);
 
   // Apply accent color asynchronously after the element is already created
-  setTimeout(() => {
+  setTimeout((): void => {
     getAccentColor().then(accentColor => {
-      const updatedHoverBgColor = themeMode === 0 
+      const updatedHoverBgColor: string = themeMode === 0 
         ? `rgba(${hexToRgb(accentColor.primary)}, 0.1)` 
         : (themeMode === 2 ? 'rgb(22, 24, 28)' : `rgba(${hexToRgb(accentColor.primary)}, 0.1)`);
       
       // Update the event listener with the accent color
-      newLink.addEventListener('mouseenter', () => {
+      newLink.addEventListener('mouseenter', (): void => {
         newLink.style.backgroundColor = updatedHoverBgColor;
-        const textDiv = newLink.querySelector('.css-146c3p1');
+        const textDiv = newLink.querySelector('.css-146c3p1') as HTMLElement | null;
         if (textDiv) textDiv.style.color = textColor;
       });
-    }).catch(err => {
+    }).catch((err: Error) => {
       logger.error("Error applying accent color to " + Name + "tab:", err);
     });
   }, 0);
@@ -97,9 +102,9 @@ export function createBetterXTab() {
 }
 
 // Helper function to convert hex to RGB for rgba values
-function hexToRgb(hex) {
+function hexToRgb(hex: string): string {
   const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-  hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+  hex = hex.replace(shorthandRegex, (m: string, r: string, g: string, b: string) => r + r + g + g + b + b);
   
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result 
@@ -107,7 +112,7 @@ function hexToRgb(hex) {
     : '29, 155, 240'; // Default Twitter blue
 }
 
-export function addBetterXTab(uiManager) {
+export function addBetterXTab(uiManager: UIManager): void {
   const activeRouteContainer = document.querySelector('div[class="css-175oi2r"][role="tablist"]');
 
   if (activeRouteContainer && !document.querySelector('[data-testid="BetterX"]')) {
@@ -119,7 +124,7 @@ export function addBetterXTab(uiManager) {
         // Add click event to the BetterX tab to open the modal
         const link = betterXTab.querySelector('a');
         if (link) {
-          link.addEventListener('click', (e) => {
+          link.addEventListener('click', (e: MouseEvent): void => {
             e.preventDefault();
             if (uiManager && uiManager.settingsModal) {
               uiManager.settingsModal.style.display = 'block';

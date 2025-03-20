@@ -1,8 +1,8 @@
 // Change the import to use .ts extension or no extension
 import { Devs, Name } from '../utils/constants';
-import { getCurrentThemeMode } from '../utils/theme-detector.js';
+import { getCurrentThemeMode } from '../utils/theme-detector';
 
-export function injectFooterLink() {
+export function injectFooterLink(): void {
   const footer = document.querySelector('nav[aria-label="Footer"]');
   if (!footer || footer.querySelector('.betterx-footer-link')) return;
 
@@ -63,28 +63,28 @@ export function injectFooterLink() {
   }
 
   // Add click handlers
-  webSettingsLink.addEventListener('click', (e) => {
+  webSettingsLink.addEventListener('click', (e: MouseEvent) => {
     e.preventDefault();
     const settingsModal = document.querySelector('#betterx-settings-modal');
     if (settingsModal) {
-      settingsModal.style.display = 'block';
+      (settingsModal as HTMLElement).style.display = 'block';
     }
   });
 
-  desktopSettingsLink.addEventListener('click', async (e) => {
+  desktopSettingsLink.addEventListener('click', async (e: MouseEvent) => {
     e.preventDefault();
-    await window.api.openSettings();
+    await (window as any).api.openSettings();
   });
 }
 
 // Function to update the color of the footer links when theme changes
-export function updateFooterLinkColors() {
+export function updateFooterLinkColors(): void {
   const footerLinks = document.querySelectorAll('.betterx-footer-link');
   if (footerLinks.length === 0) return;
   
   const themeMode = getCurrentThemeMode();
   // Use the correct color for each theme mode
-  let textColor;
+  let textColor: string;
   if (themeMode === 0) {
     textColor = 'rgb(83, 100, 113)'; // Light theme
   } else if (themeMode === 1) {
@@ -94,12 +94,12 @@ export function updateFooterLinkColors() {
   }
   
   footerLinks.forEach(link => {
-    link.style.color = textColor;
+    (link as HTMLElement).style.color = textColor;
   });
 }
 
 // Add the update function to the UI manager to be called when theme changes
-export function registerFooterThemeUpdater(uiManager) {
+export function registerFooterThemeUpdater(uiManager: any): void {
   if (uiManager.themeChangeCallbacks) {
     uiManager.themeChangeCallbacks.push(updateFooterLinkColors);
   } else {

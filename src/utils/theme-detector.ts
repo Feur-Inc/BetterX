@@ -5,9 +5,50 @@
  * night_mode=2: Lights out mode (black)
  */
 
-import { getAccentColor, watchAccentColorChanges } from './accent-color.js';
+import { getAccentColor, watchAccentColorChanges } from './accent-color';
 
-export function getCurrentThemeMode() {
+// Theme type definitions
+export type ThemeMode = 0 | 1 | 2;
+export type ThemeName = 'light' | 'dim' | 'dark';
+
+export interface AccentColor {
+  primary: string;
+  hover: string;
+}
+
+export interface ThemeColorSet {
+  bg: string;
+  modalBg: string;
+  contentBg: string;
+  borderColor: string;
+  textColor: string;
+  textColorSecondary: string;
+  accentColor: string;
+  accentHoverColor: string;
+  hoverBg: string;
+  switchBg: string;
+  pluginDetailsBg: string;
+  tabsBg: string;
+  searchBarBg: string;
+  searchBarBorderColor: string;
+  searchBarPlaceholderColor: string;
+  searchBarHoverBg: string;
+  closeButtonHoverBg: string;
+  notificationBg: string;
+  notificationBorder: string;
+  emojiPreviewBg: string;
+  emojiPreviewBorder: string;
+  themeItemBg: string;
+  editorMainBg: string;
+}
+
+export interface ThemeColors {
+  light: ThemeColorSet;
+  dim: ThemeColorSet;
+  dark: ThemeColorSet;
+}
+
+export function getCurrentThemeMode(): ThemeMode {
   // Get the night_mode cookie value
   const cookies = document.cookie.split(';');
   let nightMode = '1'; // Default to dim mode if cookie not found
@@ -22,15 +63,15 @@ export function getCurrentThemeMode() {
   
   // Parse the value as an integer, or default to 1 if it's not a valid number
   const mode = parseInt(nightMode, 10);
-  return isNaN(mode) ? 1 : mode;
+  return (isNaN(mode) ? 1 : mode) as ThemeMode;
 }
 
-export function watchThemeChanges(callback) {
-  let currentTheme = getCurrentThemeMode();
-  let currentAccentColor = null;
+export function watchThemeChanges(callback: (themeMode: ThemeMode, accentColor: AccentColor | null) => void): () => void {
+  let currentTheme: ThemeMode = getCurrentThemeMode();
+  let currentAccentColor: AccentColor | null = null;
   
   // Call callback immediately with initial theme
-  const initializeTheme = async () => {
+  const initializeTheme = async (): Promise<void> => {
     const accentColor = await getAccentColor();
     currentAccentColor = accentColor;
     callback(currentTheme, accentColor);
@@ -48,7 +89,7 @@ export function watchThemeChanges(callback) {
   }, 1000); // Check every second
   
   // Watch for accent color changes
-  const accentColorWatcher = watchAccentColorChanges((accentColor) => {
+  const accentColorWatcher = watchAccentColorChanges((accentColor: AccentColor) => {
     currentAccentColor = accentColor;
     callback(currentTheme, accentColor);
   });
@@ -70,7 +111,7 @@ export function watchThemeChanges(callback) {
   };
 }
 
-export const THEME_COLORS = {
+export const THEME_COLORS: ThemeColors = {
   // Light theme (night_mode=0)
   light: {
     bg: 'rgba(0, 0, 0, 0.4)',  // Still need some transparency for modal backdrop
@@ -153,9 +194,9 @@ export const THEME_COLORS = {
   }
 };
 
-export function applyThemeColors(themeMode, accentColor) {
-  let colors;
-  let themeName;
+export function applyThemeColors(themeMode: ThemeMode, accentColor?: AccentColor | null): void {
+  let colors: ThemeColorSet;
+  let themeName: ThemeName;
   
   // Explicitly check for each theme mode to ensure correct application
   if (themeMode === 0) {

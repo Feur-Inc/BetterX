@@ -4,15 +4,15 @@ import { css } from "@codemirror/lang-css";
 import { oneDark } from '@codemirror/theme-one-dark';
 import { ThemeManager } from './theme-manager.js';
 import { NotificationManager } from './notification-manager.js';
-import { createSettingsModal } from './ui/settings-modal.js';
-import { createBetterXTab, addBetterXTab } from './ui/tab-creator.js';
-import { createThemeEditor, formatCSS } from './ui/theme-editor.js';
+import { createSettingsModal } from './ui/settings-modal';
+import { createBetterXTab, addBetterXTab } from './ui/button-creator';
+import { createThemeEditor, formatCSS } from './ui/theme-editor';
 import { populatePluginList, createOptionElement } from './ui/plugin-list.js';
 import { populateDeveloperSettings, createNotificationTester } from './ui/developer-settings.js';
-import { injectFooterLink, registerFooterThemeUpdater, updateFooterLinkColors } from './ui/footer-mod.js';
+import { injectFooterLink, registerFooterThemeUpdater, updateFooterLinkColors } from './ui/footer-mod';
 import { injectUIStyles } from './ui/styles';
-import { watchThemeChanges, applyThemeColors } from './utils/theme-detector.js';
-import { getAccentColor } from './utils/accent-color.js';
+import { watchThemeChanges, applyThemeColors } from './utils/theme-detector';
+import { getAccentColor } from './utils/accent-color';
 
 export class UIManager {
   constructor(pluginManager) {

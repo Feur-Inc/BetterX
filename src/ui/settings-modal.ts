@@ -1,6 +1,27 @@
 import { Name } from "../utils/constants";
 
-export function createSettingsModal(uiManager) {
+// Interface for the UI Manager
+interface UIManager {
+  createUIElement: (tag: string, options: ElementOptions) => HTMLElement;
+  captureInitialPluginStates: () => void;
+  handleModalClose: (modal: HTMLElement) => void;
+  populatePluginList: (container: HTMLElement) => void;
+  initializeThemeUI: (modal: HTMLElement) => void;
+  initializeDeveloperUI: (modal: HTMLElement) => void;
+  themeChangeCallbacks?: Array<() => void>;
+  themeTabVisited?: boolean;
+  developerTabVisited?: boolean;
+}
+
+// Interface for element creation options
+interface ElementOptions {
+  id?: string;
+  className?: string;
+  innerHTML?: string;
+  [key: string]: any;
+}
+
+export function createSettingsModal(uiManager: UIManager): HTMLElement {
   const modal = uiManager.createUIElement('div', {
     id: 'betterx-settings-modal',
     className: 'betterx-modal',
@@ -38,21 +59,21 @@ export function createSettingsModal(uiManager) {
   uiManager.captureInitialPluginStates();
 
   // Add event listeners for the modal
-  const closeBtn = modal.querySelector('.betterx-close');
+  const closeBtn = modal.querySelector('.betterx-close') as HTMLElement;
   closeBtn.onclick = () => uiManager.handleModalClose(modal);
   
-  window.onclick = (event) => {
+  window.onclick = (event: MouseEvent) => {
     if (event.target == modal) {
       uiManager.handleModalClose(modal);
     }
   };
 
   // Initialize the tabs with dynamic color handling
-  const tabs = modal.querySelectorAll('.betterx-tab');
-  const tabContents = modal.querySelectorAll('.betterx-tab-content');
+  const tabs = modal.querySelectorAll('.betterx-tab') as NodeListOf<HTMLElement>;
+  const tabContents = modal.querySelectorAll('.betterx-tab-content') as NodeListOf<HTMLElement>;
   
   // Function to update tab colors based on accent color
-  const updateTabColors = () => {
+  const updateTabColors = (): void => {
     const activeColor = getComputedStyle(document.documentElement).getPropertyValue('--betterx-accentColor').trim();
     
     tabs.forEach(tab => {
@@ -75,7 +96,7 @@ export function createSettingsModal(uiManager) {
   
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
-      const tabName = tab.getAttribute('data-tab');
+      const tabName = tab.getAttribute('data-tab') as string;
       
       tabs.forEach(t => {
         t.classList.remove('active');
@@ -89,14 +110,14 @@ export function createSettingsModal(uiManager) {
       updateTabColors(); // Update colors when tab changes
       
       const activeContentId = `betterx-${tabName}-tab`;
-      const activeContent = modal.querySelector(`#${activeContentId}`);
+      const activeContent = modal.querySelector(`#${activeContentId}`) as HTMLElement;
       if (activeContent) {
         activeContent.classList.add('active');
       }
       
       if (tabName === 'plugins') {
         uiManager.captureInitialPluginStates();
-        uiManager.populatePluginList(modal.querySelector('#betterx-plugin-list'));
+        uiManager.populatePluginList(modal.querySelector('#betterx-plugin-list') as HTMLElement);
       } else if (tabName === 'themes') {
         if (!uiManager.themeTabVisited) {
           uiManager.initializeThemeUI(modal);
@@ -116,15 +137,15 @@ export function createSettingsModal(uiManager) {
   setTimeout(updateTabColors, 0);
 
   // Attach search event listener to filter plugins
-  const searchInput = modal.querySelector('#plugin-search');
+  const searchInput = modal.querySelector('#plugin-search') as HTMLInputElement;
   if (searchInput) {
     searchInput.addEventListener('input', () => {
-      uiManager.populatePluginList(modal.querySelector('#betterx-plugin-list'));
+      uiManager.populatePluginList(modal.querySelector('#betterx-plugin-list') as HTMLElement);
     });
   }
 
   // Populate plugin list initially
-  uiManager.populatePluginList(modal.querySelector('#betterx-plugin-list'));
+  uiManager.populatePluginList(modal.querySelector('#betterx-plugin-list') as HTMLElement);
 
   return modal;
 }
