@@ -21,17 +21,20 @@ export default definePlugin({
     },
 
     // Track the last transformed URL and timestamp
-    lastTransformedUrl: null,
+    lastTransformedUrl: null as string | null,
     lastTransformTime: 0,
     debounceTime: 1000, // 1 second debounce
+    boundClipboardHandler: null as ((event: ClipboardEvent) => void) | null,
 
-    transformUrl(url) {
+    transformUrl(url: string): string {
         try {
             const urlObj = new URL(url);
             if ((urlObj.hostname === 'x.com' || urlObj.hostname === 'twitter.com') && 
                  urlObj.pathname.includes('/status/')) {
-                urlObj.hostname = this.settings.store.domain;
-                return urlObj.toString();
+                if (this.settings?.store?.domain) {
+                    urlObj.hostname = this.settings.store.domain;
+                    return urlObj.toString();
+                }
             }
         } catch (e) {
             logger.error("Failed to parse URL:", e);
@@ -39,12 +42,12 @@ export default definePlugin({
         return url;
     },
 
-    clipboardCopyHandler(event) {
+    clipboardCopyHandler(event: ClipboardEvent): void {
         // Check if it's a text copy
-        if (event.clipboardData && event.clipboardData.getData) {
+        if (event.clipboardData && typeof event.clipboardData.getData === 'function') {
             setTimeout(() => {
                 // Use timeout to access the clipboard data after the copy event
-                navigator.clipboard.readText().then(text => {
+                navigator.clipboard.readText().then((text: string) => {
                     // Check if it looks like an X URL
                     if (/(https?:\/\/(www\.)?(x|twitter)\.com\/[^\/]+\/status\/\d+)/i.test(text)) {
                         const transformedUrl = this.transformUrl(text);
@@ -72,7 +75,7 @@ export default definePlugin({
         }
     },
 
-    start() {
+    start(): void {
         this.boundClipboardHandler = this.clipboardCopyHandler.bind(this);
         document.addEventListener('copy', this.boundClipboardHandler);
         
@@ -81,8 +84,10 @@ export default definePlugin({
         this.lastTransformTime = 0;
     },
 
-    stop() {
-        document.removeEventListener('copy', this.boundClipboardHandler);
-        this.boundClipboardHandler = null;
+    stop(): void {
+        if (this.boundClipboardHandler) {
+            document.removeEventListener('copy', this.boundClipboardHandler);
+            this.boundClipboardHandler = null;
+        }
     }
 });

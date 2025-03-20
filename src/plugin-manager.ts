@@ -1,4 +1,5 @@
 import { logger } from './utils/logger';
+import { Devs } from './utils/constants';
 
 // Add this type declaration at the module level
 declare function require(id: string): any;
@@ -57,6 +58,7 @@ export class PluginManager {
   public plugins: Plugin[];
   private uiElements: Record<string, any>;
   private logger: any;
+  public Devs = Devs; // Expose Devs object for UI manager to use
 
   constructor() {
     this.plugins = [];
@@ -67,12 +69,12 @@ export class PluginManager {
   async loadPlugins(): Promise<void> {
     try {
       // Load built-in plugins
-      const pluginContext = require.context('./plugins', true, /index\.(js|ts)$/);
+      const pluginContext = require.context('./plugins', true, /index\.(js|ts|tsx)$/);
       await this.loadPluginsFromContext(pluginContext, false);
 
       // Load user plugins if available
       try {
-        const userPluginContext = require.context('./userplugins', true, /index\.(js|ts)$/);
+        const userPluginContext = require.context('./userplugins', true, /index\.(js|ts|tsx)$/);
         await this.loadPluginsFromContext(userPluginContext, true);
       } catch (error) {
         this.logger.debug('No user plugins found - this is normal if none are installed');

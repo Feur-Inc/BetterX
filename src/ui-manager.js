@@ -234,6 +234,34 @@ export class UIManager {
     return formatCSS(css);
   }
 
+  getAuthorHTML(authors) {
+    if (!authors || authors.length === 0) return 'Unknown';
+
+    return authors.map(author => {
+      let authorName, handle;
+      if (typeof author === 'string') {
+        authorName = this.pluginManager.Devs[author]?.name || author;
+        handle = this.pluginManager.Devs[author]?.handle;
+      } else {
+        authorName = author.name || 'Unknown';
+        handle = author.handle;
+      }
+
+      if (!handle) {
+        return `<span class="betterx-author-name">${authorName}</span>`;
+      }
+
+      // Return avatar with tooltip
+      return `
+        <a href="https://twitter.com/${handle}" target="_blank" class="betterx-author-avatar" title="${authorName} (@${handle})">
+          <img src="https://unavatar.io/twitter/${handle}" alt="${authorName}" loading="lazy" onerror="this.src='https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png';">
+          <div class="betterx-author-tooltip">@${handle}</div>
+        </a>
+      `;
+    }).join('');
+  }
+
+  // Keep the original getAuthorNames method for backward compatibility
   getAuthorNames(authors) {
     if (!authors || authors.length === 0) return 'Unknown';
 

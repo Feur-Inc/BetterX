@@ -99,7 +99,7 @@ export function populatePluginList(container, uiManager) {
       return; // Skip this plugin if it doesn't match search
     }
     
-    const authorNames = uiManager.getAuthorNames(plugin.authors);
+    const authorHTML = uiManager.getAuthorHTML(plugin.authors);
 
     const pluginElement = uiManager.createUIElement('div', {
       className: 'betterx-plugin-item',
@@ -122,7 +122,9 @@ export function populatePluginList(container, uiManager) {
           </div>
         </div>
         <div class="betterx-plugin-details" style="display: none;">
-          <p>Author${plugin.authors.length > 1 ? 's' : ''}: ${authorNames}</p>
+          <div class="betterx-plugin-authors">
+            <p>Author${plugin.authors.length > 1 ? 's' : ''}:</p><div class="betterx-author-avatars">${authorHTML}</div>
+          </div>
           <div class="betterx-plugin-options"></div>
         </div>
       `

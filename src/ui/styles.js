@@ -845,6 +845,100 @@ export function injectUIStyles() {
       color: var(--betterx-textColorSecondary);
       font-size: 14px;
     }
+
+    /* Author avatar styles */
+    .betterx-plugin-authors {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .betterx-plugin-authors p {
+      margin: 0;
+      font-weight: 500;
+      min-width: 60px;
+    }
+    
+    .betterx-author-avatars {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      align-items: center;
+    }
+    
+    .betterx-author-avatar {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      overflow: hidden;
+      display: inline-block;
+      margin-right: -6px;
+      border: 2px solid var(--betterx-modalBg);
+      background-color: var(--betterx-contentBg);
+      transition: transform 0.2s ease, z-index 0.1s;
+      z-index: 1;
+      vertical-align: middle; /* Added to fix alignment */
+      line-height: 0; /* Added to eliminate extra space */
+    }
+    
+    .betterx-author-avatar:hover {
+      transform: scale(1.1);
+      z-index: 2;
+    }
+    
+    .betterx-author-avatar:last-child {
+      margin-right: 0;
+    }
+    
+    .betterx-author-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block; /* Added to eliminate extra space */
+    }
+
+    .betterx-author-tooltip {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--betterx-modalBg);
+      color: var(--betterx-textColor);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 100;
+      margin-bottom: 5px;
+      border: 1px solid var(--betterx-borderColor);
+    }
+    
+    .betterx-author-avatar:hover .betterx-author-tooltip {
+      opacity: 1;
+    }
+
+    .betterx-author-name {
+      font-size: 14px;
+      color: var(--betterx-textColorSecondary);
+      margin-left: 5px;
+    }
+    
+    .betterx-author-link {
+      color: #1da1f2;
+      text-decoration: none;
+    }
+    .betterx-author-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Add spacing between plugin options and authors */
+    .betterx-plugin-options {
+      margin-top: 8px;
+    }
   `;
   document.head.appendChild(styles);
 }
