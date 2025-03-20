@@ -47,7 +47,7 @@ This will use Webpack to compile and bundle the project.
 ### Project Structure
 
 - `main.js`: The main application file that initializes BetterX
-- `plugin-manager.js`: Manages loading and toggling of plugins
+- `plugin-manager.ts`: Manages loading and toggling of plugins
 - `ui-manager.js`: Handles custom UI injection
 
 ### Creating a Plugin

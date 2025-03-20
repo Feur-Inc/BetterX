@@ -1,13 +1,70 @@
-import { logger } from './utils/logger.ts';
+import { logger } from './utils/logger';
+
+// Add this type declaration at the module level
+declare function require(id: string): any;
+declare namespace require {
+  function context(directory: string, useSubdirectories: boolean, regExp: RegExp): any;
+}
+
+// Plugin author interface
+interface PluginAuthor {
+  name?: string;
+  handle?: string;
+  [key: string]: any;
+}
+
+// Plugin option interface
+interface PluginOption {
+  type: string;
+  default: any;
+  label?: string;
+  description?: string;
+  onChange?: (newValue: any, oldValue: any) => void;
+  [key: string]: any;
+}
+
+// Plugin settings interface
+interface PluginSettings {
+  store: Record<string, any>;
+  [key: string]: any;
+}
+
+// Plugin interface
+interface Plugin {
+  name: string;
+  description?: string;
+  authors?: PluginAuthor[];
+  version?: string;
+  options?: Record<string, PluginOption>;
+  settings?: PluginSettings;
+  enabled: boolean;
+  isUserPlugin: boolean;
+  start?: () => void;
+  stop?: () => void;
+  renderSettings?: (container: HTMLElement) => void;
+  [key: string]: any;
+}
+
+// Plugin storage data interface
+interface PluginStorageData {
+  enabled: boolean;
+  settings: Record<string, any>;
+}
 
 export class PluginManager {
+  // Change from private to protected so it can be accessed by subclasses
+  // or make it public if it needs to be accessed directly from outside
+  public plugins: Plugin[];
+  private uiElements: Record<string, any>;
+  private logger: any;
+
   constructor() {
     this.plugins = [];
     this.uiElements = {};
     this.logger = logger.scope('PluginManager');
   }
 
-  async loadPlugins() {
+  async loadPlugins(): Promise<void> {
     try {
       // Load built-in plugins
       const pluginContext = require.context('./plugins', true, /index\.(js|ts)$/);
@@ -29,7 +86,7 @@ export class PluginManager {
     }
   }
 
-  async loadPluginsFromContext(context, isUserPlugin) {
+  async loadPluginsFromContext(context: any, isUserPlugin: boolean): Promise<void> {
     for (const key of context.keys()) {
       try {
         const plugin = await context(key);
@@ -53,7 +110,7 @@ export class PluginManager {
     }
   }
 
-  normalizeAuthors(authors) {
+  normalizeAuthors(authors: any[]): PluginAuthor[] {
     return authors.map(author => {
       if (author.name && author.handle) return author;
       // Handle Devs.X format
@@ -64,9 +121,9 @@ export class PluginManager {
     });
   }
 
-  loadPluginData() {
+  loadPluginData(): void {
     try {
-      const savedData = JSON.parse(localStorage.getItem('betterXPluginStates')) || {};
+      const savedData: Record<string, PluginStorageData> = JSON.parse(localStorage.getItem('betterXPluginStates') || '{}') || {};
       const isFirstRun = Object.keys(savedData).length === 0;
       
       this.plugins.forEach(plugin => {
@@ -86,8 +143,8 @@ export class PluginManager {
     }
   }
 
-  initializePlugin(plugin, savedData, isFirstRun) {
-    plugin.settings = plugin.settings || {};
+  initializePlugin(plugin: Plugin, savedData: Record<string, PluginStorageData>, isFirstRun: boolean): void {
+    plugin.settings = plugin.settings || { store: {} };
     plugin.settings.store = plugin.settings.store || {};
 
     if (savedData.hasOwnProperty(plugin.name)) {
@@ -97,9 +154,9 @@ export class PluginManager {
       if (plugin.options) {
         Object.keys(plugin.options).forEach(optionKey => {
           if (pluginData.settings && pluginData.settings.hasOwnProperty(optionKey)) {
-            plugin.settings.store[optionKey] = pluginData.settings[optionKey];
+            plugin.settings!.store[optionKey] = pluginData.settings[optionKey];
           } else {
-            plugin.settings.store[optionKey] = plugin.options[optionKey].default;
+            plugin.settings!.store[optionKey] = plugin.options![optionKey].default;
           }
         });
       }
@@ -108,14 +165,14 @@ export class PluginManager {
       
       if (plugin.options) {
         Object.keys(plugin.options).forEach(optionKey => {
-          plugin.settings.store[optionKey] = plugin.options[optionKey].default;
+          plugin.settings!.store[optionKey] = plugin.options![optionKey].default;
         });
       }
     }
   }
 
-  savePluginData() {
-    const data = {};
+  savePluginData(): void {
+    const data: Record<string, PluginStorageData> = {};
     this.plugins.forEach(plugin => {
       data[plugin.name] = {
         enabled: plugin.enabled,
@@ -125,7 +182,7 @@ export class PluginManager {
     localStorage.setItem('betterXPluginStates', JSON.stringify(data));
   }
 
-  togglePlugin(pluginName) {
+  togglePlugin(pluginName: string): void {
     const plugin = this.plugins.find(p => p.name === pluginName);
     if (plugin) {
       plugin.enabled = !plugin.enabled;
@@ -148,7 +205,7 @@ export class PluginManager {
     }
   }
 
-  updatePluginOption(pluginName, optionId, value) {
+  updatePluginOption(pluginName: string, optionId: string, value: any): void {
     const plugin = this.plugins.find(p => p.name === pluginName);
     if (plugin && plugin.settings && plugin.settings.store) {
       const oldValue = plugin.settings.store[optionId];
@@ -163,11 +220,11 @@ export class PluginManager {
     }
   }
 
-  safePluginCall(plugin, methodName, ...args) {
+  safePluginCall(plugin: Plugin, methodName: string, ...args: any[]): any {
     if (!plugin || typeof plugin[methodName] !== 'function') return;
     
     try {
-      return plugin[methodName](...args);
+      return (plugin as any)[methodName](...args);
     } catch (error) {
       this.logger.error(`Plugin ${plugin.name} errored in ${methodName}:`, error);
       // Disable problematic plugins automatically
@@ -178,11 +235,11 @@ export class PluginManager {
   
   /**
    * Safely renders custom settings UI for a plugin
-   * @param {Object} plugin - The plugin object
+   * @param {Plugin} plugin - The plugin object
    * @param {HTMLElement} container - The container to render settings into
    * @returns {boolean} - Whether custom settings were rendered
    */
-  renderCustomSettings(plugin, container) {
+  renderCustomSettings(plugin: Plugin, container: HTMLElement): boolean {
     if (!plugin || !plugin.renderSettings || typeof plugin.renderSettings !== 'function') {
       return false;
     }
@@ -192,11 +249,11 @@ export class PluginManager {
       plugin.renderSettings(container);
       return true;
     } catch (error) {
-      this.logger.error(`Plugin ${plugin.name} failed to render custom settings:`, error);
+      this.logger.error(`Plugin ${plugin.name} failed to render custom settings:`, error instanceof Error ? error : new Error(String(error)));
       // Show error in the container
       container.innerHTML = `
         <div class="betterx-settings-error">
-          <p>Error rendering custom settings: ${error.message}</p>
+          <p>Error rendering custom settings: ${error instanceof Error ? error.message : String(error)}</p>
         </div>
       `;
       return false;

@@ -443,7 +443,5 @@ export class UIManager {
     if (this.observer) {
       this.observer.disconnect();
     }
-    
-    // ...existing code...
   }
 }

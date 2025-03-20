@@ -3,16 +3,27 @@
  */
 
 /**
- * Get the build date of the BetterX bundle
- * @returns {Object} Object containing buildDate (Date object) and formatted date string
+ * Interface for build information
  */
-export function getBuildInfo() {
+interface BuildInfo {
+    buildDate: Date;
+    buildTimestamp: number;
+    version: string;
+    formatted: string;
+    isValid: boolean;
+}
+
+/**
+ * Get the build date of the BetterX bundle
+ * @returns {BuildInfo} Object containing buildDate (Date object) and formatted date string
+ */
+export function getBuildInfo(): BuildInfo {
     try {
-        const buildDate = new Date(process.env.BUILD_DATE);
-        const buildTimestamp = parseInt(process.env.BUILD_TIMESTAMP, 10);
+        const buildDate = new Date(process.env.BUILD_DATE || '');
+        const buildTimestamp = parseInt(process.env.BUILD_TIMESTAMP || '0', 10);
         const version = process.env.BUNDLE_VERSION || '0.0.0';
         
-        const formatOptions = { 
+        const formatOptions: Intl.DateTimeFormatOptions = { 
             year: 'numeric', 
             month: 'long', 
             day: 'numeric',
@@ -44,7 +55,7 @@ export function getBuildInfo() {
  * Calculate time elapsed since the build
  * @returns {string} Formatted time elapsed since build
  */
-export function getTimeSinceBuild() {
+export function getTimeSinceBuild(): string {
     try {
         const buildInfo = getBuildInfo();
         if (!buildInfo.isValid) return 'Unknown';
@@ -82,7 +93,7 @@ export function getTimeSinceBuild() {
  * Get the bundle version
  * @returns {string} The version of the BetterX bundle
  */
-export function getBundleVersion() {
+export function getBundleVersion(): string {
     try {
         return process.env.BUNDLE_VERSION || '0.0.0';
     } catch (error) {
