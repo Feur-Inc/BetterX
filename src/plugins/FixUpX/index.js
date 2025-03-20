@@ -1,6 +1,6 @@
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { notifications } from "@api";
+import { logger } from "@utils/logger";
 
 export default definePlugin({
     name: "FixUpX",
@@ -34,7 +34,7 @@ export default definePlugin({
                 return urlObj.toString();
             }
         } catch (e) {
-            console.error("Failed to parse URL:", e);
+            logger.error("Failed to parse URL:", e);
         }
         return url;
     },
@@ -57,13 +57,16 @@ export default definePlugin({
                                 return;
                             }
                             
+                            // Write the transformed URL to clipboard
+                            navigator.clipboard.writeText(transformedUrl).catch(() => {});
+                            
                             // Update the last transformed URL and timestamp
                             this.lastTransformedUrl = transformedUrl;
                             this.lastTransformTime = now;
                         }
                     }
-                }).catch(err => {
-                    console.error("Failed to read clipboard:", err);
+                }).catch((err) => {
+                    logger.error("Failed to read clipboard:", err);
                 });
             }, 100);
         }
