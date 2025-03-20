@@ -10,7 +10,7 @@ import { createThemeEditor, formatCSS } from './ui/theme-editor.js';
 import { populatePluginList, createOptionElement } from './ui/plugin-list.js';
 import { populateDeveloperSettings, createNotificationTester } from './ui/developer-settings.js';
 import { injectFooterLink, registerFooterThemeUpdater, updateFooterLinkColors } from './ui/footer-mod.js';
-import { injectUIStyles } from './ui/styles.js';
+import { injectUIStyles } from './ui/styles';
 import { watchThemeChanges, applyThemeColors } from './utils/theme-detector.js';
 import { getAccentColor } from './utils/accent-color.js';
 

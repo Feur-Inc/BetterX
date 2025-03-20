@@ -1,14 +1,15 @@
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
-let observer;
+// Properly define the observer with a type
+let observer: MutationObserver | null = null;
 
 export default definePlugin({
     name: "RemovePremium",
     description: "Remove all the premium elements",
     authors: [Devs.TPM28],
-    start() {
-        const selectors = [
+    start(): void {
+        const selectors: string[] = [
             'a[href="/i/premium_sign_up"]',
             'a[href="/i/verified-orgs-signup"]',
             'a[href="/i/monetization"]',
@@ -20,16 +21,16 @@ export default definePlugin({
             'a[href="/i/account_analytics"]'
         ];
 
-        const removeElements = () => {
+        const removeElements = (): void => {
             selectors.forEach(selector => {
-                const elements = document.querySelectorAll(selector);
+                const elements: NodeListOf<Element> = document.querySelectorAll(selector);
                 elements.forEach(element => {
                     const parent = element.closest('.r-1ifxtd0');
-                    if (parent) {
+                    if (parent instanceof HTMLElement) {
                         parent.style.display = 'none';
                         parent.style.width = '0px';
                         parent.style.height = '0px';
-                    } else {
+                    } else if (element instanceof HTMLElement) {
                         element.style.display = 'none';
                         element.style.width = '0px';
                         element.style.height = '0px';
@@ -39,23 +40,24 @@ export default definePlugin({
 
             // Handle analytics promotion
             document.querySelectorAll('.r-1ifxtd0').forEach(element => {
-                if (element.textContent.includes('Access your post analytics')) {
+                if (element instanceof HTMLElement && element.textContent && 
+                    element.textContent.includes('Access your post analytics')) {
                     element.style.display = 'none';
                     element.style.width = '0px';
                     element.style.height = '0px';
                 }
             });
 
-            const elements = document.querySelectorAll('[role="complementary"].r-eqz5dr');
+            const elements: NodeListOf<Element> = document.querySelectorAll('[role="complementary"].r-eqz5dr');
             elements.forEach(element => {
                 const hasUlInside = element.querySelector('ul');
                 if (!hasUlInside) {
                     const parentDiv = element.parentElement;
-                    if (parentDiv) {
+                    if (parentDiv instanceof HTMLElement) {
                         parentDiv.style.display = 'none';
                         parentDiv.style.width = '0px';
                         parentDiv.style.height = '0px';
-                    } else {
+                    } else if (element instanceof HTMLElement) {
                         element.style.display = 'none';
                         element.style.width = '0px';
                         element.style.height = '0px';
@@ -64,31 +66,27 @@ export default definePlugin({
             });
         };
 
+        const setupObserver = (): void => {
+            removeElements();
+            observer = new MutationObserver(removeElements);
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        };
+
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
-                setTimeout(() => {
-                    removeElements();
-                    observer = new MutationObserver(removeElements);
-                    observer.observe(document.body, {
-                        childList: true,
-                        subtree: true
-                    });
-                }, 400);
+                setTimeout(setupObserver, 400);
             });
         } else {
-            setTimeout(() => {
-                removeElements();
-                observer = new MutationObserver(removeElements);
-                observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
-                });
-            }, 400);
+            setTimeout(setupObserver, 400);
         }
     },
-    stop() {
+    stop(): void {
         if (observer) {
             observer.disconnect();
+            observer = null;
         }
     }
 });
