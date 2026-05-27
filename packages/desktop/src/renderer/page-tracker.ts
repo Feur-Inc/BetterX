@@ -23,7 +23,7 @@ function formatCount(n: number): string {
 /** Get the logged-in user's numeric ID from the twid cookie. */
 function getLoggedInUserId(): string | null {
   const twid = document.cookie.split("; ").find((c) => c.startsWith("twid="));
-  return twid ? decodeURIComponent(twid.split("=")[1]).replace("u=", "") : null;
+  return twid ? decodeURIComponent(twid.split("=")[1]!).replace("u=", "") : null;
 }
 
 /** Search a response for the logged-in user's stats, matched by user ID. */

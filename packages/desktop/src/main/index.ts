@@ -215,12 +215,12 @@ app.whenReady().then(async () => {
       if (setCookie?.includes("bx_session")) {
         const url = new URL(serverUrl);
         const maxAgeMatch = setCookie.match(/max-age=(\d+)/i);
-        if (maxAgeMatch && parseInt(maxAgeMatch[1]) === 0) {
+        if (maxAgeMatch && parseInt(maxAgeMatch[1]!) === 0) {
           await session.defaultSession.cookies.remove(url.origin, "bx_session");
         } else {
           const valueMatch = setCookie.match(/bx_session=([^;]+)/);
           if (valueMatch?.[1]) {
-            const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]) : undefined;
+            const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]!) : undefined;
             await session.defaultSession.cookies.set({
               url: url.origin,
               name: "bx_session",
