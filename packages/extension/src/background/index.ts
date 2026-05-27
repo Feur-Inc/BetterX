@@ -83,7 +83,11 @@ browser.runtime.onMessage.addListener((message, sender) => {
       type: string; url: string;
       method?: string; headers?: Record<string, string>; body?: string;
     };
-    return fetch(url, { method, headers, body, credentials: "include" })
+    const init: RequestInit = { credentials: "include" };
+    if (method  !== undefined) init.method  = method;
+    if (headers !== undefined) init.headers = headers;
+    if (body    !== undefined) init.body    = body;
+    return fetch(url, init)
       .then(async (res) => {
         const text = await res.text();
         let json: unknown = null;

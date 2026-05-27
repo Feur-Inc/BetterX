@@ -22,7 +22,7 @@
     "dev:desktop": "bun run --cwd packages/desktop dev:all",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/cloud-sync/tsconfig.json"
+    "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/extension/tsconfig.json packages/desktop/tsconfig.json packages/cloud-sync/tsconfig.json"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

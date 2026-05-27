@@ -83,7 +83,7 @@ if (sensitiveMediaEnabled && sensitiveMediaBlur) {
       article.setAttribute("data-betterx-sensitive-checked", "1");
       const link = article.querySelector('a[href*="/status/"] time')?.closest("a");
       const match = link?.getAttribute("href")?.match(/\/status\/(\d+)/);
-      if (match && sensitiveIds.has(match[1])) {
+      if (match && match[1] && sensitiveIds.has(match[1])) {
         article.setAttribute("data-betterx-sensitive", "1");
       }
     }
@@ -172,7 +172,7 @@ type HookNode = {
 
 function getFiber(el: Element): Fiber | null {
   const key = Object.keys(el).find((k) => k.startsWith("__reactFiber$"));
-  return key ? (el as unknown as Record<string, Fiber>)[key] : null;
+  return key ? (el as unknown as Record<string, Fiber>)[key] ?? null : null;
 }
 
 /**
