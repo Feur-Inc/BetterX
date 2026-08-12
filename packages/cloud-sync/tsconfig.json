@@ -5,6 +5,12 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["bun"],
+    // Bun runs the .ts sources directly; emitting .js next to them would shadow
+    // the TypeScript on `./x.js` imports and get executed instead.
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": ".",
