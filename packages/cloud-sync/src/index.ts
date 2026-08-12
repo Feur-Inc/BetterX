@@ -61,12 +61,34 @@ const TWITTER_OAUTH_URL = "https://twitter.com/i/oauth2/authorize";
 const TWITTER_TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
 const TWITTER_USER_URL = "https://api.twitter.com/2/users/me";
 
-app.get("/auth/twitter", (c) => {
-  const state = Math.random().toString(36).substring(7);
-  const codeVerifier = Math.random().toString(36).substring(7); // In prod, use real PKCE
-  
-  setCookie(c, "oauth_state", state, { httpOnly: true, maxAge: 600 });
-  setCookie(c, "oauth_verifier", codeVerifier, { httpOnly: true, maxAge: 600 });
+function base64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+// 32 bytes -> 43 base64url chars, the minimum length RFC 7636 allows for a verifier
+function randomToken(byteLength = 32): string {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return base64Url(bytes);
+}
+
+async function pkceChallenge(verifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return base64Url(new Uint8Array(digest));
+}
+
+// SameSite=Lax so the cookies survive Twitter's top-level GET redirect back to /auth/callback
+const OAUTH_COOKIE = { httpOnly: true, maxAge: 600, path: "/", sameSite: "Lax" } as const;
+
+app.get("/auth/twitter", async (c) => {
+  const state = randomToken();
+  const codeVerifier = randomToken();
+
+  setCookie(c, "oauth_state", state, OAUTH_COOKIE);
+  setCookie(c, "oauth_verifier", codeVerifier, OAUTH_COOKIE);
 
   const url = new URL(TWITTER_OAUTH_URL);
   url.searchParams.set("response_type", "code");
@@ -74,8 +96,8 @@ app.get("/auth/twitter", (c) => {
   url.searchParams.set("redirect_uri", `${process.env.BASE_URL}/auth/callback`);
   url.searchParams.set("scope", "tweet.read users.read offline.access");
   url.searchParams.set("state", state);
-  url.searchParams.set("code_challenge", codeVerifier); // Simplification: should be S256
-  url.searchParams.set("code_challenge_method", "plain");
+  url.searchParams.set("code_challenge", await pkceChallenge(codeVerifier));
+  url.searchParams.set("code_challenge_method", "S256");
 
   return c.redirect(url.toString());
 });
@@ -86,7 +108,12 @@ app.get("/auth/callback", async (c) => {
   const storedState = getCookie(c, "oauth_state");
   const codeVerifier = getCookie(c, "oauth_verifier");
 
-  if (!code || state !== storedState) return c.text("Invalid state", 400);
+  if (!code || !storedState || state !== storedState) return c.text("Invalid state", 400);
+  if (!codeVerifier) return c.text("Missing PKCE verifier", 400);
+
+  // Single-use: don't leave them around for a replay of this callback
+  deleteCookie(c, "oauth_state", { path: "/" });
+  deleteCookie(c, "oauth_verifier", { path: "/" });
 
   // Exchange code for token
   const response = await fetch(TWITTER_TOKEN_URL, {
@@ -99,7 +126,7 @@ app.get("/auth/callback", async (c) => {
       code,
       grant_type: "authorization_code",
       redirect_uri: `${process.env.BASE_URL}/auth/callback`,
-      code_verifier: codeVerifier!,
+      code_verifier: codeVerifier,
     }),
   });
 
