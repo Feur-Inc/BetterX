@@ -1364,6 +1364,11 @@ export const BETTERX_STYLES = `
 }
 
 /* === Notifications === */
+#betterx-notification-container,
+#betterx-notification-container * {
+  font-family: "TwitterChirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
 .betterx-notification-container {
   position: fixed;
   bottom: 20px;
