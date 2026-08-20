@@ -93,9 +93,39 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   let mode: EditorMode = "full";
   let liveReload = false;
   let liveTimer: ReturnType<typeof setTimeout> | null = null;
+  let persistedCSS = theme.css;
+  let lastQueuedCSS = theme.css;
+  let writeQueue: Promise<void> = Promise.resolve();
+  let lastWrite: Promise<void> = Promise.resolve();
   let splitWidth = 50; // percentage of viewport
   let closed = false;
   let activeDragCleanup: (() => void) | null = null;
+
+  const persistCSS = (css: string): Promise<void> => {
+    if (css === lastQueuedCSS) return lastWrite;
+    lastQueuedCSS = css;
+    const operation = writeQueue.then(async () => {
+      await ctx.themeManager.update(theme.id, css);
+      persistedCSS = css;
+    });
+    lastWrite = operation;
+    writeQueue = operation.catch((error) => {
+      if (lastQueuedCSS === css) lastQueuedCSS = persistedCSS;
+      console.error("[BetterX] Could not save theme", error);
+    });
+    return operation;
+  };
+
+  const flushLiveCSS = (): void => {
+    if (liveTimer) {
+      clearTimeout(liveTimer);
+      liveTimer = null;
+    }
+    if (currentCSS === lastQueuedCSS) return;
+    void persistCSS(currentCSS).catch(() => {
+      ctx.notifications.showError(`Could not save theme "${theme.name}".`);
+    });
+  };
 
   // Style element that constrains page content in split mode
   const splitStyle = document.createElement("style");
@@ -246,11 +276,15 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
 
   const closeModal = (force = false): boolean => {
     if (closed) return true;
-    if (!force && !liveReload && currentCSS !== theme.css) {
+    if (!force && !liveReload && currentCSS !== lastQueuedCSS) {
       if (!window.confirm("Discard unsaved theme changes?")) return false;
     }
+    if (liveReload) flushLiveCSS();
     closed = true;
-    if (liveTimer) clearTimeout(liveTimer);
+    if (liveTimer) {
+      clearTimeout(liveTimer);
+      liveTimer = null;
+    }
     activeDragCleanup?.();
     editorView?.destroy();
     clearInlineSize();
@@ -267,9 +301,7 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   // Live reload toggle
   liveCheck.addEventListener("change", () => {
     liveReload = liveCheck.checked;
-    if (liveReload) {
-      void ctx.themeManager.update(theme.id, currentCSS);
-    }
+    flushLiveCSS();
   });
 
   // Close on overlay background click (full mode only)
@@ -288,8 +320,12 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   closeBtn.addEventListener("click", () => closeModal());
 
   saveBtn.addEventListener("click", async () => {
-    await ctx.themeManager.update(theme.id, currentCSS);
-    ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`);
+    try {
+      await persistCSS(currentCSS);
+      ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`);
+    } catch {
+      ctx.notifications.showError(`Could not save theme "${theme.name}".`);
+    }
   });
 
   // Ctrl+S / Cmd+S to save
@@ -297,9 +333,9 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
       e.preventDefault();
       e.stopPropagation();
-      void ctx.themeManager.update(theme.id, currentCSS).then(() => {
-        ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`);
-      });
+      void persistCSS(currentCSS)
+        .then(() => ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`))
+        .catch(() => ctx.notifications.showError(`Could not save theme "${theme.name}".`));
     }
   };
   overlay.addEventListener("keydown", onSaveKey);
@@ -309,7 +345,8 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     if (!liveReload) return;
     if (liveTimer) clearTimeout(liveTimer);
     liveTimer = setTimeout(() => {
-      void ctx.themeManager.update(theme.id, currentCSS);
+      liveTimer = null;
+      flushLiveCSS();
     }, 300);
   };
 

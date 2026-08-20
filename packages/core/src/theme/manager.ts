@@ -123,8 +123,8 @@ export class ThemeManager {
     const theme = this.themes.find((t) => t.id === id);
     if (!theme) return;
 
-    theme.css = css;
     await this.storage.writeTheme(id, css);
+    theme.css = css;
 
     if (theme.enabled) {
       this.applyToDom(theme);

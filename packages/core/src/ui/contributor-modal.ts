@@ -114,14 +114,17 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
   const overlay = document.createElement("div");
   overlay.id = OVERLAY_ID;
   overlay.className = "bx-cm-overlay";
+  let closePluginDetail: (() => void) | null = null;
 
   // If BetterX modal closes while contributor modal is open → remove contributor too
   const unsubClose = bxModal?.onClose(() => {
+    closePluginDetail?.();
     overlay.remove();
     document.removeEventListener("keydown", onKey);
   });
 
   const closeSelf = (restoreBx = true) => {
+    closePluginDetail?.();
     overlay.remove();
     document.removeEventListener("keydown", onKey);
     unsubClose?.();
@@ -188,6 +191,7 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
   pluginsSection.append(sectionLabel, pluginList);
 
   const showDetail = (plugin: Plugin) => {
+    closePluginDetail?.();
     const pdOverlay = document.createElement("div");
     pdOverlay.className = "bx-pd-overlay";
 
@@ -201,13 +205,11 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
     const backBtn = document.createElement("button");
     backBtn.className = "betterx-detail-back";
     backBtn.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg> ${escHtml(dev.name)}`;
-    backBtn.addEventListener("click", () => pdOverlay.remove());
 
     const closeBtn = document.createElement("button");
     closeBtn.className = "betterx-modal-close";
     closeBtn.setAttribute("aria-label", "Close");
     closeBtn.textContent = "✕";
-    closeBtn.addEventListener("click", () => pdOverlay.remove());
 
     pdHeader.append(backBtn, closeBtn);
 
@@ -272,17 +274,22 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
     pdOverlay.appendChild(pdModal);
     document.body.appendChild(pdOverlay);
 
+    const closeDetail = () => {
+      pdOverlay.remove();
+      document.removeEventListener("keydown", onPdKey);
+      if (closePluginDetail === closeDetail) closePluginDetail = null;
+    };
+    closePluginDetail = closeDetail;
+    backBtn.addEventListener("click", closeDetail);
+    closeBtn.addEventListener("click", closeDetail);
+
     pdOverlay.addEventListener("click", (e) => {
-      if (e.target === pdOverlay) pdOverlay.remove();
+      if (e.target === pdOverlay) closeDetail();
     });
     const onPdKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        pdOverlay.remove();
-        document.removeEventListener("keydown", onPdKey);
-      }
+      if (e.key === "Escape") closeDetail();
     };
     document.addEventListener("keydown", onPdKey);
-    pdOverlay.addEventListener("remove", () => document.removeEventListener("keydown", onPdKey));
   };
 
   if (plugins.length > 0) {

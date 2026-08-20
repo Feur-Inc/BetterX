@@ -22,7 +22,7 @@
     "start:desktop": "bun run --cwd packages/desktop start",
     "dev:extension": "bun run --cwd packages/extension dev",
     "dev:desktop": "bun run --cwd packages/desktop dev:all",
-    "test": "bun test packages/core/src packages/desktop/src",
+    "test": "bun test packages/core/src packages/plugins/src packages/extension/src packages/desktop/src packages/cloud-sync/src packages/android/src",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/extension/tsconfig.json packages/desktop/tsconfig.json packages/cloud-sync/tsconfig.json && bun run --cwd packages/android typecheck"

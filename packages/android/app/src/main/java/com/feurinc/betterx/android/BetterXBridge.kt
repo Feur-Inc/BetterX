@@ -98,10 +98,9 @@ class BetterXBridge(private val activity: Activity, private val bridgeToken: Str
   private fun handleProxyImage(url: String): JSONObject {
     if (url.isBlank()) throw IllegalArgumentException("Missing image URL")
 
-    val connection = openConnection(url, "GET", null, null, false)
+    val connection = openConnectionFollowingRedirects(url, "GET", null, null, false)
     return try {
       val status = connection.responseCode
-      validateNetworkUrl(connection.url.toString())
       if (status !in 200..299) throw IllegalArgumentException("Image request failed ($status)")
       val bytes = readBodyBytes(connection)
       val mime = connection.contentType?.substringBefore(';')?.trim().takeUnless { value -> value.isNullOrBlank() } ?: "image/png"
@@ -130,14 +129,19 @@ class BetterXBridge(private val activity: Activity, private val bridgeToken: Str
       throw IllegalArgumentException("Request body is too large")
     }
 
-    val connection = openConnection(url, requestMethod, headers, body, includeCredentials)
+    val connection = openConnectionFollowingRedirects(
+      url,
+      requestMethod,
+      headers,
+      body,
+      includeCredentials,
+    )
     return try {
       val status = connection.responseCode
-      validateNetworkUrl(connection.url.toString())
       val text = readBodyText(connection)
       val json = runCatching { JSONTokener(text).nextValue() }.getOrNull()
 
-      if (includeCredentials) applyResponseCookies(url, connection)
+      if (includeCredentials) applyResponseCookies(connection.url.toString(), connection)
 
       JSONObject()
         .put("ok", status in 200..299)
@@ -172,7 +176,7 @@ class BetterXBridge(private val activity: Activity, private val bridgeToken: Str
     val parsed = validateNetworkUrl(url)
     val connection = parsed.openConnection() as HttpURLConnection
     connection.requestMethod = method
-    connection.instanceFollowRedirects = true
+    connection.instanceFollowRedirects = false
     connection.connectTimeout = 20_000
     connection.readTimeout = 20_000
     connection.doInput = true
@@ -203,6 +207,77 @@ class BetterXBridge(private val activity: Activity, private val bridgeToken: Str
     }
 
     return connection
+  }
+
+  private fun openConnectionFollowingRedirects(
+    url: String,
+    method: String,
+    headers: JSONObject?,
+    body: String?,
+    includeCredentials: Boolean,
+  ): HttpURLConnection {
+    var currentUrl = url
+    var currentMethod = method
+    var currentBody = body
+    var currentHeaders = headers
+
+    repeat(MAX_REDIRECTS + 1) { redirectCount ->
+      val connection = openConnection(
+        currentUrl,
+        currentMethod,
+        currentHeaders,
+        currentBody,
+        includeCredentials,
+      )
+      val status = connection.responseCode
+      if (status !in REDIRECT_STATUS_CODES) return connection
+
+      val location = connection.getHeaderField("Location")
+      if (location.isNullOrBlank()) return connection
+      if (redirectCount == MAX_REDIRECTS) {
+        connection.disconnect()
+        throw IllegalArgumentException("Too many redirects")
+      }
+
+      val nextUrl = try {
+        if (includeCredentials) applyResponseCookies(currentUrl, connection)
+        URL(connection.url, location).toString().also { validateNetworkUrl(it) }
+      } finally {
+        connection.disconnect()
+      }
+
+      if (status == HttpURLConnection.HTTP_SEE_OTHER ||
+        ((status == HttpURLConnection.HTTP_MOVED_PERM || status == HttpURLConnection.HTTP_MOVED_TEMP) &&
+          currentMethod == "POST")
+      ) {
+        currentMethod = "GET"
+        currentBody = null
+      }
+      currentHeaders = headersForRedirect(currentHeaders, currentUrl, nextUrl)
+      currentUrl = nextUrl
+    }
+
+    throw IllegalStateException("Redirect loop terminated unexpectedly")
+  }
+
+  private fun headersForRedirect(headers: JSONObject?, fromUrl: String, toUrl: String): JSONObject? {
+    if (headers == null || sameOrigin(fromUrl, toUrl)) return headers
+    return JSONObject().apply {
+      headers.keys().forEach { key ->
+        if (key.lowercase(Locale.US) !in CROSS_ORIGIN_BLOCKED_HEADERS) {
+          put(key, headers.opt(key))
+        }
+      }
+    }
+  }
+
+  private fun sameOrigin(firstUrl: String, secondUrl: String): Boolean {
+    val first = URL(firstUrl)
+    val second = URL(secondUrl)
+    val firstPort = if (first.port == -1) first.defaultPort else first.port
+    val secondPort = if (second.port == -1) second.defaultPort else second.port
+    return first.protocol.equals(second.protocol, ignoreCase = true) &&
+      first.host.equals(second.host, ignoreCase = true) && firstPort == secondPort
   }
 
   private fun readBodyBytes(connection: HttpURLConnection): ByteArray {
@@ -388,7 +463,10 @@ class BetterXBridge(private val activity: Activity, private val bridgeToken: Str
     const val MAX_MESSAGE_CHARS = 5_000_000
     const val MAX_REQUEST_BODY_CHARS = 2_000_000
     const val MAX_RESPONSE_BYTES = 10_000_000
+    const val MAX_REDIRECTS = 5
     val ALLOWED_METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE")
     val BLOCKED_HEADERS = setOf("cookie", "host", "origin", "referer")
+    val CROSS_ORIGIN_BLOCKED_HEADERS = setOf("authorization", "proxy-authorization")
+    val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
   }
 }

@@ -11,7 +11,7 @@ async function ensureThemesDir(): Promise<void> {
 }
 
 function validateThemeId(id: unknown): string {
-  if (typeof id !== "string" || id !== basename(id) || !/^[a-zA-Z0-9._ -]+\.css$/.test(id)) {
+  if (typeof id !== "string" || id !== basename(id) || !/^[a-zA-Z0-9._ -]{1,100}\.css$/.test(id)) {
     throw new Error("Invalid theme id");
   }
   return id;

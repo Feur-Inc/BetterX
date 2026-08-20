@@ -92,7 +92,7 @@ if (sensitiveMediaEnabled && sensitiveMediaBlur) {
       }
     }
   };
-  new MutationObserver(markArticles).observe(document.documentElement, {
+  new MutationObserver(markArticles).observe(document, {
     childList: true,
     subtree: true,
   });

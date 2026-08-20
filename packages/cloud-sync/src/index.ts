@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
 import { SignJWT, jwtVerify } from "jose";
 import { db } from "./db/schema.js";
+import { validThemeId } from "./validation.js";
 
 type Env = {
   Variables: {
@@ -243,10 +244,6 @@ type StoredConfig = {
 
 function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function validThemeId(value: unknown): value is string {
-  return typeof value === "string" && /^[a-zA-Z0-9_-]{1,100}\.css$/.test(value);
 }
 
 function isBoundedJsonValue(value: unknown): boolean {
