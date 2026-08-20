@@ -15,22 +15,18 @@ import DMDrawerResizer from "./DMDrawerResizer/index.js";
 import DontOverthink from "./DontOverthink/index.js";
 import FixUpX from "./FixUpX/index.js";
 import GifFavorites from "./GifFavorites/index.js";
-import ImageMagnifier from "./imageMagnifier/index.js";
 import MenuReorder from "./MenuReorder/index.js";
-import MeowAd from "./meowad/index.js";
 import NoTrending from "./NoTrending/index.js";
-import Oneko from "./oneko/index.js";
 import QuickEmoji from "./QuickEmoji/index.js";
 import RemoveGrok from "./RemoveGrok/index.js";
 import RemovePremium from "./RemovePremium/index.js";
 import SensitiveMedia from "./SensitiveMedia/index.js";
 import TweetScreenshot from "./TweetScreenshot/index.js";
-import UsersStatus from "./UsersStatus/index.js";
+import ImageMagnifier from "./imageMagnifier/index.js";
+import MeowAd from "./meowad/index.js";
+import Oneko from "./oneko/index.js";
 
-// PluginDefinition<any> is needed here because each plugin has a different
-// strongly-typed options generic that is invariant due to `this` parameter typing.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const allPlugins: PluginDefinition<any>[] = [
+export const allPlugins: PluginDefinition[] = [
   // Meta plugin first
   BetterXPlugin,
   // Library plugins — dependency order also enforced at runtime
@@ -54,7 +50,6 @@ export const allPlugins: PluginDefinition<any>[] = [
   RemovePremium,
   SensitiveMedia,
   TweetScreenshot,
-  UsersStatus,
 ];
 
 export {
@@ -79,5 +74,4 @@ export {
   RemovePremium,
   SensitiveMedia,
   TweetScreenshot,
-  UsersStatus,
 };

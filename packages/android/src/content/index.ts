@@ -20,6 +20,7 @@ import {
   injectStyle,
   setFetchProxy,
   setImageProxy,
+  startCloudAutoSync,
   watchNavButton,
 } from "@betterx/core";
 import { BETTERX_STYLES } from "@betterx/core";
@@ -55,33 +56,11 @@ async function init(): Promise<void> {
   // 4. Init themes first (applies CSS before plugins run)
   await themeManager.initialize();
 
-  // 5. Init plugins
   const androidPlugins = allPlugins.map((plugin) =>
     plugin.name === "RemovePremium" ? RemovePremium : plugin
   );
   androidPlugins.push(GoogleSignInCompat);
   androidPlugins.push(MoreLikeOriginal);
-  await pluginManager.initialize(androidPlugins, "android");
-
-  const webViewLoginBridgeState =
-    savedPluginStates["WebView Login Bridge"] ?? savedPluginStates["Google Sign-In Compat"];
-
-  if (!webViewLoginBridgeState) {
-    const googleSignInCompat = pluginManager.get("WebView Login Bridge");
-    if (googleSignInCompat && !googleSignInCompat.enabled) {
-      await pluginManager.toggle("WebView Login Bridge");
-    }
-  }
-
-  if (!savedPluginStates["More like original"]) {
-    const moreLikeOriginal = pluginManager.get("More like original");
-    if (moreLikeOriginal && !moreLikeOriginal.enabled) {
-      await pluginManager.toggle("More like original");
-    }
-  }
-
-  // 6. Apply accent color
-  applyAccentColor();
 
   const logoUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(BETTERX_LOGO_SVG)}`;
 
@@ -110,6 +89,28 @@ async function init(): Promise<void> {
     }
   });
 
+  // Proxies must be registered before plugin start hooks run.
+  await pluginManager.initialize(androidPlugins, "android");
+
+  const webViewLoginBridgeState =
+    savedPluginStates["WebView Login Bridge"] ?? savedPluginStates["Google Sign-In Compat"];
+
+  if (!webViewLoginBridgeState) {
+    const googleSignInCompat = pluginManager.get("WebView Login Bridge");
+    if (googleSignInCompat && !googleSignInCompat.enabled) {
+      await pluginManager.toggle("WebView Login Bridge");
+    }
+  }
+
+  if (!savedPluginStates["More like original"]) {
+    const moreLikeOriginal = pluginManager.get("More like original");
+    if (moreLikeOriginal && !moreLikeOriginal.enabled) {
+      await pluginManager.toggle("More like original");
+    }
+  }
+
+  applyAccentColor();
+
   TabRegistry.register(PluginsTab);
   TabRegistry.register(ThemesTab);
   TabRegistry.register(CloudTab);
@@ -127,6 +128,7 @@ async function init(): Promise<void> {
     openOAuth: (url: string) =>
       browser.runtime.sendMessage({ type: "OPEN_URL", url }).then(() => undefined),
   };
+  startCloudAutoSync(ctx);
 
   // 8. Create modal
   const modal = new SettingsModal(ctx);

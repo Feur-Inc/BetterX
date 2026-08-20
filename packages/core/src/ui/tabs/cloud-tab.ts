@@ -1,13 +1,177 @@
-import type { SettingsTab, BetterXContext } from "../tab-registry.js";
-import type { IStorage } from "../../types/storage.js";
 import type { PluginStorageData } from "../../types/plugin.js";
-import { logger } from "../../utils/logger.js";
+import type { IStorage } from "../../types/storage.js";
+import type { ThemeStorageState } from "../../types/theme.js";
 import { BETTERX_VERSION } from "../../utils/constants.js";
+import { logger } from "../../utils/logger.js";
 import { proxyFetch } from "../../utils/proxy.js";
+import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
 // ─── Cloud Sync Tab ───────────────────────────────────────────────────────────
 
 const DEFAULT_SERVER = "https://cloud.betterx.mopigames.dev";
+const AUTO_SYNC_INTERVAL_MS = 30_000;
+const MAX_CONFIG_CHARS = 5_000_000;
+const MAX_PLUGINS = 250;
+const MAX_THEMES = 100;
+const MAX_THEME_CHARS = 2_000_000;
+const THEME_ID = /^[a-zA-Z0-9._ -]{1,100}\.css$/;
+
+type CloudThemeState = ThemeStorageState & { themes: Record<string, string> };
+type CloudConfig = {
+  plugin_states: Record<string, PluginStorageData>;
+  theme_state: CloudThemeState;
+};
+
+let autoSyncTimer: number | null = null;
+let lastAutoSyncSnapshot = "";
+let autoSyncRunning = false;
+
+function normalizeServer(value: string): string {
+  const url = new URL(value || DEFAULT_SERVER);
+  const isLoopback =
+    url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopback)) {
+    throw new Error("Cloud server must use HTTPS (HTTP is allowed only on loopback)");
+  }
+  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("Cloud server must be an origin without a path");
+  }
+  return url.origin;
+}
+
+function isPluginState(value: unknown): value is PluginStorageData {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const state = value as Record<string, unknown>;
+  return (
+    typeof state.enabled === "boolean" &&
+    !!state.settings &&
+    typeof state.settings === "object" &&
+    !Array.isArray(state.settings)
+  );
+}
+
+function parseCloudConfig(value: unknown): CloudConfig | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const config = value as Record<string, unknown>;
+  if (
+    !config.plugin_states ||
+    typeof config.plugin_states !== "object" ||
+    !config.theme_state ||
+    typeof config.theme_state !== "object"
+  )
+    return null;
+
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    return null;
+  }
+  if (serialized.length > MAX_CONFIG_CHARS) return null;
+
+  const pluginEntries = Object.entries(config.plugin_states);
+  if (pluginEntries.length > MAX_PLUGINS) return null;
+  const pluginStates: Record<string, PluginStorageData> = {};
+  for (const [name, state] of pluginEntries) {
+    if (name.length === 0 || name.length > 100 || !isPluginState(state)) return null;
+    pluginStates[name] = { enabled: state.enabled, settings: { ...state.settings } };
+  }
+  const themeState = config.theme_state as Record<string, unknown>;
+  if (!themeState.themes || typeof themeState.themes !== "object") return null;
+  const themeEntries = Object.entries(themeState.themes);
+  if (themeEntries.length > MAX_THEMES) return null;
+  const themes: Record<string, string> = {};
+  for (const [id, css] of themeEntries) {
+    if (!THEME_ID.test(id) || typeof css !== "string" || css.length > MAX_THEME_CHARS) return null;
+    themes[id] = css;
+  }
+  const ids = new Set(Object.keys(themes));
+  const normalizeIds = (items: unknown): string[] =>
+    Array.isArray(items)
+      ? [
+          ...new Set(
+            items.filter(
+              (id): id is string => typeof id === "string" && THEME_ID.test(id) && ids.has(id)
+            )
+          ),
+        ].slice(0, MAX_THEMES)
+      : [];
+
+  return {
+    plugin_states: pluginStates,
+    theme_state: {
+      order: normalizeIds(themeState.order),
+      active: normalizeIds(themeState.active),
+      themes,
+    },
+  };
+}
+
+async function collectCloudConfig(storage: IStorage): Promise<CloudConfig> {
+  const [pluginStates, themeState, themeIds] = await Promise.all([
+    storage.getPluginStates(),
+    storage.getThemeState(),
+    storage.listThemes(),
+  ]);
+  const themes: Record<string, string> = {};
+  for (const id of themeIds) themes[id] = await storage.readTheme(id);
+  return { plugin_states: pluginStates, theme_state: { ...themeState, themes } };
+}
+
+async function applyCloudConfig(storage: IStorage, config: CloudConfig): Promise<void> {
+  for (const [id, css] of Object.entries(config.theme_state.themes)) {
+    await storage.writeTheme(id, css);
+  }
+  await storage.setPluginStates(config.plugin_states);
+  await storage.setThemeState({
+    order: config.theme_state.order,
+    active: config.theme_state.active,
+  });
+}
+
+async function pushCloudConfig(storage: IStorage, server: string): Promise<boolean> {
+  const config = await collectCloudConfig(storage);
+  const response = await proxyFetch(`${server}/api/config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+    credentials: "include",
+  });
+  return response.ok;
+}
+
+async function runAutoSync(ctx: BetterXContext): Promise<void> {
+  if (autoSyncRunning || localStorage.getItem("bx_autosync") !== "true") return;
+  autoSyncRunning = true;
+  try {
+    const config = await collectCloudConfig(ctx.storage);
+    const snapshot = JSON.stringify(config);
+    if (snapshot === lastAutoSyncSnapshot) return;
+    const server = normalizeServer(localStorage.getItem("bx_cloud_server") || DEFAULT_SERVER);
+    const response = await proxyFetch(`${server}/api/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: snapshot,
+      credentials: "include",
+    });
+    if (response.ok) lastAutoSyncSnapshot = snapshot;
+  } catch (error) {
+    logger.warn("Automatic cloud sync failed", error);
+  } finally {
+    autoSyncRunning = false;
+  }
+}
+
+export function startCloudAutoSync(ctx: BetterXContext): void {
+  if (autoSyncTimer !== null) window.clearInterval(autoSyncTimer);
+  collectCloudConfig(ctx.storage)
+    .then((config) => {
+      lastAutoSyncSnapshot =
+        localStorage.getItem("bx_autosync") === "true" ? "" : JSON.stringify(config);
+    })
+    .catch((error) => logger.warn("Could not initialize automatic cloud sync", error));
+  autoSyncTimer = window.setInterval(() => void runAutoSync(ctx), AUTO_SYNC_INTERVAL_MS);
+}
 
 // ─── Local JSON Config Helpers ──────────────────────────────────────────────
 
@@ -19,47 +183,78 @@ async function exportConfig(storage: IStorage): Promise<string> {
   for (const id of themeIds) {
     themes[id] = await storage.readTheme(id);
   }
-  return JSON.stringify(
-    { version: BETTERX_VERSION, pluginStates, themeState, themes },
-    null,
-    2,
-  );
+  return JSON.stringify({ version: BETTERX_VERSION, pluginStates, themeState, themes }, null, 2);
 }
 
-async function importConfig(
-  storage: IStorage,
-  json: string,
-  ctx: BetterXContext,
-): Promise<void> {
-  const data = JSON.parse(json) as {
-    pluginStates?: Record<string, PluginStorageData>;
-    themeState?: { order: string[]; active: string[] };
-    themes?: Record<string, string>;
-  };
+async function importConfig(storage: IStorage, json: string, ctx: BetterXContext): Promise<void> {
+  if (json.length > 5_000_000) throw new Error("Config file is too large");
+  const raw = JSON.parse(json) as unknown;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Invalid config");
+  const data = raw as Record<string, unknown>;
 
-  if (data.pluginStates) {
-    const unavailable = new Set(
-      ctx.pluginManager
-        .getAll()
-        .filter((p) => p.unavailable)
-        .map((p) => p.name),
-    );
-
-    for (const [name, state] of Object.entries(data.pluginStates)) {
-      if (unavailable.has(name)) {
-        state.enabled = false;
-      }
+  const pluginStates: Record<string, PluginStorageData> = {};
+  const hasPluginStates = data.pluginStates !== undefined;
+  if (hasPluginStates) {
+    if (
+      !data.pluginStates ||
+      typeof data.pluginStates !== "object" ||
+      Array.isArray(data.pluginStates)
+    ) {
+      throw new Error("Invalid plugin states");
     }
-
-    await storage.setPluginStates(data.pluginStates);
+    const entries = Object.entries(data.pluginStates);
+    if (entries.length > 250) throw new Error("Too many plugin states");
+    for (const [name, state] of entries) {
+      if (name.length > 100 || !isPluginState(state)) throw new Error("Invalid plugin state");
+      pluginStates[name] = { enabled: state.enabled, settings: { ...state.settings } };
+    }
   }
 
-  if (data.themeState) {
-    await storage.setThemeState(data.themeState);
+  const themes: Record<string, string> = {};
+  if (data.themes !== undefined) {
+    if (!data.themes || typeof data.themes !== "object" || Array.isArray(data.themes)) {
+      throw new Error("Invalid themes");
+    }
+    const entries = Object.entries(data.themes);
+    if (entries.length > 100) throw new Error("Too many themes");
+    for (const [id, css] of entries) {
+      if (
+        !/^[a-zA-Z0-9._ -]+\.css$/.test(id) ||
+        typeof css !== "string" ||
+        css.length > 2_000_000
+      ) {
+        throw new Error("Invalid theme");
+      }
+      themes[id] = css;
+    }
   }
 
-  if (data.themes) {
-    for (const [id, css] of Object.entries(data.themes)) {
+  let themeState: ThemeStorageState | undefined;
+  if (data.themeState !== undefined) {
+    if (!data.themeState || typeof data.themeState !== "object" || Array.isArray(data.themeState)) {
+      throw new Error("Invalid theme state");
+    }
+    const candidate = data.themeState as Record<string, unknown>;
+    const validIds = (value: unknown): value is string[] =>
+      Array.isArray(value) &&
+      value.length <= 100 &&
+      value.every((id) => typeof id === "string" && /^[a-zA-Z0-9._ -]+\.css$/.test(id));
+    if (!validIds(candidate.order) || !validIds(candidate.active)) {
+      throw new Error("Invalid theme state");
+    }
+    themeState = { order: [...candidate.order], active: [...candidate.active] };
+  }
+
+  if (hasPluginStates) {
+    await storage.setPluginStates(pluginStates);
+  }
+
+  if (themeState) {
+    await storage.setThemeState(themeState);
+  }
+
+  if (Object.keys(themes).length > 0) {
+    for (const [id, css] of Object.entries(themes)) {
       await storage.writeTheme(id, css);
     }
   }
@@ -87,8 +282,6 @@ async function refreshStatus(container: HTMLElement, ctx: BetterXContext) {
   const userName = container.querySelector("#cloud-user-name") as HTMLElement;
   const serverInput = container.querySelector("#cloud-server-url") as HTMLInputElement;
 
-  const server = serverInput?.value.replace(/\/+$/, "") || localStorage.getItem("bx_cloud_server") || DEFAULT_SERVER;
-
   const setStatus = (label: string, color: string) => {
     statusVal.textContent = label;
     statusVal.style.color = color;
@@ -96,35 +289,51 @@ async function refreshStatus(container: HTMLElement, ctx: BetterXContext) {
   };
 
   const setDisconnected = (label: string) => {
-    const color = label === "Not logged in" ? "var(--betterx-danger)" : "var(--betterx-textColorSecondary)";
+    const color =
+      label === "Not logged in" ? "var(--betterx-danger)" : "var(--betterx-textColorSecondary)";
     setStatus(label, color);
     loginBtn.style.display = "";
     logoutBtn.style.display = "none";
     userInfo.style.display = "none";
   };
 
-  if (!server) { setDisconnected("Not Configured"); return; }
+  let server: string;
+  try {
+    server = normalizeServer(
+      serverInput?.value || localStorage.getItem("bx_cloud_server") || DEFAULT_SERVER
+    );
+  } catch {
+    setDisconnected("Invalid Server URL");
+    return;
+  }
+
+  if (!server) {
+    setDisconnected("Not Configured");
+    return;
+  }
 
   try {
-    const res = await proxyFetch(`${server}/api/config`);
-    const data = res.json as any;
-    if (res.ok && data && typeof data === "object" && "plugin_states" in data) {
+    const res = await proxyFetch(`${server}/api/config`, { credentials: "include" });
+    const data = parseCloudConfig(res.json);
+    if (res.ok && data) {
       setStatus("Connected", "var(--betterx-success)");
       loginBtn.style.display = "none";
       logoutBtn.style.display = "";
 
-      proxyFetch(`${server}/api/me`).then((meRes) => {
-        const me = meRes.json as { username: string; profile_image_url: string | null } | null;
-        if (!meRes.ok || !me) return;
-        userName.textContent = `@${me.username}`;
-        if (me.profile_image_url) {
-          userPfp.src = me.profile_image_url.replace("_normal", "_bigger");
-          userPfp.style.display = "";
-        } else {
-          userPfp.style.display = "none";
-        }
-        userInfo.style.display = "flex";
-      }).catch(() => {});
+      proxyFetch(`${server}/api/me`, { credentials: "include" })
+        .then((meRes) => {
+          const me = meRes.json as { username: string; profile_image_url: string | null } | null;
+          if (!meRes.ok || !me) return;
+          userName.textContent = `@${me.username}`;
+          if (me.profile_image_url) {
+            userPfp.src = me.profile_image_url.replace("_normal", "_bigger");
+            userPfp.style.display = "";
+          } else {
+            userPfp.style.display = "none";
+          }
+          userInfo.style.display = "flex";
+        })
+        .catch(() => {});
     } else {
       setDisconnected("Not logged in");
     }
@@ -143,10 +352,16 @@ async function setupEvents(container: HTMLElement, ctx: BetterXContext) {
   const autoSyncToggle = container.querySelector("#cloud-autosync-toggle") as HTMLInputElement;
   const serverInput = container.querySelector("#cloud-server-url") as HTMLInputElement;
 
-  const getServer = () => serverInput.value.replace(/\/+$/, "") || DEFAULT_SERVER;
+  const getServer = () => normalizeServer(serverInput.value || DEFAULT_SERVER);
 
   serverInput.addEventListener("change", () => {
-    localStorage.setItem("bx_cloud_server", getServer());
+    try {
+      localStorage.setItem("bx_cloud_server", getServer());
+    } catch (error) {
+      ctx.notifications.showError(
+        error instanceof Error ? error.message : "Invalid cloud server URL"
+      );
+    }
     refreshStatus(container, ctx);
   });
 
@@ -166,6 +381,10 @@ async function setupEvents(container: HTMLElement, ctx: BetterXContext) {
     input.addEventListener("change", () => {
       const file = input.files?.[0];
       if (!file) return;
+      if (file.size > 5_000_000) {
+        ctx.notifications.showError("Config file is too large");
+        return;
+      }
       file
         .text()
         .then((text) => importConfig(ctx.storage, text, ctx))
@@ -178,33 +397,37 @@ async function setupEvents(container: HTMLElement, ctx: BetterXContext) {
   });
 
   loginBtn.addEventListener("click", () => {
-    const url = `${getServer()}/auth/twitter`;
-    if (ctx.openOAuth) {
-      ctx.openOAuth(url).catch(console.error);
-    } else {
-      window.open(url, "_blank");
+    try {
+      const url = `${getServer()}/auth/twitter`;
+      if (ctx.openOAuth) {
+        ctx.openOAuth(url).catch(() => ctx.notifications.showError("Could not open login."));
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (error) {
+      ctx.notifications.showError(
+        error instanceof Error ? error.message : "Invalid cloud server URL"
+      );
     }
   });
 
   logoutBtn.addEventListener("click", async () => {
-    await proxyFetch(`${getServer()}/auth/logout`).catch(() => {});
-    refreshStatus(container, ctx);
+    try {
+      await proxyFetch(`${getServer()}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      await refreshStatus(container, ctx);
+    } catch (error) {
+      ctx.notifications.showError(error instanceof Error ? error.message : "Could not log out.");
+    }
   });
 
   pushBtn.addEventListener("click", async () => {
     pushBtn.disabled = true;
     pushBtn.textContent = "Pushing...";
     try {
-      const pluginStates = await ctx.storage.getPluginStates();
-      const themeState = await ctx.storage.getThemeState();
-
-      const res = await proxyFetch(`${getServer()}/api/config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plugin_states: pluginStates, theme_state: themeState }),
-      });
-
-      if (res.ok) {
+      if (await pushCloudConfig(ctx.storage, getServer())) {
         ctx.notifications.showSuccess("Successfully pushed to cloud.");
       } else {
         ctx.notifications.showError("Failed to push to cloud — are you still logged in?");
@@ -221,15 +444,14 @@ async function setupEvents(container: HTMLElement, ctx: BetterXContext) {
     pullBtn.disabled = true;
     pullBtn.textContent = "Pulling...";
     try {
-      const res = await proxyFetch(`${getServer()}/api/config`);
+      const res = await proxyFetch(`${getServer()}/api/config`, { credentials: "include" });
       if (res.ok) {
-        const data = res.json as { plugin_states: Record<string, unknown>; theme_state: Record<string, unknown> } | null;
-        if (!data || typeof data !== "object" || !("plugin_states" in data) || !("theme_state" in data)) {
+        const data = parseCloudConfig(res.json);
+        if (!data) {
           ctx.notifications.showError("Unexpected response from server — try again.");
           return;
         }
-        await ctx.storage.setPluginStates(data.plugin_states as any);
-        await ctx.storage.setThemeState(data.theme_state as any);
+        await applyCloudConfig(ctx.storage, data);
         ctx.notifications.showSuccess("Pulled from cloud. Reloading…");
         setTimeout(() => location.reload(), 1200);
       } else {
@@ -246,6 +468,8 @@ async function setupEvents(container: HTMLElement, ctx: BetterXContext) {
   autoSyncToggle.checked = localStorage.getItem("bx_autosync") === "true";
   autoSyncToggle.addEventListener("change", () => {
     localStorage.setItem("bx_autosync", String(autoSyncToggle.checked));
+    lastAutoSyncSnapshot = autoSyncToggle.checked ? "" : lastAutoSyncSnapshot;
+    if (autoSyncToggle.checked) void runAutoSync(ctx);
   });
 }
 
@@ -280,7 +504,7 @@ function init(container: HTMLElement, ctx: BetterXContext): void {
         <div class="bx-cloud-field">
           <label class="bx-cloud-field-label">Server URL</label>
           <div class="bx-cloud-field-desc">The URL of your BetterX cloud-sync instance.</div>
-          <input type="text" id="cloud-server-url" class="betterx-input-text bx-cloud-url-input" value="${savedServer}" placeholder="${DEFAULT_SERVER}">
+          <input type="text" id="cloud-server-url" class="betterx-input-text bx-cloud-url-input" placeholder="${DEFAULT_SERVER}">
         </div>
       </div>
 
@@ -310,7 +534,7 @@ function init(container: HTMLElement, ctx: BetterXContext): void {
           <div class="betterx-option" style="border:none;padding:0;margin-top:8px;">
             <div class="betterx-option-label-group">
               <div class="betterx-option-label">Auto-Sync</div>
-              <div class="betterx-option-description">Automatically sync changes to the cloud.</div>
+              <div class="betterx-option-description">Automatically back up local changes to the cloud every 30 seconds.</div>
             </div>
             <div class="betterx-option-control">
               <label class="betterx-toggle">
@@ -324,6 +548,9 @@ function init(container: HTMLElement, ctx: BetterXContext): void {
       </div>
     </div>
   `;
+
+  const serverInput = container.querySelector<HTMLInputElement>("#cloud-server-url");
+  if (serverInput) serverInput.value = savedServer;
 
   setupEvents(container, ctx);
   refreshStatus(container, ctx);

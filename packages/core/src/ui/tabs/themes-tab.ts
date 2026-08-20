@@ -1,18 +1,17 @@
-import type { SettingsTab, BetterXContext } from "../tab-registry.js";
 import type { Theme } from "../../types/theme.js";
+import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
 // ─── Themes Tab ───────────────────────────────────────────────────────────────
 
 const EDITOR_OVERLAY_ID = "betterx-editor-overlay";
 
 const SPLIT_STYLE_ID = "betterx-split-constraint";
+let activeEditorCleanup: (() => boolean) | null = null;
 
 type EditorMode = "full" | "split" | "window";
 
 function openEditorModal(theme: Theme, ctx: BetterXContext): void {
-  // Remove any existing editor modal
-  document.getElementById(EDITOR_OVERLAY_ID)?.remove();
-  document.getElementById(SPLIT_STYLE_ID)?.remove();
+  if (activeEditorCleanup && !activeEditorCleanup()) return;
 
   const overlay = document.createElement("div");
   overlay.id = EDITOR_OVERLAY_ID;
@@ -58,9 +57,9 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   const modeBtns = new Map<EditorMode, HTMLButtonElement>();
   for (const m of modes) {
     const btn = document.createElement("button");
-    btn.className = "betterx-editor-mode-btn" + (m.key === "full" ? " betterx-editor-mode-active" : "");
+    btn.className = `betterx-editor-mode-btn${m.key === "full" ? " betterx-editor-mode-active" : ""}`;
     btn.textContent = m.label;
-    btn.dataset["mode"] = m.key;
+    btn.dataset.mode = m.key;
     modeBtns.set(m.key, btn);
     modeGroup.appendChild(btn);
   }
@@ -94,7 +93,39 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   let mode: EditorMode = "full";
   let liveReload = false;
   let liveTimer: ReturnType<typeof setTimeout> | null = null;
+  let persistedCSS = theme.css;
+  let lastQueuedCSS = theme.css;
+  let writeQueue: Promise<void> = Promise.resolve();
+  let lastWrite: Promise<void> = Promise.resolve();
   let splitWidth = 50; // percentage of viewport
+  let closed = false;
+  let activeDragCleanup: (() => void) | null = null;
+
+  const persistCSS = (css: string): Promise<void> => {
+    if (css === lastQueuedCSS) return lastWrite;
+    lastQueuedCSS = css;
+    const operation = writeQueue.then(async () => {
+      await ctx.themeManager.update(theme.id, css);
+      persistedCSS = css;
+    });
+    lastWrite = operation;
+    writeQueue = operation.catch((error) => {
+      if (lastQueuedCSS === css) lastQueuedCSS = persistedCSS;
+      console.error("[BetterX] Could not save theme", error);
+    });
+    return operation;
+  };
+
+  const flushLiveCSS = (): void => {
+    if (liveTimer) {
+      clearTimeout(liveTimer);
+      liveTimer = null;
+    }
+    if (currentCSS === lastQueuedCSS) return;
+    void persistCSS(currentCSS).catch(() => {
+      ctx.notifications.showError(`Could not save theme "${theme.name}".`);
+    });
+  };
 
   // Style element that constrains page content in split mode
   const splitStyle = document.createElement("style");
@@ -106,8 +137,7 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     const w = splitWidth;
     modal.style.width = `${w}vw`;
     modal.style.maxWidth = `${w}vw`;
-    splitStyle.textContent =
-      `body > #react-root { max-width: ${100 - w}vw !important; overflow-x: hidden !important; }`;
+    splitStyle.textContent = `body > #react-root { max-width: ${100 - w}vw !important; overflow-x: hidden !important; }`;
   };
 
   const clearInlineSize = (): void => {
@@ -199,12 +229,14 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
       document.removeEventListener("mouseup", onUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      activeDragCleanup = null;
     };
 
     document.body.style.cursor = mode === "split" ? "ew-resize" : "nwse-resize";
     document.body.style.userSelect = "none";
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+    activeDragCleanup = onUp;
   });
 
   // ── Window drag (title bar) ─────────────────────
@@ -231,6 +263,7 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       modal.style.opacity = "";
+      activeDragCleanup = null;
     };
 
     modal.style.opacity = "0.75";
@@ -238,23 +271,37 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     document.body.style.userSelect = "none";
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+    activeDragCleanup = onUp;
   });
 
-  const closeModal = (): void => {
-    if (liveTimer) clearTimeout(liveTimer);
+  const closeModal = (force = false): boolean => {
+    if (closed) return true;
+    if (!force && !liveReload && currentCSS !== lastQueuedCSS) {
+      if (!window.confirm("Discard unsaved theme changes?")) return false;
+    }
+    if (liveReload) flushLiveCSS();
+    closed = true;
+    if (liveTimer) {
+      clearTimeout(liveTimer);
+      liveTimer = null;
+    }
+    activeDragCleanup?.();
     editorView?.destroy();
     clearInlineSize();
     splitStyle.remove();
     overlay.remove();
     document.removeEventListener("keydown", onKey);
+    if (activeEditorCleanup === cleanup) activeEditorCleanup = null;
+    return true;
   };
+
+  const cleanup = (): boolean => closeModal();
+  activeEditorCleanup = cleanup;
 
   // Live reload toggle
   liveCheck.addEventListener("change", () => {
     liveReload = liveCheck.checked;
-    if (liveReload) {
-      void ctx.themeManager.update(theme.id, currentCSS);
-    }
+    flushLiveCSS();
   });
 
   // Close on overlay background click (full mode only)
@@ -270,11 +317,15 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   };
   document.addEventListener("keydown", onKey);
 
-  closeBtn.addEventListener("click", closeModal);
+  closeBtn.addEventListener("click", () => closeModal());
 
   saveBtn.addEventListener("click", async () => {
-    await ctx.themeManager.update(theme.id, currentCSS);
-    ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`);
+    try {
+      await persistCSS(currentCSS);
+      ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`);
+    } catch {
+      ctx.notifications.showError(`Could not save theme "${theme.name}".`);
+    }
   });
 
   // Ctrl+S / Cmd+S to save
@@ -282,9 +333,9 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
       e.preventDefault();
       e.stopPropagation();
-      void ctx.themeManager.update(theme.id, currentCSS).then(() => {
-        ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`);
-      });
+      void persistCSS(currentCSS)
+        .then(() => ctx.notifications.showSuccess(`Theme "${theme.name}" saved.`))
+        .catch(() => ctx.notifications.showError(`Could not save theme "${theme.name}".`));
     }
   };
   overlay.addEventListener("keydown", onSaveKey);
@@ -294,41 +345,49 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     if (!liveReload) return;
     if (liveTimer) clearTimeout(liveTimer);
     liveTimer = setTimeout(() => {
-      void ctx.themeManager.update(theme.id, currentCSS);
+      liveTimer = null;
+      flushLiveCSS();
     }, 300);
   };
 
   // Lazy load CodeMirror
-  import("codemirror").then(({ EditorView, basicSetup }) => {
-    import("@codemirror/lang-css").then(({ css }) => {
-      import("@codemirror/theme-one-dark").then(({ oneDark }) => {
-        const view = new EditorView({
-          doc: theme.css,
-          extensions: [
-            basicSetup,
-            css(),
-            oneDark,
-            EditorView.theme({
-              "&": { height: "100%", fontSize: "13px" },
-              ".cm-scroller": { overflow: "auto" },
-            }),
-            EditorView.updateListener.of((update) => {
-              if (update.docChanged) {
-                currentCSS = update.state.doc.toString();
-                applyLive();
-              }
-            }),
-          ],
-          parent: editorEl,
-        });
-
-        editorView = view;
-
-        // Focus editor
-        view.focus();
+  Promise.all([
+    import("codemirror"),
+    import("@codemirror/lang-css"),
+    import("@codemirror/theme-one-dark"),
+  ])
+    .then(([{ EditorView, basicSetup }, { css }, { oneDark }]) => {
+      if (closed || !editorEl.isConnected) return;
+      const view = new EditorView({
+        doc: theme.css,
+        extensions: [
+          basicSetup,
+          css(),
+          oneDark,
+          EditorView.theme({
+            "&": { height: "100%", fontSize: "13px" },
+            ".cm-scroller": { overflow: "auto" },
+          }),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              currentCSS = update.state.doc.toString();
+              applyLive();
+            }
+          }),
+        ],
+        parent: editorEl,
       });
+
+      editorView = view;
+
+      // Focus editor
+      view.focus();
+    })
+    .catch((error) => {
+      if (closed) return;
+      ctx.notifications.showError("Could not load the theme editor.");
+      console.error("[BetterX] Theme editor failed to load", error);
     });
-  });
 }
 
 export const ThemesTab: SettingsTab = {
@@ -383,7 +442,10 @@ export const ThemesTab: SettingsTab = {
 
       const confirm = async () => {
         const name = input.value.trim();
-        if (!name) { restore(); return; }
+        if (!name) {
+          restore();
+          return;
+        }
         restore();
         await ctx.themeManager.create(name);
         this.render(container, ctx);
@@ -407,7 +469,7 @@ export const ThemesTab: SettingsTab = {
       openFolderBtn.style.alignItems = "center";
       openFolderBtn.style.gap = "5px";
       openFolderBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>Open Folder</span>`;
-      openFolderBtn.addEventListener("click", () => ctx.openThemesFolder!());
+      openFolderBtn.addEventListener("click", () => ctx.openThemesFolder?.());
       toolbar.appendChild(openFolderBtn);
     }
 
@@ -435,14 +497,32 @@ export const ThemesTab: SettingsTab = {
 
       const files = e.dataTransfer?.files;
       if (!files || files.length === 0) return;
+      const cssFiles = Array.from(files).filter((file) => file.name.toLowerCase().endsWith(".css"));
+      if (cssFiles.length > 100 || themes.length + cssFiles.length > 100) {
+        ctx.notifications.showError("A maximum of 100 themes is supported.");
+        return;
+      }
+      if (cssFiles.some((file) => file.size > 2_000_000)) {
+        ctx.notifications.showError("Each theme must be 2 MB or smaller.");
+        return;
+      }
+      if (cssFiles.reduce((total, file) => total + file.size, 0) > 5_000_000) {
+        ctx.notifications.showError("The imported themes are too large.");
+        return;
+      }
 
       let imported = 0;
-      for (const file of Array.from(files)) {
-        if (!file.name.endsWith(".css")) continue;
-        const css = await file.text();
-        const name = file.name.replace(/\.css$/i, "");
-        await ctx.themeManager.create(name, css);
-        imported++;
+      try {
+        for (const file of cssFiles) {
+          const css = await file.text();
+          const name = file.name.replace(/\.css$/i, "");
+          await ctx.themeManager.create(name, css);
+          imported++;
+        }
+      } catch (error) {
+        ctx.notifications.showError(
+          error instanceof Error ? error.message : "Theme import failed."
+        );
       }
 
       if (imported > 0) {
@@ -476,14 +556,10 @@ export const ThemesTab: SettingsTab = {
     container.appendChild(list);
   },
 
-  buildThemeItem(
-    theme: Theme,
-    ctx: BetterXContext,
-    onRefresh: () => void
-  ): HTMLElement {
+  buildThemeItem(theme: Theme, ctx: BetterXContext, onRefresh: () => void): HTMLElement {
     const item = document.createElement("div");
     item.className = "betterx-theme-item";
-    item.dataset["themeId"] = theme.id;
+    item.dataset.themeId = theme.id;
 
     const drag = document.createElement("span");
     drag.textContent = "⠿";

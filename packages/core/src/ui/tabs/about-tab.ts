@@ -1,6 +1,6 @@
-import type { SettingsTab, BetterXContext } from "../tab-registry.js";
-import { Devs, BETTERX_VERSION } from "../../utils/constants.js";
+import { BETTERX_VERSION, Devs } from "../../utils/constants.js";
 import { openContributorModal } from "../contributor-modal.js";
+import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
 // ─── About Tab ────────────────────────────────────────────────────────────────
 
@@ -56,10 +56,19 @@ export const AboutTab: SettingsTab = {
         const avatar = document.createElement("img");
         avatar.className = "betterx-author-avatar betterx-about-contributor-avatar";
         avatar.alt = dev.name;
-        avatar.addEventListener("error", () => { avatar.style.display = "none"; });
+        avatar.addEventListener("error", () => {
+          avatar.style.display = "none";
+        });
         const avatarUrl = `https://unavatar.io/twitter/${dev.handle}`;
         if (ctx.proxyImage) {
-          ctx.proxyImage(avatarUrl).then((src) => { avatar.src = src; }).catch(() => { avatar.src = avatarUrl; });
+          ctx
+            .proxyImage(avatarUrl)
+            .then((src) => {
+              avatar.src = src;
+            })
+            .catch(() => {
+              avatar.src = avatarUrl;
+            });
         } else {
           avatar.src = avatarUrl;
         }

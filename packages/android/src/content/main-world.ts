@@ -15,7 +15,7 @@
 // before any of Twitter's scripts run.
 
 /** Whether the SensitiveMedia plugin is currently enabled. */
-const sensitiveMediaEnabled = localStorage.getItem("betterx:sensitiveMedia") !== "0";
+const sensitiveMediaEnabled = localStorage.getItem("betterx:sensitiveMedia") === "1";
 /** When true, apply our own CSS blur instead of fully revealing media. */
 const sensitiveMediaBlur = localStorage.getItem("betterx:sensitiveMedia:blur") === "1";
 
@@ -93,7 +93,7 @@ if (sensitiveMediaEnabled && sensitiveMediaBlur) {
       }
     }
   };
-  new MutationObserver(markArticles).observe(document.documentElement, {
+  new MutationObserver(markArticles).observe(document, {
     childList: true,
     subtree: true,
   });
@@ -129,7 +129,7 @@ const TWITTER_API = /^https?:\/\/(api\.)?(twitter|x)\.com\//;
 const GRAPHQL_PATH = "/i/api/graphql/";
 
 const _fetch = window.fetch.bind(window);
-(window as typeof window & { fetch: typeof fetch }).fetch = async (input, init) => {
+(window as typeof window & { fetch: typeof fetch }).fetch = (async (input, init) => {
   const url =
     typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
 
@@ -164,7 +164,7 @@ const _fetch = window.fetch.bind(window);
   } catch {
     return res;
   }
-};
+}) as typeof fetch;
 
 // ─── React fiber utilities ────────────────────────────────────────────────────
 
@@ -222,8 +222,8 @@ function dispatchReactState(el: Element, from: unknown, to: unknown): boolean {
   if (walkAndDispatch(btnFiber, from as boolean, to as boolean, 30)) return true;
   if (walkAndDispatch(articleFiber, from as boolean, to as boolean, 30)) return true;
 
-  const fromInv = !from as boolean,
-    toInv = !to as boolean;
+  const fromInv = !from as boolean;
+  const toInv = !to as boolean;
   if (walkAndDispatch(btnFiber, fromInv, toInv, 30)) return true;
   if (walkAndDispatch(articleFiber, fromInv, toInv, 30)) return true;
 

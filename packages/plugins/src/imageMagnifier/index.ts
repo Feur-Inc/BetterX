@@ -1,8 +1,7 @@
-import { definePlugin, Devs, OptionType } from "@betterx/core";
+import { Devs, OptionType, definePlugin } from "@betterx/core";
 
 let magStyle: HTMLStyleElement | null = null;
 let magEl: HTMLDivElement | null = null;
-let magObserver: MutationObserver | null = null;
 let magIsActive = false;
 let magZoom = 2;
 let magSize = 150;
@@ -36,12 +35,17 @@ export default definePlugin({
     defaultZoom: {
       type: OptionType.NUMBER,
       default: 2,
+      min: 1,
+      max: 6,
+      step: 0.1,
       label: "Default zoom level",
       description: "Default zoom level (1–6)",
     },
     magnifierSize: {
       type: OptionType.NUMBER,
       default: 150,
+      min: 50,
+      max: 400,
       label: "Magnifier size (px)",
       description: "Default magnifier size in pixels (50–400)",
     },
@@ -63,7 +67,9 @@ export default definePlugin({
 
     magOnMouseMove = (e: MouseEvent): void => updateMagnifier(e);
     magOnMouseDown = (e: MouseEvent): void => {
-      const img = (e.target as HTMLElement).closest<HTMLImageElement>('[data-testid="swipe-to-dismiss"] img');
+      const img = (e.target as HTMLElement).closest<HTMLImageElement>(
+        '[data-testid="swipe-to-dismiss"] img'
+      );
       if (!img) return;
       e.preventDefault();
       magCurrentImg = img;
@@ -103,11 +109,6 @@ export default definePlugin({
     document.addEventListener("mouseup", magOnMouseUp);
     document.addEventListener("mousemove", magOnMouseMove);
     document.addEventListener("wheel", magOnWheel, { passive: false });
-
-    magObserver = new MutationObserver(() => {
-      // Images are found dynamically - no action needed
-    });
-    magObserver.observe(document.body, { childList: true, subtree: true });
   },
 
   stop() {
@@ -115,12 +116,10 @@ export default definePlugin({
     if (magOnMouseUp) document.removeEventListener("mouseup", magOnMouseUp);
     if (magOnMouseMove) document.removeEventListener("mousemove", magOnMouseMove);
     if (magOnWheel) document.removeEventListener("wheel", magOnWheel);
-    magObserver?.disconnect();
     magStyle?.remove();
     magEl?.remove();
     magStyle = null;
     magEl = null;
-    magObserver = null;
     magIsActive = false;
     magCurrentImg = null;
     magOnMouseMove = null;

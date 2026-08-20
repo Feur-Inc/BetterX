@@ -1,5 +1,5 @@
-import { Client } from "@xhayper/discord-rpc";
 import { logger } from "@betterx/core";
+import { Client } from "@xhayper/discord-rpc";
 
 // ─── Discord RPC Service ─────────────────────────────────────────────────────
 
@@ -72,5 +72,5 @@ async function setActivity(details: string, state: string): Promise<void> {
 }
 
 function clamp(str: string, max: number): string {
-  return str.length > max ? str.slice(0, max - 1) + "\u2026" : str;
+  return str.length > max ? `${str.slice(0, max - 1)}\u2026` : str;
 }

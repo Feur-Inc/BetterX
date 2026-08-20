@@ -9,17 +9,13 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": [
-    "storage",
-    "tabs",
-    "clipboardWrite",
-    "clipboardRead"
-  ],
+  "permissions": ["storage", "tabs", "clipboardWrite", "clipboardRead"],
   "host_permissions": [
     "https://x.com/*",
     "https://twitter.com/*",
-    "https://cloud.betterx.mopigames.dev/*",
-    "http://localhost:3000/*"
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "content_scripts": [
     {

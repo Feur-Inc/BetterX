@@ -1,4 +1,12 @@
-import { definePlugin, Devs, notifications, TabRegistry, BETTERX_VERSION, OptionType } from "@betterx/core";
+import {
+  BETTERX_VERSION,
+  Devs,
+  OptionType,
+  TabRegistry,
+  definePlugin,
+  getSettingsModal,
+  notifications,
+} from "@betterx/core";
 
 type NotifPos = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
@@ -21,9 +29,9 @@ export default definePlugin({
       default: "bottom-right",
       options: [
         { label: "Bottom right", value: "bottom-right" },
-        { label: "Bottom left",  value: "bottom-left"  },
-        { label: "Top right",    value: "top-right"    },
-        { label: "Top left",     value: "top-left"     },
+        { label: "Bottom left", value: "bottom-left" },
+        { label: "Top right", value: "top-right" },
+        { label: "Top left", value: "top-left" },
       ],
       onChange(pos) {
         applyPosition(pos as NotifPos);
@@ -34,6 +42,9 @@ export default definePlugin({
       label: "Notification duration (ms)",
       description: "How long notifications stay visible. Set to 0 to keep them until dismissed.",
       default: 5000,
+      min: 0,
+      max: 3_600_000,
+      step: 500,
       onChange(ms) {
         notifications.setDefaultDuration(ms as number);
       },
@@ -46,7 +57,7 @@ export default definePlugin({
       onChange(enabled) {
         TabRegistry.setTabHidden("developer", !enabled);
         // If the modal is open, close it so the tab list rebuilds on next open
-        document.getElementById("betterx-modal-overlay")?.remove();
+        getSettingsModal()?.close(true);
       },
     },
   },

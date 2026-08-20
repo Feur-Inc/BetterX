@@ -1,7 +1,7 @@
-import browser from "webextension-polyfill";
 import type { IStorage } from "@betterx/core";
 import type { PluginStorageData } from "@betterx/core";
 import type { ThemeStorageState } from "@betterx/core";
+import browser from "webextension-polyfill";
 
 // ─── Extension Storage (IStorage impl) ───────────────────────────────────────
 // Plugin states + theme metadata → browser.storage.sync

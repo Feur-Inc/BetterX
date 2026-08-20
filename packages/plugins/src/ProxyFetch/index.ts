@@ -1,5 +1,5 @@
-import { definePlugin, Devs, proxyFetch, proxyImage } from "@betterx/core";
-import type { ProxyFetchResult, ProxyFetchInit } from "@betterx/core";
+import { Devs, definePlugin, proxyFetch, proxyImage } from "@betterx/core";
+import type { ProxyFetchInit, ProxyFetchResult } from "@betterx/core";
 
 // ─── BxFetch API ──────────────────────────────────────────────────────────────
 // Re-exported from this module so dependent plugins have a single import point
@@ -19,19 +19,18 @@ export type BxFetchOptions = ProxyFetchInit & {
 async function fetchOnce(url: string, opts: BxFetchOptions): Promise<ProxyFetchResult> {
   const { timeout = 15_000, retries: _r, retryDelay: _d, ...init } = opts;
 
-  const timeoutId = timeout > 0
-    ? setTimeout(() => { /* can't abort proxyFetch, but we reject below */ }, timeout)
-    : null;
+  if (timeout <= 0) return proxyFetch(url, init);
 
-  const race = Promise.race([
-    proxyFetch(url, init),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Request timed out after ${timeout}ms`)), timeout)
-    ),
-  ]);
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error(`Request timed out after ${timeout}ms`)),
+      timeout
+    );
+  });
 
   try {
-    return await race;
+    return await Promise.race([proxyFetch(url, init), timeoutPromise]);
   } finally {
     if (timeoutId !== null) clearTimeout(timeoutId);
   }

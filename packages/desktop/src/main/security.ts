@@ -1,24 +1,35 @@
-import { session } from "electron";
+import type { Session } from "electron";
+import { patchBetterXCSP } from "./csp.js";
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 
 /**
- * Configure Content-Security-Policy to allow the betterx:// script protocol
- * while keeping X.com's existing CSP otherwise intact.
+ * Configure X's Content-Security-Policy for BetterX's main-world patches and
+ * external plugin images while keeping the remaining directives intact.
  *
- * Twitter's CSP already includes 'unsafe-inline' in script-src, but that
- * directive is suppressed whenever a nonce is present in the list. We strip
- * the nonce so 'unsafe-inline' becomes active again - this lets the preload
- * inject its sensitive-media patch script without fighting the nonce system.
- * All other CSP directives (connect-src, frame-src, etc.) are kept intact.
+ * X includes a nonce alongside unsafe-inline, which makes Chromium ignore
+ * unsafe-inline and blocks BetterX's main-world patches. Strip only nonce
+ * sources from X's script directives and extend image sources for BetterX.
  */
-export function setupCSP(): void {
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+const configuredSessions = new WeakSet<Session>();
+
+export function setupCSP(targetSession: Session): void {
+  if (configuredSessions.has(targetSession)) return;
+  configuredSessions.add(targetSession);
+  targetSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = { ...details.responseHeaders };
 
     // Only patch X.com / Twitter CSP
-    const url = details.url;
-    if (!url.includes("x.com") && !url.includes("twitter.com")) {
+    let trustedXResponse = false;
+    try {
+      const parsed = new URL(details.url);
+      trustedXResponse =
+        parsed.protocol === "https:" &&
+        (parsed.hostname === "x.com" || parsed.hostname === "twitter.com");
+    } catch {
+      trustedXResponse = false;
+    }
+    if (!trustedXResponse) {
       callback({ responseHeaders });
       return;
     }
@@ -30,17 +41,11 @@ export function setupCSP(): void {
     if (cspKey) {
       const existing = responseHeaders[cspKey];
       if (Array.isArray(existing)) {
-        responseHeaders[cspKey] = existing.map((directive) =>
-          directive
-            .replace("script-src", "script-src betterx:")
-            // Strip the per-load nonce - 'unsafe-inline' is already present but
-            // is ignored by browsers when any nonce/hash is in the list.
-            .replace(/'nonce-[^']+'\s*/g, "")
-            // Allow any HTTPS image - plugins load from GitHub, cataas, unavatar, etc.
-            .replace("img-src", "img-src betterx: https:")
-            // Allow plugins to reach external APIs (e.g. bsky.social for BlueSkyFeed).
-            .replace(/\bconnect-src\b/, "connect-src https://bsky.social")
-        );
+        responseHeaders[cspKey] = existing.map((directive) => patchBetterXCSP(directive));
+      } else if (typeof existing === "string") {
+        // Electron currently types response header values as arrays, but keep
+        // this compatible with Chromium versions that surface a single value.
+        responseHeaders[cspKey] = [patchBetterXCSP(existing)];
       }
     }
 

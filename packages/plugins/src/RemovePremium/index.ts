@@ -1,4 +1,4 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 import { DOMObserver } from "../SharedObserver/index.js";
 
 const SELECTORS = [
@@ -17,6 +17,22 @@ const SELECTORS = [
 ];
 
 let premiumUnsub: (() => void) | null = null;
+let premiumSetupTimer: ReturnType<typeof setTimeout> | null = null;
+let premiumDomReady: (() => void) | null = null;
+const hiddenElements = new Map<HTMLElement, { display: string; width: string; height: string }>();
+
+function hideElement(element: HTMLElement): void {
+  if (!hiddenElements.has(element)) {
+    hiddenElements.set(element, {
+      display: element.style.display,
+      width: element.style.width,
+      height: element.style.height,
+    });
+  }
+  element.style.display = "none";
+  element.style.width = "0px";
+  element.style.height = "0px";
+}
 
 export default definePlugin({
   name: "RemovePremium",
@@ -26,32 +42,27 @@ export default definePlugin({
 
   start() {
     const removeElements = (): void => {
+      for (const element of hiddenElements.keys()) {
+        if (!element.isConnected) hiddenElements.delete(element);
+      }
       for (const selector of SELECTORS) {
-        document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+        for (const el of document.querySelectorAll<HTMLElement>(selector)) {
           const parent = el.closest<HTMLElement>(".r-1ifxtd0");
-          const target = parent ?? el;
-          target.style.display = "none";
-          target.style.width = "0px";
-          target.style.height = "0px";
-        });
+          hideElement(parent ?? el);
+        }
       }
 
-      document.querySelectorAll<HTMLElement>(".r-1ifxtd0").forEach((el) => {
+      for (const el of document.querySelectorAll<HTMLElement>(".r-1ifxtd0")) {
         if (el.textContent?.includes("Access your post analytics")) {
-          el.style.display = "none";
-          el.style.width = "0px";
-          el.style.height = "0px";
+          hideElement(el);
         }
-      });
+      }
 
-      document.querySelectorAll<HTMLElement>('[role="complementary"].r-eqz5dr').forEach((el) => {
+      for (const el of document.querySelectorAll<HTMLElement>('[role="complementary"].r-eqz5dr')) {
         if (!el.querySelector("ul")) {
-          const target = el.parentElement ?? el;
-          target.style.display = "none";
-          target.style.width = "0px";
-          target.style.height = "0px";
+          hideElement(el.parentElement ?? el);
         }
-      });
+      }
     };
 
     const setup = (): void => {
@@ -60,38 +71,27 @@ export default definePlugin({
     };
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => setTimeout(setup, 400));
+      premiumDomReady = () => {
+        premiumSetupTimer = setTimeout(setup, 400);
+      };
+      document.addEventListener("DOMContentLoaded", premiumDomReady, { once: true });
     } else {
-      setTimeout(setup, 400);
+      premiumSetupTimer = setTimeout(setup, 400);
     }
   },
 
   stop() {
     premiumUnsub?.();
     premiumUnsub = null;
-    for (const selector of SELECTORS) {
-      document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
-        const parent = el.closest<HTMLElement>(".r-1ifxtd0");
-        const target = parent ?? el;
-        target.style.removeProperty("display");
-        target.style.removeProperty("width");
-        target.style.removeProperty("height");
-      });
+    if (premiumSetupTimer) clearTimeout(premiumSetupTimer);
+    premiumSetupTimer = null;
+    if (premiumDomReady) document.removeEventListener("DOMContentLoaded", premiumDomReady);
+    premiumDomReady = null;
+    for (const [element, original] of hiddenElements) {
+      element.style.display = original.display;
+      element.style.width = original.width;
+      element.style.height = original.height;
     }
-    document.querySelectorAll<HTMLElement>(".r-1ifxtd0").forEach((el) => {
-      if (el.textContent?.includes("Access your post analytics")) {
-        el.style.removeProperty("display");
-        el.style.removeProperty("width");
-        el.style.removeProperty("height");
-      }
-    });
-    document.querySelectorAll<HTMLElement>('[role="complementary"].r-eqz5dr').forEach((el) => {
-      if (!el.querySelector("ul")) {
-        const target = el.parentElement ?? el;
-        target.style.removeProperty("display");
-        target.style.removeProperty("width");
-        target.style.removeProperty("height");
-      }
-    });
+    hiddenElements.clear();
   },
 });

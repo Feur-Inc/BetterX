@@ -1,6 +1,6 @@
-import { build } from "vite";
-import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "vite";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const outDir = resolve(root, "app/src/main/assets/betterx");
@@ -31,8 +31,16 @@ const shared = {
 
 const entries = [
   { file: resolve(root, "src/content/index.ts"), out: "content.js", name: "BetterXAndroidContent" },
-  { file: resolve(root, "src/content/main-world.ts"), out: "main-world.js", name: "BetterXAndroidMainWorld" },
-  { file: resolve(root, "src/content/early-logo.ts"), out: "early-logo.js", name: "BetterXAndroidEarlyLogo" },
+  {
+    file: resolve(root, "src/content/main-world.ts"),
+    out: "main-world.js",
+    name: "BetterXAndroidMainWorld",
+  },
+  {
+    file: resolve(root, "src/content/early-logo.ts"),
+    out: "early-logo.js",
+    name: "BetterXAndroidEarlyLogo",
+  },
 ];
 
 const [firstEntry, ...remainingEntries] = entries;
@@ -41,7 +49,7 @@ await build({
   ...shared,
   build: {
     ...shared.build,
-    emptyOutDir: true,
+    emptyOutDir: false,
     lib: {
       entry: firstEntry.file,
       formats: ["iife"],

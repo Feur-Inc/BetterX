@@ -1,5 +1,5 @@
-import { defineConfig, type UserConfig } from "vite";
-import { resolve } from "path";
+import { resolve } from "node:path";
+import { type UserConfig, defineConfig } from "vite";
 
 export default defineConfig({
   build: {

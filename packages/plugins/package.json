@@ -8,12 +8,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "vite build && rm -f tsconfig.tsbuildinfo && tsc --emitDeclarationOnly --outDir dist",
+    "build": "vite build && tsc --build --force",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit"
   },

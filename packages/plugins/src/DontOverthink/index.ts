@@ -1,4 +1,4 @@
-import { definePlugin, Devs, OptionType } from "@betterx/core";
+import { Devs, OptionType, definePlugin } from "@betterx/core";
 
 let dontOverthinkObserver: MutationObserver | null = null;
 const dontOverthinkTimers = new Set<ReturnType<typeof setInterval>>();
@@ -12,6 +12,8 @@ export default definePlugin({
     timerDuration: {
       type: OptionType.NUMBER,
       default: 10,
+      min: 1,
+      max: 300,
       label: "Timer duration (seconds)",
       description: "How long to wait before auto-posting (1–300 seconds)",
     },
@@ -21,19 +23,29 @@ export default definePlugin({
     const getDuration = (): number => this.settings.store.timerDuration ?? 10;
 
     const addTimer = (composerBox: Element): void => {
-      if (composerBox.parentElement?.querySelector("#betterx-tweet-timer")) return;
+      if (composerBox.parentElement?.querySelector("[data-betterx-tweet-timer]")) return;
       const timerDiv = document.createElement("div");
-      timerDiv.id = "betterx-tweet-timer";
+      timerDiv.dataset.betterxTweetTimer = "1";
       timerDiv.style.cssText =
         "color:rgb(29,155,240);font-size:14px;font-weight:700;margin-top:10px;font-family:TwitterChirp,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
       composerBox.parentElement?.insertBefore(timerDiv, composerBox.nextSibling);
 
       let timerId: ReturnType<typeof setInterval> | null = null;
 
+      const findPostButton = (): HTMLButtonElement | null => {
+        let scope: Element | null = composerBox.parentElement;
+        while (scope && scope !== document.body) {
+          const button = scope.querySelector<HTMLButtonElement>(
+            '[data-testid="tweetButton"],[data-testid="tweetButtonInline"]'
+          );
+          if (button) return button;
+          scope = scope.parentElement;
+        }
+        return null;
+      };
+
       const checkAndStart = setInterval(() => {
-        const btn = document.querySelector<HTMLButtonElement>(
-          '[data-testid="tweetButton"],[data-testid="tweetButtonInline"]'
-        );
+        const btn = findPostButton();
         if (btn && !btn.disabled) {
           if (!timerId) {
             let left = getDuration();
@@ -64,10 +76,11 @@ export default definePlugin({
     };
 
     const checkForComposer = (): void => {
-      const box = document.querySelector('[data-testid="tweetTextarea_0"]');
-      if (box && !box.parentElement?.querySelector("#betterx-tweet-timer")) {
-        addTimer(box);
-      }
+      document
+        .querySelectorAll('[data-testid="tweetTextarea_0"],[data-testid="tweetTextarea_1"]')
+        .forEach((box) => {
+          if (!box.parentElement?.querySelector("[data-betterx-tweet-timer]")) addTimer(box);
+        });
     };
 
     dontOverthinkObserver = new MutationObserver(checkForComposer);
@@ -82,6 +95,6 @@ export default definePlugin({
     dontOverthinkObserver = null;
     for (const id of dontOverthinkTimers) clearInterval(id);
     dontOverthinkTimers.clear();
-    document.getElementById("betterx-tweet-timer")?.remove();
+    document.querySelectorAll("[data-betterx-tweet-timer]").forEach((timer) => timer.remove());
   },
 });

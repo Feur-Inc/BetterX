@@ -3,31 +3,32 @@
 // Has access to window.electronAPI via contextBridge.
 
 import {
-  PluginManager,
-  ThemeManager,
-  NotificationManager,
-  TabRegistry,
-  PluginsTab,
-  ThemesTab,
+  AboutTab,
+  type BetterXContext,
   CloudTab,
   DeveloperTab,
-  AboutTab,
-  SettingsModal,
-  type BetterXContext,
-  injectNavButton,
-  watchNavButton,
-  applyAccentColor,
-  injectStyle,
-  notifications,
-  logger,
-  setFetchProxy,
+  NotificationManager,
+  PluginManager,
+  PluginsTab,
   type ProxyFetchInit,
+  SettingsModal,
+  TabRegistry,
+  ThemeManager,
+  ThemesTab,
+  applyAccentColor,
+  injectNavButton,
+  injectStyle,
+  logger,
+  notifications,
+  setFetchProxy,
+  startCloudAutoSync,
+  watchNavButton,
 } from "@betterx/core";
 import { BETTERX_STYLES } from "@betterx/core";
 import { allPlugins } from "@betterx/plugins";
-import { DesktopStorage } from "./platform.js";
 import { DesktopTab } from "./desktop-tab.js";
 import { startPageTracker } from "./page-tracker.js";
+import { DesktopStorage } from "./platform.js";
 
 let initialized = false;
 
@@ -52,9 +53,14 @@ async function init(): Promise<void> {
 
   // 5. Wire up proxy fetch BEFORE initializing plugins so proxyFetch() works
   //    inside plugin start() hooks (cloudFetch routes through main process, bypassing X's CSP)
+  const electronAPI = window.electronAPI;
+  if (!electronAPI) throw new Error("BetterX desktop API is unavailable");
   setFetchProxy(async (url: string, init?: ProxyFetchInit) => {
     const u = new URL(url);
-    return window.electronAPI!.cloudFetch(u.origin, u.pathname + u.search, init);
+    if (["/api/config", "/api/me", "/auth/logout"].includes(u.pathname)) {
+      return electronAPI.cloudFetch(u.origin, u.pathname + u.search, init);
+    }
+    return electronAPI.proxyFetch(u.toString(), init);
   });
 
   // 6. Init plugins
@@ -72,9 +78,11 @@ async function init(): Promise<void> {
     storage,
     logoUrl,
     platform: "desktop",
-    openThemesFolder: () => { window.electronAPI?.themes.openFolder(); },
-    openOAuth: (url: string) => window.electronAPI!.openOAuth(url),
-    onOAuthComplete: (cb: () => void) => window.electronAPI!.onOAuthComplete(cb),
+    openThemesFolder: () => {
+      window.electronAPI?.themes.openFolder();
+    },
+    openOAuth: (url: string) => electronAPI.openOAuth(url),
+    onOAuthComplete: (cb: () => void) => electronAPI.onOAuthComplete(cb),
   };
   TabRegistry.register(PluginsTab);
   TabRegistry.register(ThemesTab);
@@ -82,25 +90,21 @@ async function init(): Promise<void> {
   TabRegistry.register(DesktopTab);
   TabRegistry.register(DeveloperTab);
   TabRegistry.register(AboutTab);
+  startCloudAutoSync(ctx);
 
   // 8. Modal
   const modal = new SettingsModal(ctx);
   const openModal = (): void => modal.toggle();
 
   // Expose for tray "Settings" menu item
-  (window as typeof window & { __betterx_open_settings?: () => void }).__betterx_open_settings = () => modal.open();
+  (window as typeof window & { __betterx_open_settings?: () => void }).__betterx_open_settings =
+    () => modal.open();
 
   // 9. Nav button
   injectNavButton(openModal, logoUrl);
   watchNavButton(openModal, logoUrl);
 
-  // 11. Listen for bundle updates from main process
-  window.electronAPI?.update?.onBundleApplied(() => {
-    notifications.showInfo("BetterX bundle updated. Refreshing...", { duration: 3000 });
-    setTimeout(() => window.location.reload(), 3000);
-  });
-
-  // 12. Page tracker (Discord RPC)
+  // 11. Page tracker (Discord RPC)
   startPageTracker();
 
   logger.info("BetterX Desktop initialized ✓");

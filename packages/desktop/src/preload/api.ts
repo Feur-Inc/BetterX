@@ -20,13 +20,6 @@ export type ElectronAPI = {
     chooseBundlePath(): Promise<string | null>;
   };
 
-  // Updates
-  update: {
-    checkBundle(): Promise<{ updateAvailable: boolean; remoteHash?: string }>;
-    applyBundle(remoteHash: string): Promise<void>;
-    onBundleApplied(callback: () => void): () => void;
-  };
-
   // Screenshot capture
   captureElement(rect: { x: number; y: number; width: number; height: number }): Promise<string>;
 
@@ -41,7 +34,21 @@ export type ElectronAPI = {
   onOAuthComplete(callback: () => void): () => void;
 
   // Cloud Sync proxy (bypasses CSP by routing through main process)
-  cloudFetch(serverUrl: string, path: string, options?: { method?: string; body?: string; headers?: Record<string, string> }): Promise<{
+  cloudFetch(
+    serverUrl: string,
+    path: string,
+    options?: { method?: string; body?: string; headers?: Record<string, string> }
+  ): Promise<{
+    ok: boolean;
+    status: number;
+    json: unknown;
+    text: string;
+  }>;
+
+  proxyFetch(
+    url: string,
+    options?: { method?: string; body?: string; headers?: Record<string, string> }
+  ): Promise<{
     ok: boolean;
     status: number;
     json: unknown;

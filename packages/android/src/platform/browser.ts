@@ -1,4 +1,4 @@
-import { getBridge, requestNative, type NativePayload } from "./native-bridge.js";
+import { type NativePayload, getBridge, requestNative } from "./native-bridge.js";
 
 type StorageAreaName = "sync" | "local";
 
@@ -73,9 +73,10 @@ function emitStorageChange(area: StorageAreaName, changes: Record<string, Storag
   }
 }
 
-function normalizeKeyInput(
-  keys: string | string[] | Record<string, unknown> | undefined,
-): { keys?: string[]; defaults?: Record<string, unknown> } {
+function normalizeKeyInput(keys: string | string[] | Record<string, unknown> | undefined): {
+  keys?: string[];
+  defaults?: Record<string, unknown>;
+} {
   if (typeof keys === "string") return { keys: [keys] };
   if (Array.isArray(keys)) return { keys };
   if (isObject(keys)) return { keys: Object.keys(keys), defaults: keys };
@@ -85,7 +86,7 @@ function normalizeKeyInput(
 function fillRequestedKeys(
   requested: string[] | undefined,
   defaults: Record<string, unknown> | undefined,
-  result: Record<string, unknown>,
+  result: Record<string, unknown>
 ): Record<string, unknown> {
   if (requested) {
     for (const key of requested) {
@@ -100,9 +101,14 @@ function fillRequestedKeys(
   return result;
 }
 
-async function readStorage(area: StorageAreaName, keys?: string[]): Promise<Record<string, unknown>> {
+async function readStorage(
+  area: StorageAreaName,
+  keys?: string[]
+): Promise<Record<string, unknown>> {
   if (getBridge()) {
-    return (await requestNative<Record<string, unknown>>({ type: "STORAGE_GET", area, keys })) ?? {};
+    return (
+      (await requestNative<Record<string, unknown>>({ type: "STORAGE_GET", area, keys })) ?? {}
+    );
   }
 
   const allKeys = keys ?? listLocalKeys(area);
@@ -165,24 +171,32 @@ async function proxyImage(url: string): Promise<string> {
 
 async function proxyFetch(
   url: string,
-  init?: { method?: string | undefined; headers?: Record<string, string> | undefined; body?: string | undefined },
+  init?: {
+    method?: string | undefined;
+    headers?: Record<string, string> | undefined;
+    body?: string | undefined;
+    credentials?: "include" | "omit" | undefined;
+  }
 ) {
   if (getBridge()) {
-    return (await requestNative<{ ok: boolean; status: number; text: string; json: unknown }>({
-      type: "PROXY_FETCH",
-      url,
-      method: init?.method,
-      headers: init?.headers,
-      body: init?.body,
-    })) ?? { ok: false, status: 0, text: "", json: null };
+    return (
+      (await requestNative<{ ok: boolean; status: number; text: string; json: unknown }>({
+        type: "PROXY_FETCH",
+        url,
+        method: init?.method,
+        headers: init?.headers,
+        body: init?.body,
+        credentials: init?.credentials,
+      })) ?? { ok: false, status: 0, text: "", json: null }
+    );
   }
 
-    const requestInit: RequestInit = { credentials: "include" };
-    if (init?.method) requestInit.method = init.method;
-    if (init?.headers) requestInit.headers = init.headers;
-    if (init?.body !== undefined) requestInit.body = init.body;
+  const requestInit: RequestInit = { credentials: init?.credentials ?? "omit" };
+  if (init?.method) requestInit.method = init.method;
+  if (init?.headers) requestInit.headers = init.headers;
+  if (init?.body !== undefined) requestInit.body = init.body;
 
-    const res = await fetch(url, requestInit);
+  const res = await fetch(url, requestInit);
 
   const text = await res.text();
   let json: unknown = null;
@@ -205,9 +219,7 @@ async function openExternalUrl(url: string): Promise<void> {
 }
 
 function matchesPattern(url: string, pattern: string): boolean {
-  const escaped = pattern
-    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-    .replace(/\\\*/g, ".*");
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*");
   return new RegExp(`^${escaped}$`).test(url);
 }
 
@@ -227,8 +239,11 @@ const browser = {
       if (message?.type === "PROXY_FETCH" && typeof message.url === "string") {
         return await proxyFetch(message.url, {
           method: typeof message.method === "string" ? message.method : undefined,
-          headers: isObject(message.headers) ? Object.fromEntries(Object.entries(message.headers).map(([k, v]) => [k, String(v)])) : undefined,
+          headers: isObject(message.headers)
+            ? Object.fromEntries(Object.entries(message.headers).map(([k, v]) => [k, String(v)]))
+            : undefined,
           body: typeof message.body === "string" ? message.body : undefined,
+          credentials: message.credentials === "include" ? "include" : "omit",
         });
       }
       if (message?.type === "OPEN_URL" && typeof message.url === "string") {

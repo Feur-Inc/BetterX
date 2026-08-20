@@ -1,4 +1,4 @@
-import { definePlugin, Devs, OptionType, injectStyle, removeStyle } from "@betterx/core";
+import { Devs, definePlugin, injectStyle, removeStyle } from "@betterx/core";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -91,16 +91,17 @@ let currentNav: HTMLElement | null = null;
  *  first before searching children. */
 function getItemId(el: HTMLElement): string {
   // Direct attributes (current Twitter layout: <a href="..."> or <button data-testid="...">)
-  if (el.getAttribute("href")) return el.getAttribute("href")!;
-  if (el.getAttribute("data-testid")) return el.getAttribute("data-testid")!;
-  if (el.getAttribute("aria-label")) return el.getAttribute("aria-label")!;
+  for (const attribute of ["href", "data-testid", "aria-label"]) {
+    const value = el.getAttribute(attribute);
+    if (value) return value;
+  }
   // Child search fallback (older layouts with <li> wrappers)
   const link = el.querySelector("a[href]");
-  if (link) return link.getAttribute("href")!;
+  if (link) return link.getAttribute("href") ?? "";
   const testId = el.querySelector("[data-testid]");
-  if (testId) return testId.getAttribute("data-testid")!;
+  if (testId) return testId.getAttribute("data-testid") ?? "";
   const label = el.querySelector("[aria-label]");
-  if (label) return label.getAttribute("aria-label")!;
+  if (label) return label.getAttribute("aria-label") ?? "";
   return "";
 }
 
@@ -442,20 +443,9 @@ export default definePlugin({
   name: "MenuReorder",
   description: "Drag-and-drop reordering and hiding of navigation menu items",
   authors: [Devs.TPM28, Devs.Mopi],
-  options: {
-    enableReordering: {
-      type: OptionType.BOOLEAN,
-      default: true,
-      label: "Enable reordering",
-      description: "Allow menu items to be reordered by drag and drop",
-    },
-  },
-
   start() {
     injectStyle(CSS, STYLE_ID);
     hiddenIds = loadHidden();
-
-    if (!this.settings.store.enableReordering) return;
 
     const tryInit = (): void => {
       const nav = findNav();

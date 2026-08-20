@@ -1,4 +1,4 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 import { DOMObserver } from "../SharedObserver/index.js";
 
 type RemovedElement = {
@@ -39,16 +39,14 @@ export default definePlugin({
       }
 
       // "Trends for you" - only target regions whose label indicates trending content
-      document
-        .querySelectorAll<HTMLElement>('div[role="region"][aria-label]')
-        .forEach((region) => {
-          const label = region.getAttribute("aria-label") ?? "";
-          if (/trend/i.test(label) && region.parentNode) {
-            const { parentNode, nextSibling } = region;
-            parentNode.removeChild(region);
-            noTrendingRemoved.push({ element: region, parent: parentNode, nextSibling });
-          }
-        });
+      document.querySelectorAll<HTMLElement>('div[role="region"][aria-label]').forEach((region) => {
+        const label = region.getAttribute("aria-label") ?? "";
+        if (/trend/i.test(label) && region.parentNode) {
+          const { parentNode, nextSibling } = region;
+          parentNode.removeChild(region);
+          noTrendingRemoved.push({ element: region, parent: parentNode, nextSibling });
+        }
+      });
     };
 
     removeTrending();
@@ -68,7 +66,8 @@ export default definePlugin({
     noTrendingDebounce = null;
 
     for (const { element, parent, nextSibling } of noTrendingRemoved) {
-      if (nextSibling) {
+      if (!(parent as Node).isConnected) continue;
+      if (nextSibling?.parentNode === parent) {
         parent.insertBefore(element, nextSibling);
       } else {
         (parent as Element).appendChild(element);

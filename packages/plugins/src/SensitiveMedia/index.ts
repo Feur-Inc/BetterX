@@ -1,4 +1,11 @@
-import { definePlugin, Devs, OptionType, notifications, injectStyle, removeStyle } from "@betterx/core";
+import {
+  Devs,
+  OptionType,
+  definePlugin,
+  injectStyle,
+  notifications,
+  removeStyle,
+} from "@betterx/core";
 
 const BLUR_CSS = `
 /* Blur the entire media container for sensitive tweets */
@@ -33,13 +40,10 @@ export default definePlugin({
       description: "Keep sensitive media blurred and reveal on hover instead of showing directly",
       onChange(value) {
         localStorage.setItem("betterx:sensitiveMedia:blur", value ? "1" : "0");
-        notifications.showWarning(
-          `"SensitiveMedia" requires a page refresh to apply.`,
-          {
-            duration: 0,
-            actions: [{ label: "Refresh now", callback: () => location.reload() }],
-          },
-        );
+        notifications.showWarning(`"SensitiveMedia" requires a page refresh to apply.`, {
+          duration: 0,
+          actions: [{ label: "Refresh now", callback: () => location.reload() }],
+        });
       },
     },
   },

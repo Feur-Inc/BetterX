@@ -1,22 +1,27 @@
-import { definePlugin, Devs, OptionType } from "@betterx/core";
+import { Devs, OptionType, definePlugin } from "@betterx/core";
 
 const STYLE_ID = "betterx-custom-accent-color";
 const DEFAULT_COLOR = "#1d9bf0";
 
 // X.com's known accent colors (all six choices available in settings)
 const X_ACCENT_COLORS = [
-  "29, 155, 240",  // blue  #1d9bf0
-  "255, 212, 0",   // yellow #ffd400
-  "249, 24, 128",  // magenta #f91880
-  "120, 86, 255",  // purple #7856ff
-  "255, 122, 0",   // orange #ff7a00
-  "0, 186, 124",   // green #00ba7c
+  "29, 155, 240", // blue  #1d9bf0
+  "255, 212, 0", // yellow #ffd400
+  "249, 24, 128", // magenta #f91880
+  "120, 86, 255", // purple #7856ff
+  "255, 122, 0", // orange #ff7a00
+  "0, 186, 124", // green #00ba7c
 ];
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = hex.replace("#", "").match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-  if (!m) return null;
-  return { r: parseInt(m[1]!, 16), g: parseInt(m[2]!, 16), b: parseInt(m[3]!, 16) };
+  const [, red, green, blue] = m ?? [];
+  if (!red || !green || !blue) return null;
+  return {
+    r: Number.parseInt(red, 16),
+    g: Number.parseInt(green, 16),
+    b: Number.parseInt(blue, 16),
+  };
 }
 
 function buildCSS(color: string): string {
@@ -37,9 +42,9 @@ function buildCSS(color: string): string {
     (c) => `[style*="border-color: rgb(${c})"]`
   ).join(",\n");
 
-  const inlineStrokeSelectors = X_ACCENT_COLORS.map(
-    (c) => `[style*="stroke: rgb(${c})"]`
-  ).join(",\n");
+  const inlineStrokeSelectors = X_ACCENT_COLORS.map((c) => `[style*="stroke: rgb(${c})"]`).join(
+    ",\n"
+  );
 
   return `
 /* ── BetterX Custom Accent Color ─────────────────────────────────────────── */

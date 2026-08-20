@@ -1,4 +1,4 @@
-import type { SettingsTab, BetterXContext } from "@betterx/core";
+import type { BetterXContext, SettingsTab } from "@betterx/core";
 
 // ─── Desktop Settings Tab ─────────────────────────────────────────────────────
 
@@ -72,52 +72,57 @@ export const DesktopTab: SettingsTab = {
     // ── App Behaviour ──────────────────────────────────────────────────────────
     const appSection = makeSection("App Behaviour");
 
-    api.settings.getAll().then((settings) => {
-      const rows: Array<{ key: string; label: string; desc: string; restart?: boolean }> = [
-        {
-          key: "minimizeToTray",
-          label: "Minimize to tray on close",
-          desc: "Clicking × hides the window to the system tray instead of quitting.",
-        },
-        {
-          key: "startMinimized",
-          label: "Start minimized",
-          desc: "Launch BetterX in the background without showing the window.",
-        },
-        {
-          key: "checkForUpdates",
-          label: "Check for updates on start",
-          desc: "Automatically download and apply BetterX bundle updates at launch.",
-        },
-        {
-          key: "enableTransparency",
-          label: "Window transparency",
-          desc: "Makes the window background transparent.",
-          restart: true,
-        },
-        {
-          key: "enableDiscordRPC",
-          label: "Discord Rich Presence",
-          desc: "Show your current X activity as Discord status.",
-        },
-      ];
+    api.settings
+      .getAll()
+      .then((settings) => {
+        const rows: Array<{ key: string; label: string; desc: string; restart?: boolean }> = [
+          {
+            key: "minimizeToTray",
+            label: "Minimize to tray on close",
+            desc: "Clicking × hides the window to the system tray instead of quitting.",
+          },
+          {
+            key: "startMinimized",
+            label: "Start minimized",
+            desc: "Launch BetterX in the background without showing the window.",
+          },
+          {
+            key: "autoStart",
+            label: "Launch at login",
+            desc: "Start BetterX automatically when you sign in.",
+          },
+          {
+            key: "enableTransparency",
+            label: "Window transparency",
+            desc: "Makes the window background transparent.",
+            restart: true,
+          },
+          {
+            key: "enableDiscordRPC",
+            label: "Discord Rich Presence",
+            desc: "Show your current X activity as Discord status.",
+          },
+        ];
 
-      for (const { key, label, desc, restart } of rows) {
-        const row = makeToggleRow(
-          label,
-          desc,
-          (settings[key] as boolean) ?? false,
-          restart ?? false,
-          (val) => { api.settings.set(key, val).catch(console.error); }
-        );
-        appSection.appendChild(row);
-      }
-    }).catch(() => {
-      const err = document.createElement("p");
-      err.className = "betterx-option-description";
-      err.textContent = "Failed to load settings.";
-      appSection.appendChild(err);
-    });
+        for (const { key, label, desc, restart } of rows) {
+          const row = makeToggleRow(
+            label,
+            desc,
+            (settings[key] as boolean) ?? false,
+            restart ?? false,
+            (val) => {
+              api.settings.set(key, val).catch(console.error);
+            }
+          );
+          appSection.appendChild(row);
+        }
+      })
+      .catch(() => {
+        const err = document.createElement("p");
+        err.className = "betterx-option-description";
+        err.textContent = "Failed to load settings.";
+        appSection.appendChild(err);
+      });
 
     // ── Bundle ─────────────────────────────────────────────────────────────────
     const bundleSection = makeSection("Bundle");
@@ -126,9 +131,12 @@ export const DesktopTab: SettingsTab = {
     pathDisplay.className = "betterx-bundle-path";
     pathDisplay.textContent = "Loading…";
 
-    api.settings.get("bundlePath").then((p) => {
-      pathDisplay.textContent = (p as string) || "(default built-in bundle)";
-    }).catch(() => {});
+    api.settings
+      .get("bundlePath")
+      .then((p) => {
+        pathDisplay.textContent = (p as string) || "(default built-in bundle)";
+      })
+      .catch(() => {});
 
     const bundleBtns = document.createElement("div");
     bundleBtns.className = "betterx-dev-actions";
@@ -161,30 +169,6 @@ export const DesktopTab: SettingsTab = {
     const actionBtns = document.createElement("div");
     actionBtns.className = "betterx-dev-actions";
 
-    const checkBtn = document.createElement("button");
-    checkBtn.className = "betterx-btn betterx-btn-secondary";
-    checkBtn.textContent = "Check for updates";
-    checkBtn.addEventListener("click", async () => {
-      checkBtn.disabled = true;
-      checkBtn.textContent = "Checking…";
-      try {
-        const result = await api.update?.checkBundle();
-        if (result?.updateAvailable && result.remoteHash) {
-          ctx.notifications.showInfo("Update found! Downloading…");
-          await api.update?.applyBundle(result.remoteHash);
-          ctx.notifications.showSuccess("Bundle updated! Reloading in 2s…");
-          setTimeout(() => window.location.reload(), 2000);
-        } else {
-          ctx.notifications.showSuccess("Already up to date!");
-        }
-      } catch {
-        ctx.notifications.showError("Update check failed.");
-      } finally {
-        checkBtn.disabled = false;
-        checkBtn.textContent = "Check for updates";
-      }
-    });
-
     const restartBtn = document.createElement("button");
     restartBtn.className = "betterx-btn betterx-btn-secondary";
     restartBtn.textContent = "Restart app";
@@ -192,7 +176,7 @@ export const DesktopTab: SettingsTab = {
       api.restart?.();
     });
 
-    actionBtns.append(checkBtn, restartBtn);
+    actionBtns.append(restartBtn);
     actionsSection.appendChild(actionBtns);
 
     container.append(appSection, bundleSection, actionsSection);

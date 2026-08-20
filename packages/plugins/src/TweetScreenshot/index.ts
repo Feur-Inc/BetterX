@@ -1,4 +1,4 @@
-import { definePlugin, Devs, notifications } from "@betterx/core";
+import { Devs, definePlugin, notifications } from "@betterx/core";
 
 const SCREENSHOT_BTN_HTML = `
 <button aria-label="Screenshot" role="button"
@@ -15,6 +15,7 @@ const SCREENSHOT_BTN_HTML = `
 `.trim();
 
 let screenshotObserver: MutationObserver | null = null;
+let screenshotFrame: number | null = null;
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header = "", b64 = ""] = dataUrl.split(",");
@@ -34,14 +35,21 @@ async function captureTweet(tweet: HTMLElement): Promise<void> {
   try {
     // Use html2canvas if available, otherwise notify that we need it
     const win = window as unknown as Record<string, unknown>;
-    const h2c = win["html2canvas"] as
+    const h2c = win.html2canvas as
       | ((el: HTMLElement, opts?: Record<string, unknown>) => Promise<HTMLCanvasElement>)
       | undefined;
 
     if (!h2c) {
       // In Electron, use the IPC capture API
-      const electronAPI = win["electronAPI"] as
-        | { captureElement?: (rect: { x: number; y: number; width: number; height: number }) => Promise<string> }
+      const electronAPI = win.electronAPI as
+        | {
+            captureElement?: (rect: {
+              x: number;
+              y: number;
+              width: number;
+              height: number;
+            }) => Promise<string>;
+          }
         | undefined;
 
       if (electronAPI?.captureElement) {
@@ -104,7 +112,9 @@ export default definePlugin({
       for (const m of mutations) {
         for (const node of m.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            (node as HTMLElement)
+            const element = node as HTMLElement;
+            if (element.matches('article[data-testid="tweet"]')) pending.add(element);
+            element
               .querySelectorAll<HTMLElement>('article[data-testid="tweet"]')
               .forEach((t) => pending.add(t));
           }
@@ -112,7 +122,8 @@ export default definePlugin({
       }
       if (!scheduled) {
         scheduled = true;
-        requestAnimationFrame(() => {
+        screenshotFrame = requestAnimationFrame(() => {
+          screenshotFrame = null;
           pending.forEach((t) => addScreenshotButton(t));
           pending.clear();
           scheduled = false;
@@ -128,6 +139,8 @@ export default definePlugin({
   stop() {
     screenshotObserver?.disconnect();
     screenshotObserver = null;
+    if (screenshotFrame !== null) cancelAnimationFrame(screenshotFrame);
+    screenshotFrame = null;
     document.querySelectorAll('[data-testid="bx-screenshot"]').forEach((btn) => btn.remove());
   },
 });

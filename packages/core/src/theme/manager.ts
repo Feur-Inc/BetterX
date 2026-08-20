@@ -7,6 +7,27 @@ import { processCSS } from "./processor.js";
 
 const STYLE_PREFIX = "betterx-theme-";
 
+/**
+ * BetterX themes historically overrode X's atomic utility classes by giving
+ * every ordinary declaration `!important`. Do this through the parsed CSSOM
+ * so multiline declarations, data URLs, nesting, and keyframes remain valid.
+ */
+export function prioritizeThemeRules(rules: CSSRuleList): void {
+  for (const rule of rules) {
+    if (rule.type === 1) {
+      const declaration = (rule as CSSStyleRule).style;
+      for (const property of declaration) {
+        if (declaration.getPropertyPriority(property) !== "important") {
+          declaration.setProperty(property, declaration.getPropertyValue(property), "important");
+        }
+      }
+    }
+
+    const nestedRules = (rule as CSSRule & { cssRules?: CSSRuleList }).cssRules;
+    if (nestedRules) prioritizeThemeRules(nestedRules);
+  }
+}
+
 export class ThemeManager {
   private storage: IStorage;
   private themes: Theme[] = [];
@@ -56,6 +77,11 @@ export class ThemeManager {
         if (theme.enabled) {
           this.applyToDom(theme);
         }
+      } else if (css) {
+        this.themes.push({ id, name: id.replace(/\.css$/i, ""), css, enabled: false });
+        void this.persistState().catch((error) =>
+          logger.warn(`ThemeManager: failed to register external theme "${id}"`, error)
+        );
       }
     });
 
@@ -64,6 +90,8 @@ export class ThemeManager {
 
   destroy(): void {
     this.unsubscribeStorage?.();
+    this.unsubscribeStorage = null;
+    for (const theme of this.themes) this.removeDom(theme.id);
   }
 
   getAll(): Theme[] {
@@ -78,6 +106,13 @@ export class ThemeManager {
     const id = this.uniqueId(name);
     await this.storage.writeTheme(id, css);
 
+    const externallyRegistered = this.themes.find((theme) => theme.id === id);
+    if (externallyRegistered) {
+      externallyRegistered.name = name;
+      externallyRegistered.css = css;
+      return externallyRegistered;
+    }
+
     const theme: Theme = { id, name, css, enabled: false };
     this.themes.push(theme);
     await this.persistState();
@@ -88,8 +123,8 @@ export class ThemeManager {
     const theme = this.themes.find((t) => t.id === id);
     if (!theme) return;
 
-    theme.css = css;
     await this.storage.writeTheme(id, css);
+    theme.css = css;
 
     if (theme.enabled) {
       this.applyToDom(theme);
@@ -123,9 +158,9 @@ export class ThemeManager {
 
   async reorder(ids: string[]): Promise<void> {
     const map = new Map(this.themes.map((t) => [t.id, t]));
-    this.themes = ids
-      .map((id) => map.get(id))
-      .filter((t): t is Theme => t !== undefined);
+    const reordered = ids.map((id) => map.get(id)).filter((t): t is Theme => t !== undefined);
+    const included = new Set(reordered.map((theme) => theme.id));
+    this.themes = [...reordered, ...this.themes.filter((theme) => !included.has(theme.id))];
 
     await this.persistState();
   }
@@ -141,6 +176,11 @@ export class ThemeManager {
       document.head.appendChild(style);
     }
     style.textContent = processed;
+    try {
+      if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
+    } catch (error) {
+      logger.warn(`ThemeManager: could not prioritize theme "${theme.id}"`, error);
+    }
   }
 
   private removeDom(id: string): void {
@@ -176,7 +216,10 @@ export class ThemeManager {
   }
 
   private uniqueId(name: string): string {
-    const base = name.trim().replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+    const base = name
+      .trim()
+      .replace(/[^a-z0-9_-]/gi, "_")
+      .toLowerCase();
     const id = base.endsWith(".css") ? base : `${base}.css`;
 
     if (!this.themes.some((t) => t.id === id)) return id;

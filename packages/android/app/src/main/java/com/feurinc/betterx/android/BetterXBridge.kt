@@ -9,23 +9,32 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 import java.io.File
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URL
 import java.nio.charset.Charset
 import java.util.Locale
 import java.util.concurrent.Executors
 
-class BetterXBridge(private val activity: Activity) {
+class BetterXBridge(private val activity: Activity, private val bridgeToken: String) {
   private val executor = Executors.newCachedThreadPool()
   private val syncPrefs = activity.getSharedPreferences("betterx_sync", Context.MODE_PRIVATE)
   private val localPrefs = activity.getSharedPreferences("betterx_local", Context.MODE_PRIVATE)
   private val themeDir = File(activity.filesDir, "betterx-themes").apply { mkdirs() }
 
   fun handle(messageJson: String, reply: (String) -> Unit) {
+    if (messageJson.length > MAX_MESSAGE_CHARS) {
+      reply(failure("", IllegalArgumentException("Bridge request is too large")))
+      return
+    }
     executor.execute {
       val id = runCatching { JSONObject(messageJson).optString("id") }.getOrDefault("")
       val response = runCatching {
         val request = JSONObject(messageJson)
+        if (request.optString("token") != bridgeToken) {
+          throw SecurityException("Invalid BetterX bridge capability")
+        }
         val type = request.optString("type")
         val result = when (type) {
           "STORAGE_GET" -> handleStorageGet(request)
@@ -44,7 +53,7 @@ class BetterXBridge(private val activity: Activity) {
   }
 
   private fun handleStorageGet(request: JSONObject): JSONObject {
-    val area = request.optString("area")
+    val area = requireStorageArea(request.optString("area"))
     val keys = request.optJSONArray("keys")
     val result = JSONObject()
 
@@ -63,7 +72,7 @@ class BetterXBridge(private val activity: Activity) {
   }
 
   private fun handleStorageSet(request: JSONObject): JSONObject {
-    val area = request.optString("area")
+    val area = requireStorageArea(request.optString("area"))
     val items = request.optJSONObject("items") ?: JSONObject()
 
     for (key in items.keys()) {
@@ -75,7 +84,7 @@ class BetterXBridge(private val activity: Activity) {
   }
 
   private fun handleStorageRemove(request: JSONObject): JSONObject {
-    val area = request.optString("area")
+    val area = requireStorageArea(request.optString("area"))
     val keys = request.optJSONArray("keys") ?: JSONArray()
 
     for (index in 0 until keys.length()) {
@@ -89,8 +98,10 @@ class BetterXBridge(private val activity: Activity) {
   private fun handleProxyImage(url: String): JSONObject {
     if (url.isBlank()) throw IllegalArgumentException("Missing image URL")
 
-    val connection = openConnection(url, "GET", null, null)
+    val connection = openConnectionFollowingRedirects(url, "GET", null, null, false)
     return try {
+      val status = connection.responseCode
+      if (status !in 200..299) throw IllegalArgumentException("Image request failed ($status)")
       val bytes = readBodyBytes(connection)
       val mime = connection.contentType?.substringBefore(';')?.trim().takeUnless { value -> value.isNullOrBlank() } ?: "image/png"
       val dataUrl = "data:$mime;base64,${Base64.encodeToString(bytes, Base64.NO_WRAP)}"
@@ -112,14 +123,25 @@ class BetterXBridge(private val activity: Activity) {
     val headers = request.optJSONObject("headers")
     val body = if (request.has("body") && !request.isNull("body")) request.optString("body") else null
     val requestMethod = method ?: if (body != null) "POST" else "GET"
+    val includeCredentials = request.optString("credentials") == "include"
+    if (requestMethod !in ALLOWED_METHODS) throw IllegalArgumentException("Unsupported request method")
+    if (body != null && body.length > MAX_REQUEST_BODY_CHARS) {
+      throw IllegalArgumentException("Request body is too large")
+    }
 
-    val connection = openConnection(url, requestMethod, headers, body)
+    val connection = openConnectionFollowingRedirects(
+      url,
+      requestMethod,
+      headers,
+      body,
+      includeCredentials,
+    )
     return try {
       val status = connection.responseCode
       val text = readBodyText(connection)
       val json = runCatching { JSONTokener(text).nextValue() }.getOrNull()
 
-      applyResponseCookies(url, connection)
+      if (includeCredentials) applyResponseCookies(connection.url.toString(), connection)
 
       JSONObject()
         .put("ok", status in 200..299)
@@ -133,9 +155,13 @@ class BetterXBridge(private val activity: Activity) {
 
   private fun handleOpenUrl(url: String): JSONObject {
     if (url.isBlank()) throw IllegalArgumentException("Missing URL")
+    val parsed = Uri.parse(url)
+    if (parsed.scheme != "https" && parsed.scheme != "http") {
+      throw IllegalArgumentException("Only HTTP(S) URLs may be opened")
+    }
 
     activity.runOnUiThread {
-      activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+      activity.startActivity(Intent(Intent.ACTION_VIEW, parsed))
     }
     return JSONObject().put("opened", true)
   }
@@ -145,10 +171,12 @@ class BetterXBridge(private val activity: Activity) {
     method: String,
     headers: JSONObject?,
     body: String?,
+    includeCredentials: Boolean,
   ): HttpURLConnection {
-    val connection = URL(url).openConnection() as HttpURLConnection
+    val parsed = validateNetworkUrl(url)
+    val connection = parsed.openConnection() as HttpURLConnection
     connection.requestMethod = method
-    connection.instanceFollowRedirects = true
+    connection.instanceFollowRedirects = false
     connection.connectTimeout = 20_000
     connection.readTimeout = 20_000
     connection.doInput = true
@@ -156,13 +184,15 @@ class BetterXBridge(private val activity: Activity) {
 
     headers?.keys()?.forEach { key ->
       if (key == null) return@forEach
-      if (key.equals("cookie", ignoreCase = true)) return@forEach
+      if (key.lowercase(Locale.US) in BLOCKED_HEADERS) return@forEach
       connection.setRequestProperty(key, headers.optString(key, ""))
     }
 
-    val cookie = android.webkit.CookieManager.getInstance().getCookie(url)
-    if (!cookie.isNullOrBlank() && connection.getRequestProperty("Cookie").isNullOrBlank()) {
-      connection.setRequestProperty("Cookie", cookie)
+    if (includeCredentials) {
+      val cookie = android.webkit.CookieManager.getInstance().getCookie(url)
+      if (!cookie.isNullOrBlank() && connection.getRequestProperty("Cookie").isNullOrBlank()) {
+        connection.setRequestProperty("Cookie", cookie)
+      }
     }
 
     if (body != null) {
@@ -179,9 +209,121 @@ class BetterXBridge(private val activity: Activity) {
     return connection
   }
 
+  private fun openConnectionFollowingRedirects(
+    url: String,
+    method: String,
+    headers: JSONObject?,
+    body: String?,
+    includeCredentials: Boolean,
+  ): HttpURLConnection {
+    var currentUrl = url
+    var currentMethod = method
+    var currentBody = body
+    var currentHeaders = headers
+
+    repeat(MAX_REDIRECTS + 1) { redirectCount ->
+      val connection = openConnection(
+        currentUrl,
+        currentMethod,
+        currentHeaders,
+        currentBody,
+        includeCredentials,
+      )
+      val status = connection.responseCode
+      if (status !in REDIRECT_STATUS_CODES) return connection
+
+      val location = connection.getHeaderField("Location")
+      if (location.isNullOrBlank()) return connection
+      if (redirectCount == MAX_REDIRECTS) {
+        connection.disconnect()
+        throw IllegalArgumentException("Too many redirects")
+      }
+
+      val nextUrl = try {
+        if (includeCredentials) applyResponseCookies(currentUrl, connection)
+        URL(connection.url, location).toString().also { validateNetworkUrl(it) }
+      } finally {
+        connection.disconnect()
+      }
+
+      if (status == HttpURLConnection.HTTP_SEE_OTHER ||
+        ((status == HttpURLConnection.HTTP_MOVED_PERM || status == HttpURLConnection.HTTP_MOVED_TEMP) &&
+          currentMethod == "POST")
+      ) {
+        currentMethod = "GET"
+        currentBody = null
+      }
+      currentHeaders = headersForRedirect(currentHeaders, currentUrl, nextUrl)
+      currentUrl = nextUrl
+    }
+
+    throw IllegalStateException("Redirect loop terminated unexpectedly")
+  }
+
+  private fun headersForRedirect(headers: JSONObject?, fromUrl: String, toUrl: String): JSONObject? {
+    if (headers == null || sameOrigin(fromUrl, toUrl)) return headers
+    return JSONObject().apply {
+      headers.keys().forEach { key ->
+        if (key.lowercase(Locale.US) !in CROSS_ORIGIN_BLOCKED_HEADERS) {
+          put(key, headers.opt(key))
+        }
+      }
+    }
+  }
+
+  private fun sameOrigin(firstUrl: String, secondUrl: String): Boolean {
+    val first = URL(firstUrl)
+    val second = URL(secondUrl)
+    val firstPort = if (first.port == -1) first.defaultPort else first.port
+    val secondPort = if (second.port == -1) second.defaultPort else second.port
+    return first.protocol.equals(second.protocol, ignoreCase = true) &&
+      first.host.equals(second.host, ignoreCase = true) && firstPort == secondPort
+  }
+
   private fun readBodyBytes(connection: HttpURLConnection): ByteArray {
+    if (connection.contentLengthLong > MAX_RESPONSE_BYTES) {
+      throw IllegalArgumentException("Response is too large")
+    }
     val stream = runCatching { connection.inputStream }.getOrNull() ?: connection.errorStream
-    return stream?.use { it.readBytes() } ?: ByteArray(0)
+    return stream?.use { input ->
+      val output = ByteArrayOutputStream()
+      val buffer = ByteArray(16 * 1024)
+      var total = 0
+      while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        total += count
+        if (total > MAX_RESPONSE_BYTES) throw IllegalArgumentException("Response is too large")
+        output.write(buffer, 0, count)
+      }
+      output.toByteArray()
+    } ?: ByteArray(0)
+  }
+
+  private fun requireStorageArea(area: String): String {
+    if (area != "sync" && area != "local") throw IllegalArgumentException("Invalid storage area")
+    return area
+  }
+
+  private fun validateNetworkUrl(rawUrl: String): URL {
+    val parsed = URL(rawUrl)
+    val loopback = parsed.host.equals("localhost", ignoreCase = true) ||
+      parsed.host == "127.0.0.1" || parsed.host == "::1"
+    if (parsed.protocol != "https" && !(parsed.protocol == "http" && loopback)) {
+      throw IllegalArgumentException("HTTPS is required outside loopback")
+    }
+    if (parsed.userInfo != null) throw IllegalArgumentException("URL credentials are not allowed")
+    val addresses = InetAddress.getAllByName(parsed.host)
+    if (!loopback && addresses.any {
+        it.isAnyLocalAddress || it.isLoopbackAddress || it.isLinkLocalAddress || it.isSiteLocalAddress
+      }) {
+      throw IllegalArgumentException("Private network targets are not allowed")
+    }
+    return parsed
+  }
+
+  fun close() {
+    executor.shutdownNow()
   }
 
   private fun readBodyText(connection: HttpURLConnection): String {
@@ -318,5 +460,13 @@ class BetterXBridge(private val activity: Activity) {
 
   private companion object {
     const val THEME_CSS_PREFIX = "bx_theme_css_"
+    const val MAX_MESSAGE_CHARS = 5_000_000
+    const val MAX_REQUEST_BODY_CHARS = 2_000_000
+    const val MAX_RESPONSE_BYTES = 10_000_000
+    const val MAX_REDIRECTS = 5
+    val ALLOWED_METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE")
+    val BLOCKED_HEADERS = setOf("cookie", "host", "origin", "referer")
+    val CROSS_ORIGIN_BLOCKED_HEADERS = setOf("authorization", "proxy-authorization")
+    val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
   }
 }

@@ -27,19 +27,14 @@
 
 1. Clone and build (see [Development](#development))
 2. Go to `chrome://extensions`, enable **Developer mode**
-3. Click **Load unpacked** and select `packages/extension/dist`
+3. Click **Load unpacked** and select `packages/extension/dist/chrome`
 
 ### Desktop App
 
-Download the latest release for your platform:
+Packaged desktop releases are still in development. For now, build and run the desktop app from
+source using the instructions below.
 
-| Platform | Formats |
-|----------|---------|
-| **Windows** | `.exe` installer, portable |
-| **Linux** | AppImage, `.deb` |
-| **macOS** | `.dmg` (ARM & x64) |
-
-The desktop app includes everything the extension offers, plus exclusive features like Discord Rich Presence, system tray integration, window transparency, and auto-updates.
+The desktop app includes everything the extension offers, plus exclusive features like Discord Rich Presence, system tray integration, and window transparency. Updates are delivered through packaged app releases.
 
 ---
 
@@ -82,6 +77,8 @@ packages/
   plugins/     # All built-in plugins
   extension/   # Chrome/Firefox browser extension (MV3)
   desktop/     # Electron desktop app
+  android/     # Android WebView app
+  cloud-sync/  # Optional cloud settings service
 ```
 
 ### Build
@@ -95,6 +92,7 @@ bun run build:core
 bun run build:plugins
 bun run build:extension
 bun run build:desktop
+bun run build:android
 ```
 
 ### Building the Firefox Extension (for AMO)
@@ -158,7 +156,8 @@ export default definePlugin({
 });
 ```
 
-Add your plugin to `packages/plugins/src/MyPlugin/index.ts` and it will appear in the settings panel on both platforms.
+Add your plugin to `packages/plugins/src/MyPlugin/index.ts`, then import it and add it to
+`allPlugins` in `packages/plugins/src/index.ts`. It will then appear on every compatible platform.
 
 ### Fetching External Resources
 

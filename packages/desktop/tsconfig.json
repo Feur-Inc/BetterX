@@ -12,9 +12,6 @@
       "@betterx/plugins": ["../plugins/src/index.ts"]
     }
   },
-  "references": [
-    { "path": "../core" },
-    { "path": "../plugins" }
-  ],
+  "references": [{ "path": "../core" }, { "path": "../plugins" }],
   "include": ["src/**/*"]
 }

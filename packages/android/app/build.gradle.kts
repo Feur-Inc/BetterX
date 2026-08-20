@@ -43,6 +43,7 @@ dependencies {
 }
 
 tasks.register<Exec>("buildWeb") {
+  onlyIf { !project.hasProperty("skipBetterXWebBuild") }
   workingDir = rootProject.projectDir
   commandLine("bun", "run", "build:web")
 }

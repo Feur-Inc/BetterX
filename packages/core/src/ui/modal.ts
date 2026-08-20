@@ -1,8 +1,8 @@
+import { BETTERX_LOGO_SVG, BETTERX_VERSION } from "../utils/constants.js";
+import { injectStyle } from "../utils/dom.js";
+import { BETTERX_STYLES } from "./styles.js";
 import type { BetterXContext, SettingsTab } from "./tab-registry.js";
 import { TabRegistry } from "./tab-registry.js";
-import { BETTERX_STYLES } from "./styles.js";
-import { injectStyle } from "../utils/dom.js";
-import { BETTERX_VERSION, BETTERX_LOGO_SVG } from "../utils/constants.js";
 
 // ─── Settings Modal ───────────────────────────────────────────────────────────
 
@@ -10,7 +10,9 @@ const STYLE_ID = "betterx-ui-styles";
 const OVERLAY_ID = "betterx-modal-overlay";
 
 let _instance: SettingsModal | null = null;
-export function getSettingsModal(): SettingsModal | null { return _instance; }
+export function getSettingsModal(): SettingsModal | null {
+  return _instance;
+}
 
 export class SettingsModal {
   private ctx: BetterXContext;
@@ -18,9 +20,10 @@ export class SettingsModal {
   private activeTabId: string | null = null;
   private initialized = new Set<string>();
   private _closeCallbacks: (() => void)[] = [];
-  private _closeInterceptor: (() => boolean | void) | null = null;
+  private _closeInterceptor: (() => boolean | undefined) | null = null;
+  private keydownHandler: ((event: KeyboardEvent) => void) | null = null;
 
-  setCloseInterceptor(fn: (() => boolean | void) | null): void {
+  setCloseInterceptor(fn: (() => boolean | undefined) | null): void {
     this._closeInterceptor = fn;
   }
 
@@ -30,12 +33,19 @@ export class SettingsModal {
     injectStyle(BETTERX_STYLES, STYLE_ID);
   }
 
-  hide(): void { if (this.overlay) this.overlay.style.display = "none"; }
-  show(): void { if (this.overlay) this.overlay.style.display = ""; else this.open(); }
+  hide(): void {
+    if (this.overlay) this.overlay.style.display = "none";
+  }
+  show(): void {
+    if (this.overlay) this.overlay.style.display = "";
+    else this.open();
+  }
 
   onClose(cb: () => void): () => void {
     this._closeCallbacks.push(cb);
-    return () => { this._closeCallbacks = this._closeCallbacks.filter((c) => c !== cb); };
+    return () => {
+      this._closeCallbacks = this._closeCallbacks.filter((c) => c !== cb);
+    };
   }
 
   open(): void {
@@ -50,23 +60,17 @@ export class SettingsModal {
     // Close on overlay click (interceptor can cancel)
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) {
-        if (this._closeInterceptor?.() === false) return;
         this.close();
       }
     });
 
     // Close on Escape (interceptor can cancel)
-    const onKey = (e: KeyboardEvent) => {
+    this.keydownHandler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (this._closeInterceptor?.() === false) {
-          document.removeEventListener("keydown", onKey);
-          return;
-        }
         this.close();
-        document.removeEventListener("keydown", onKey);
       }
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", this.keydownHandler);
 
     // Close button
     overlay.querySelector(".betterx-modal-close")?.addEventListener("click", () => this.close());
@@ -76,7 +80,7 @@ export class SettingsModal {
     const tabBtns = overlay.querySelectorAll<HTMLButtonElement>(".betterx-tab");
     tabBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
-        const id = btn.dataset["tabId"];
+        const id = btn.dataset.tabId;
         if (id) this.activateTab(id);
       });
     });
@@ -87,7 +91,12 @@ export class SettingsModal {
     }
   }
 
-  close(): void {
+  close(force = false): boolean {
+    if (!force && this._closeInterceptor?.() === false) return false;
+    if (this.keydownHandler) {
+      document.removeEventListener("keydown", this.keydownHandler);
+      this.keydownHandler = null;
+    }
     this.overlay?.remove();
     this.overlay = null;
     this.activeTabId = null;
@@ -95,6 +104,7 @@ export class SettingsModal {
     const cbs = this._closeCallbacks.slice();
     this._closeCallbacks = [];
     for (const cb of cbs) cb();
+    return true;
   }
 
   toggle(): void {
@@ -112,15 +122,17 @@ export class SettingsModal {
 
     // Update tab button styles
     this.overlay.querySelectorAll<HTMLButtonElement>(".betterx-tab").forEach((btn) => {
-      btn.classList.toggle("betterx-tab-active", btn.dataset["tabId"] === id);
+      btn.classList.toggle("betterx-tab-active", btn.dataset.tabId === id);
     });
 
     // Show correct panel
     this.overlay.querySelectorAll<HTMLElement>(".betterx-tab-panel").forEach((panel) => {
-      panel.style.display = panel.dataset["tabId"] === id ? "" : "none";
+      panel.style.display = panel.dataset.tabId === id ? "" : "none";
     });
 
-    const panel = this.overlay.querySelector<HTMLElement>(`.betterx-tab-panel[data-tab-id="${id}"]`);
+    const panel = this.overlay.querySelector<HTMLElement>(
+      `.betterx-tab-panel[data-tab-id="${id}"]`
+    );
     if (!panel) return;
 
     if (!this.initialized.has(id)) {
@@ -137,15 +149,13 @@ export class SettingsModal {
 
     const tabButtons = tabs
       .map(
-        (t) =>
-          `<button class="betterx-tab" data-tab-id="${t.id}">${this.escHtml(t.name)}</button>`
+        (t) => `<button class="betterx-tab" data-tab-id="${t.id}">${this.escHtml(t.name)}</button>`
       )
       .join("");
 
     const tabPanels = tabs
       .map(
-        (t) =>
-          `<div class="betterx-tab-panel" data-tab-id="${t.id}" style="display:none;"></div>`
+        (t) => `<div class="betterx-tab-panel" data-tab-id="${t.id}" style="display:none;"></div>`
       )
       .join("");
 

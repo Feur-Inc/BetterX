@@ -6,26 +6,31 @@
     "packages/plugins",
     "packages/extension",
     "packages/desktop",
-    "packages/cloud-sync"
+    "packages/cloud-sync",
+    "packages/android"
   ],
   "scripts": {
-    "build": "bun run build:core && bun run build:plugins && bun run build:extension && bun run build:desktop && bun run build:cloud-sync",
+    "build": "bun run build:core && bun run build:plugins && bun run build:extension && bun run build:desktop && bun run build:cloud-sync && bun run build:android",
     "build:core": "bun run --cwd packages/core build",
     "build:plugins": "bun run --cwd packages/plugins build",
     "build:extension": "bun run --cwd packages/extension build",
     "build:desktop": "bun run --cwd packages/desktop build",
     "build:cloud-sync": "bun run --cwd packages/cloud-sync typecheck",
+    "build:android": "bun run --cwd packages/android build:web",
     "start:cloud-sync": "bun run --cwd packages/cloud-sync start",
     "dev:cloud-sync": "bun run --cwd packages/cloud-sync dev",
     "start:desktop": "bun run --cwd packages/desktop start",
     "dev:extension": "bun run --cwd packages/extension dev",
     "dev:desktop": "bun run --cwd packages/desktop dev:all",
+    "test": "bun run build:core && bun test packages/core/src packages/plugins/src packages/extension/src packages/desktop/src packages/cloud-sync/src packages/android/src",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/extension/tsconfig.json packages/desktop/tsconfig.json packages/cloud-sync/tsconfig.json"
+    "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/extension/tsconfig.json packages/desktop/tsconfig.json packages/cloud-sync/tsconfig.json && bun run --cwd packages/android typecheck"
   },
   "devDependencies": {
+    "@betterx/core": "*",
     "@biomejs/biome": "^1.9.4",
+    "@types/bun": "1.3.11",
     "typescript": "^5.7.2"
   },
   "dependencies": {

@@ -12,5 +12,6 @@ services:
       - TWITTER_CLIENT_SECRET=${TWITTER_CLIENT_SECRET}
       - SESSION_SECRET=${SESSION_SECRET}
       - BASE_URL=${BASE_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - PORT=${PORT:-4000}
     restart: unless-stopped

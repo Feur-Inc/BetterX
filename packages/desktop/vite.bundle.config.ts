@@ -1,6 +1,6 @@
+import { resolve } from "node:path";
 // Builds the injected bundle (BetterX content script for Electron)
-import { defineConfig, type UserConfig } from "vite";
-import { resolve } from "path";
+import { type UserConfig, defineConfig } from "vite";
 
 export default defineConfig({
   build: {
@@ -11,7 +11,7 @@ export default defineConfig({
       fileName: "bundle",
     },
     outDir: "dist/bundle",
-    emptyOutDir: true,
+    emptyOutDir: false,
     sourcemap: true,
     rollupOptions: {
       // All deps bundled into the IIFE

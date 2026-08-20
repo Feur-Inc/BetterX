@@ -1,4 +1,4 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 import { DOMObserver } from "../SharedObserver/index.js";
 
 const AD_KEYWORDS = new Set([
@@ -11,10 +11,15 @@ const AD_KEYWORDS = new Set([
 ]);
 
 let adUnsub: (() => void) | null = null;
+const processedPosts = new Map<HTMLElement, { display: string; marker: string | undefined }>();
 
 function processPost(el: HTMLElement): void {
-  if (el.dataset["adBlockerProcessed"]) return;
-  el.dataset["adBlockerProcessed"] = "true";
+  if (el.dataset.adBlockerProcessed) return;
+  processedPosts.set(el, {
+    display: el.style.display,
+    marker: el.dataset.adBlockerProcessed,
+  });
+  el.dataset.adBlockerProcessed = "true";
   if (isAd(el)) el.style.display = "none";
 }
 
@@ -24,10 +29,11 @@ function isAd(el: HTMLElement): boolean {
   if (hasPromoted && hasAdArticle) return true;
 
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
+  let node = walker.nextNode();
+  while (node) {
     const text = (node as Text).textContent?.trim();
     if (text && AD_KEYWORDS.has(text)) return true;
+    node = walker.nextNode();
   }
   return false;
 }
@@ -63,5 +69,11 @@ export default definePlugin({
   stop() {
     adUnsub?.();
     adUnsub = null;
+    for (const [post, original] of processedPosts) {
+      post.style.display = original.display;
+      if (original.marker === undefined) delete post.dataset.adBlockerProcessed;
+      else post.dataset.adBlockerProcessed = original.marker;
+    }
+    processedPosts.clear();
   },
 });

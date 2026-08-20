@@ -15,17 +15,21 @@ const SELECTORS = [
 ];
 
 let observer: MutationObserver | null = null;
+let setupTimer: ReturnType<typeof setTimeout> | null = null;
+let domReadyHandler: (() => void) | null = null;
+const hiddenElements = new Map<HTMLElement, { display: string; width: string; height: string }>();
 
 function hideElement(el: HTMLElement): void {
+  if (!hiddenElements.has(el)) {
+    hiddenElements.set(el, {
+      display: el.style.display,
+      width: el.style.width,
+      height: el.style.height,
+    });
+  }
   el.style.display = "none";
   el.style.width = "0px";
   el.style.height = "0px";
-}
-
-function restoreElement(el: HTMLElement): void {
-  el.style.removeProperty("display");
-  el.style.removeProperty("width");
-  el.style.removeProperty("height");
 }
 
 export default definePlugin({
@@ -36,6 +40,9 @@ export default definePlugin({
 
   start() {
     const removeElements = (): void => {
+      for (const element of hiddenElements.keys()) {
+        if (!element.isConnected) hiddenElements.delete(element);
+      }
       for (const selector of SELECTORS) {
         for (const el of document.querySelectorAll<HTMLElement>(selector)) {
           const parent = el.closest<HTMLElement>(".r-1ifxtd0");
@@ -72,42 +79,29 @@ export default definePlugin({
     };
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => setTimeout(setup, 400));
+      domReadyHandler = () => {
+        setupTimer = setTimeout(setup, 400);
+      };
+      document.addEventListener("DOMContentLoaded", domReadyHandler, { once: true });
     } else {
-      setTimeout(setup, 400);
+      setupTimer = setTimeout(setup, 400);
     }
   },
 
   stop() {
     observer?.disconnect();
     observer = null;
-
-    for (const selector of SELECTORS) {
-      for (const el of document.querySelectorAll<HTMLElement>(selector)) {
-        const parent = el.closest<HTMLElement>(".r-1ifxtd0");
-        const target = parent ?? el;
-        restoreElement(target);
-      }
+    if (setupTimer) clearTimeout(setupTimer);
+    setupTimer = null;
+    if (domReadyHandler) {
+      document.removeEventListener("DOMContentLoaded", domReadyHandler);
+      domReadyHandler = null;
     }
-
-    for (const anchor of document.querySelectorAll<HTMLAnchorElement>(
-      'a[href^="/i/premium_sign_up"]'
-    )) {
-      const wrapper = anchor.closest<HTMLElement>("div.r-dnmrzs");
-      if (wrapper) restoreElement(wrapper);
+    for (const [element, original] of hiddenElements) {
+      element.style.display = original.display;
+      element.style.width = original.width;
+      element.style.height = original.height;
     }
-
-    for (const el of document.querySelectorAll<HTMLElement>(".r-1ifxtd0")) {
-      if (el.textContent?.includes("Access your post analytics")) {
-        restoreElement(el);
-      }
-    }
-
-    for (const el of document.querySelectorAll<HTMLElement>('[role="complementary"].r-eqz5dr')) {
-      if (!el.querySelector("ul")) {
-        const target = el.parentElement ?? el;
-        restoreElement(target as HTMLElement);
-      }
-    }
+    hiddenElements.clear();
   },
 });
