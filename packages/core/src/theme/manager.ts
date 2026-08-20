@@ -7,6 +7,27 @@ import { processCSS } from "./processor.js";
 
 const STYLE_PREFIX = "betterx-theme-";
 
+/**
+ * BetterX themes historically overrode X's atomic utility classes by giving
+ * every ordinary declaration `!important`. Do this through the parsed CSSOM
+ * so multiline declarations, data URLs, nesting, and keyframes remain valid.
+ */
+function prioritizeThemeRules(rules: CSSRuleList): void {
+  for (const rule of rules) {
+    if (rule.type === CSSRule.STYLE_RULE) {
+      const declaration = (rule as CSSStyleRule).style;
+      for (const property of declaration) {
+        if (declaration.getPropertyPriority(property) !== "important") {
+          declaration.setProperty(property, declaration.getPropertyValue(property), "important");
+        }
+      }
+    }
+
+    const nestedRules = (rule as CSSRule & { cssRules?: CSSRuleList }).cssRules;
+    if (nestedRules) prioritizeThemeRules(nestedRules);
+  }
+}
+
 export class ThemeManager {
   private storage: IStorage;
   private themes: Theme[] = [];
@@ -139,6 +160,7 @@ export class ThemeManager {
       document.head.appendChild(style);
     }
     style.textContent = processed;
+    if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
   }
 
   private removeDom(id: string): void {
