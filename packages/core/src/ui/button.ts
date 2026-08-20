@@ -12,7 +12,9 @@ const MOBILE_STYLE_ID = "betterx-mobile-drawer-style";
 const MOBILE_DRAWER_ATTR = "data-betterx-account-drawer";
 
 const NAV_SELECTORS = [
-  'nav[aria-label="Primary"]',
+  'nav[aria-label="Primary"] a[href="/explore"]',
+  'nav[aria-label="Primary"] a[href="/notifications"]',
+  'nav[aria-label="Primary"] a[href="/messages"]',
   '[data-testid="AppTabBar_Home_Link"]',
   'a[href="/home"]',
 ];
@@ -79,88 +81,103 @@ const MOBILE_CSS = `
 }
 `;
 
-let compactObserver: ResizeObserver | null = null;
+let desktopOnClick: OnClickFn | null = null;
+let desktopTemplate: HTMLAnchorElement | null = null;
+let desktopTemplateObserver: MutationObserver | null = null;
+let desktopSyncRaf = 0;
 
-function findDesktopNavParent(): Element | null {
+function findDesktopTemplateAnchor(): HTMLAnchorElement | null {
   for (const sel of NAV_SELECTORS) {
-    const el = document.querySelector(sel);
-    if (el) return sel === NAV_SELECTORS[0] ? el : el.parentElement;
+    const anchor = document.querySelector<HTMLAnchorElement>(sel);
+    if (anchor) return anchor;
   }
   return null;
 }
 
-/**
- * Check if X's nav is in compact (icon-only) mode.
- */
-function isNavCompact(): boolean {
-  const homeLink =
-    document.querySelector('[data-testid="AppTabBar_Home_Link"]') ??
-    document.querySelector('a[href="/home"]');
-  if (!homeLink) return false;
-  return (homeLink as HTMLElement).offsetWidth < 100;
-}
+function buildDesktopButton(
+  templateAnchor: HTMLAnchorElement,
+  onClick: OnClickFn
+): HTMLAnchorElement {
+  const anchor = templateAnchor.cloneNode(true) as HTMLAnchorElement;
+  anchor.id = BUTTON_ID;
+  anchor.href = "#";
+  anchor.setAttribute("role", "button");
+  anchor.setAttribute("aria-label", "BetterX");
+  anchor.setAttribute("title", "BetterX");
+  anchor.setAttribute("data-testid", "betterx");
+  anchor.removeAttribute("aria-current");
 
-function syncCompact(): void {
-  const li = document.getElementById(BUTTON_ID);
-  if (!li) return;
-  li.classList.toggle("betterx-nav-compact", isNavCompact());
-}
-
-/**
- * Read the text color X is currently using for nav item labels.
- */
-function getNavTextColor(): string {
-  const candidates = document.querySelectorAll('nav[aria-label="Primary"] a [dir="ltr"]');
-  for (const el of candidates) {
-    if ((el as HTMLElement).style.color) {
-      return getComputedStyle(el).color;
-    }
+  const icon = anchor.querySelector("svg");
+  if (icon instanceof SVGSVGElement) {
+    const replacement = createLogoIcon(icon);
+    if (replacement) icon.replaceWith(replacement);
   }
-  return candidates[0] ? getComputedStyle(candidates[0]).color : "";
-}
 
-function buildDesktopButton(onClick: OnClickFn, logoUrl: string): HTMLElement {
-  void logoUrl;
+  const label = anchor.querySelector<HTMLElement>('div[dir="ltr"]');
+  if (label) label.textContent = "BetterX";
 
-  const li = document.createElement("li");
-  li.id = BUTTON_ID;
-
-  const btn = document.createElement("div");
-  btn.className = "betterx-nav-button";
-  btn.setAttribute("role", "button");
-  btn.setAttribute("tabindex", "0");
-  btn.setAttribute("aria-label", "BetterX");
-  btn.setAttribute("title", "BetterX");
-  btn.innerHTML = `<span class="betterx-nav-icon">${BETTERX_LOGO_SVG}</span><span class="betterx-nav-label">BetterX</span>`;
-
-  const navColor = getNavTextColor();
-  if (navColor) btn.style.color = navColor;
-
-  btn.addEventListener("click", onClick);
-  btn.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
+  anchor.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClick();
+  });
+  anchor.addEventListener("keydown", (event) => {
+    if (event.key === " ") {
+      event.preventDefault();
+      event.stopPropagation();
       onClick();
     }
   });
 
-  li.appendChild(btn);
-  return li;
+  return anchor;
+}
+
+function scheduleDesktopSync(): void {
+  if (desktopSyncRaf) return;
+  desktopSyncRaf = requestAnimationFrame(() => {
+    desktopSyncRaf = 0;
+
+    const current = document.getElementById(BUTTON_ID);
+    const template = findDesktopTemplateAnchor();
+    if (!current || !template?.parentElement || !desktopOnClick) return;
+
+    observeDesktopTemplate(template);
+    const next = buildDesktopButton(template, desktopOnClick);
+    if (current.parentElement === template.parentElement) {
+      current.replaceWith(next);
+    } else {
+      current.remove();
+      template.parentElement.appendChild(next);
+    }
+  });
+}
+
+function observeDesktopTemplate(template: HTMLAnchorElement): void {
+  if (desktopTemplate === template) return;
+
+  desktopTemplateObserver?.disconnect();
+  desktopTemplate = template;
+  desktopTemplateObserver = new MutationObserver(scheduleDesktopSync);
+  desktopTemplateObserver.observe(template, { childList: true, subtree: true });
 }
 
 function injectDesktopNavButton(onClick: OnClickFn, logoUrl: string): void {
-  if (document.getElementById(BUTTON_ID)) return;
+  void logoUrl;
+  desktopOnClick = onClick;
+  if (document.getElementById(BUTTON_ID)) {
+    const template = findDesktopTemplateAnchor();
+    if (template) {
+      observeDesktopTemplate(template);
+      scheduleDesktopSync();
+    }
+    return;
+  }
 
-  const nav = findDesktopNavParent();
-  if (!nav) return;
+  const templateAnchor = findDesktopTemplateAnchor();
+  if (!templateAnchor?.parentElement) return;
 
-  const list = nav.tagName === "NAV" ? nav.querySelector("ul") ?? nav : nav;
-  list.appendChild(buildDesktopButton(onClick, logoUrl));
-
-  syncCompact();
-  compactObserver?.disconnect();
-  compactObserver = new ResizeObserver(() => syncCompact());
-  compactObserver.observe(document.documentElement);
+  templateAnchor.parentElement.appendChild(buildDesktopButton(templateAnchor, onClick));
+  observeDesktopTemplate(templateAnchor);
 }
 
 function ensureMobileStyles(): void {
@@ -302,8 +319,12 @@ export function injectNavButton(onClick: OnClickFn, logoUrl: string, platform: P
 
 export function removeNavButton(): void {
   document.getElementById(BUTTON_ID)?.remove();
-  compactObserver?.disconnect();
-  compactObserver = null;
+  if (desktopSyncRaf) cancelAnimationFrame(desktopSyncRaf);
+  desktopSyncRaf = 0;
+  desktopTemplateObserver?.disconnect();
+  desktopTemplateObserver = null;
+  desktopTemplate = null;
+  desktopOnClick = null;
 
   for (const el of document.querySelectorAll<HTMLElement>(`[${MOBILE_DRAWER_ATTR}="1"]`)) {
     el.removeAttribute(MOBILE_DRAWER_ATTR);
@@ -328,7 +349,16 @@ export function watchNavButton(onClick: OnClickFn, logoUrl: string, platform: Pl
   let rafId = 0;
 
   const observer = new MutationObserver(() => {
-    if (document.getElementById(BUTTON_ID)) return;
+    if (document.getElementById(BUTTON_ID)) {
+      if (platform !== "android") {
+        const template = findDesktopTemplateAnchor();
+        if (template && template !== desktopTemplate) {
+          observeDesktopTemplate(template);
+          scheduleDesktopSync();
+        }
+      }
+      return;
+    }
     if (rafId) return;
 
     rafId = requestAnimationFrame(() => {
