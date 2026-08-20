@@ -1,7 +1,8 @@
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { logger } from "@betterx/core";
 import { BrowserWindow, app, protocol, shell } from "electron";
+import type { WebContents } from "electron";
 import { isTrustedRendererUrl, parseExternalHttpUrl } from "./ipc/security.js";
 import { setupCSP } from "./security.js";
 
@@ -10,9 +11,42 @@ import { setupCSP } from "./security.js";
 const BUNDLE_PATH_KEY = "betterx_bundle_path";
 let bundlePath: string | null = null;
 let assetsPath: string | null = null;
+let bundleCode: Promise<string> | null = null;
+const optionalBundlePaths = new Map<string, string>();
+const optionalBundleCode = new Map<string, Promise<string>>();
 
 export function setBundlePath(path: string): void {
   bundlePath = path;
+  bundleCode = null;
+}
+
+export function invalidateBundleCache(): void {
+  bundleCode = null;
+}
+
+export function setOptionalBundlePath(name: "editor" | "emoji", path: string): void {
+  optionalBundlePaths.set(name, path);
+  optionalBundleCode.delete(name);
+}
+
+async function getBundleCode(): Promise<string> {
+  if (!bundlePath) throw new Error("BetterX bundle is unavailable");
+  bundleCode ??= readFile(bundlePath, "utf8");
+  return bundleCode;
+}
+
+export async function loadOptionalRendererModule(
+  webContents: WebContents,
+  name: "editor" | "emoji"
+): Promise<void> {
+  const path = optionalBundlePaths.get(name);
+  if (!path) throw new Error(`Unknown renderer module: ${name}`);
+  let code = optionalBundleCode.get(name);
+  if (!code) {
+    code = readFile(path, "utf8");
+    optionalBundleCode.set(name, code);
+  }
+  await webContents.executeJavaScriptInIsolatedWorld(1000, [{ code: await code }]);
 }
 
 export function setAssetsPath(path: string): void {
@@ -48,11 +82,13 @@ export function handleBetterxProtocol(): void {
         });
       }
       try {
-        await access(bundlePath);
-        const content = await readFile(bundlePath);
-        return new Response(new Uint8Array(content), {
+        const content = await getBundleCode();
+        return new Response(content, {
           status: 200,
-          headers: { "Content-Type": "application/javascript" },
+          headers: {
+            "Content-Type": "application/javascript",
+            "Cache-Control": "no-cache",
+          },
         });
       } catch {
         return new Response("// BetterX bundle read error", {
@@ -83,7 +119,10 @@ export function handleBetterxProtocol(): void {
         };
         return new Response(new Uint8Array(content), {
           status: 200,
-          headers: { "Content-Type": mimeTypes[ext] ?? "application/octet-stream" },
+          headers: {
+            "Content-Type": mimeTypes[ext] ?? "application/octet-stream",
+            "Cache-Control": "public, max-age=86400",
+          },
         });
       } catch {
         return new Response("Not found", { status: 404 });
@@ -116,7 +155,7 @@ export function createMainWindow(preloadPath: string, enableTransparency: boolea
   win.webContents.on("did-finish-load", async () => {
     if (!bundlePath) return;
     try {
-      const code = await readFile(bundlePath, "utf8");
+      const code = await getBundleCode();
       await win.webContents.executeJavaScriptInIsolatedWorld(1000, [{ code }]);
     } catch (err) {
       logger.error("Failed to inject BetterX script:", err);
@@ -131,6 +170,10 @@ export function createMainWindow(preloadPath: string, enableTransparency: boolea
     } catch {
       logger.warn("Blocked navigation to unsafe URL:", url);
     }
+  });
+
+  win.webContents.on("did-navigate-in-page", () => {
+    win.webContents.send("bx:navigation");
   });
 
   // Allow OAuth popups to open inside the app so postMessage works back to the opener

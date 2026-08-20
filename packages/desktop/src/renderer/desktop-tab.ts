@@ -68,12 +68,12 @@ export const DesktopTab: SettingsTab = {
     container.innerHTML = "";
 
     const api = window.electronAPI;
+    const settingsRequest = api.settings.getAll();
 
     // ── App Behaviour ──────────────────────────────────────────────────────────
     const appSection = makeSection("App Behaviour");
 
-    api.settings
-      .getAll()
+    settingsRequest
       .then((settings) => {
         const rows: Array<{ key: string; label: string; desc: string; restart?: boolean }> = [
           {
@@ -131,10 +131,9 @@ export const DesktopTab: SettingsTab = {
     pathDisplay.className = "betterx-bundle-path";
     pathDisplay.textContent = "Loading…";
 
-    api.settings
-      .get("bundlePath")
+    settingsRequest
       .then((p) => {
-        pathDisplay.textContent = (p as string) || "(default built-in bundle)";
+        pathDisplay.textContent = (p.bundlePath as string) || "(default built-in bundle)";
       })
       .catch(() => {});
 

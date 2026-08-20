@@ -113,15 +113,16 @@ async function collectCloudConfig(storage: IStorage): Promise<CloudConfig> {
     storage.getThemeState(),
     storage.listThemes(),
   ]);
-  const themes: Record<string, string> = {};
-  for (const id of themeIds) themes[id] = await storage.readTheme(id);
+  const themes = Object.fromEntries(
+    await Promise.all(themeIds.map(async (id) => [id, await storage.readTheme(id)] as const))
+  );
   return { plugin_states: pluginStates, theme_state: { ...themeState, themes } };
 }
 
 async function applyCloudConfig(storage: IStorage, config: CloudConfig): Promise<void> {
-  for (const [id, css] of Object.entries(config.theme_state.themes)) {
-    await storage.writeTheme(id, css);
-  }
+  await Promise.all(
+    Object.entries(config.theme_state.themes).map(([id, css]) => storage.writeTheme(id, css))
+  );
   await storage.setPluginStates(config.plugin_states);
   await storage.setThemeState({
     order: config.theme_state.order,
@@ -164,12 +165,10 @@ async function runAutoSync(ctx: BetterXContext): Promise<void> {
 
 export function startCloudAutoSync(ctx: BetterXContext): void {
   if (autoSyncTimer !== null) window.clearInterval(autoSyncTimer);
-  collectCloudConfig(ctx.storage)
-    .then((config) => {
-      lastAutoSyncSnapshot =
-        localStorage.getItem("bx_autosync") === "true" ? "" : JSON.stringify(config);
-    })
-    .catch((error) => logger.warn("Could not initialize automatic cloud sync", error));
+  autoSyncTimer = null;
+  if (localStorage.getItem("bx_autosync") !== "true") return;
+  lastAutoSyncSnapshot = "";
+  void runAutoSync(ctx);
   autoSyncTimer = window.setInterval(() => void runAutoSync(ctx), AUTO_SYNC_INTERVAL_MS);
 }
 
@@ -179,10 +178,9 @@ async function exportConfig(storage: IStorage): Promise<string> {
   const pluginStates = await storage.getPluginStates();
   const themeState = await storage.getThemeState();
   const themeIds = await storage.listThemes();
-  const themes: Record<string, string> = {};
-  for (const id of themeIds) {
-    themes[id] = await storage.readTheme(id);
-  }
+  const themes = Object.fromEntries(
+    await Promise.all(themeIds.map(async (id) => [id, await storage.readTheme(id)] as const))
+  );
   return JSON.stringify({ version: BETTERX_VERSION, pluginStates, themeState, themes }, null, 2);
 }
 
@@ -468,8 +466,7 @@ async function setupEvents(container: HTMLElement, ctx: BetterXContext) {
   autoSyncToggle.checked = localStorage.getItem("bx_autosync") === "true";
   autoSyncToggle.addEventListener("change", () => {
     localStorage.setItem("bx_autosync", String(autoSyncToggle.checked));
-    lastAutoSyncSnapshot = autoSyncToggle.checked ? "" : lastAutoSyncSnapshot;
-    if (autoSyncToggle.checked) void runAutoSync(ctx);
+    startCloudAutoSync(ctx);
   });
 }
 

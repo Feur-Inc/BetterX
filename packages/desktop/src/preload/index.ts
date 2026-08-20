@@ -1,6 +1,41 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type { ElectronAPI } from "./api.js";
 
+const settingCache = new Map<string, unknown>();
+const settingRequests = new Map<string, Promise<unknown>>();
+const themeCache = new Map<string, string>();
+const themeRequests = new Map<string, Promise<string>>();
+
+function getSettingCached(key: string): Promise<unknown> {
+  if (settingCache.has(key)) return Promise.resolve(settingCache.get(key));
+  const pending = settingRequests.get(key);
+  if (pending) return pending;
+  const request = ipcRenderer
+    .invoke("settings:get", key)
+    .then((value: unknown) => {
+      settingCache.set(key, value);
+      return value;
+    })
+    .finally(() => settingRequests.delete(key));
+  settingRequests.set(key, request);
+  return request;
+}
+
+function readThemeCached(id: string): Promise<string> {
+  if (themeCache.has(id)) return Promise.resolve(themeCache.get(id) ?? "");
+  const pending = themeRequests.get(id);
+  if (pending) return pending;
+  const request = ipcRenderer
+    .invoke("themes:read", id)
+    .then((css: string) => {
+      themeCache.set(id, css);
+      return css;
+    })
+    .finally(() => themeRequests.delete(id));
+  themeRequests.set(id, request);
+  return request;
+}
+
 // ─── Sensitive-media patch injection ─────────────────────────────────────────
 // contextIsolation:true means we can't patch window.JSON.parse directly.
 // Injecting an inline <script> into document bypasses that - scripts appended
@@ -114,14 +149,18 @@ injectSensitiveMediaPatch();
 // in window.__betterxUserStats so the renderer can read them immediately.
 
 const STATS_PATCH = `(function () {
+  if (window.__betterxStatsPatchInstalled) {
+    window.__betterxStatsEnabled = true;
+    return;
+  }
+  window.__betterxStatsPatchInstalled = true;
+  window.__betterxStatsEnabled = true;
   // Get the logged-in user's numeric ID from the twid cookie (format: u%3D{id}).
   var twid = document.cookie.split('; ').find(function(c) { return c.startsWith('twid='); });
   var userId = twid ? decodeURIComponent(twid.split('=')[1]).replace('u=', '') : null;
-  console.log('[BetterX STATS] twid cookie:', twid ? twid.substring(0, 30) : 'NOT FOUND', '| userId:', userId);
   if (!userId) return;
 
   function bxEmit(stats) {
-    console.log('[BetterX STATS] found for user ' + userId + ':', JSON.stringify(stats));
     window.__betterxUserStats = stats;
     window.dispatchEvent(new CustomEvent('betterx:user-stats', { detail: stats }));
   }
@@ -167,6 +206,7 @@ const STATS_PATCH = `(function () {
   };
 
   XMLHttpRequest.prototype.send = function (body) {
+    if (!window.__betterxStatsEnabled) return _origSend.apply(this, arguments);
     if (window.__betterxUserStats) return _origSend.apply(this, arguments);
     var url = this.__bxUrl || '';
     if (url.indexOf('/i/api/graphql/') !== -1 ||
@@ -183,69 +223,29 @@ const STATS_PATCH = `(function () {
     return _origSend.apply(this, arguments);
   };
 
-  // On window.load (main.js is in cache by then), scan it for the UserByRestId
-  // queryId and make a targeted GraphQL call for the logged-in user's stats.
-  window.addEventListener('load', function () {
-    if (window.__betterxUserStats) return;
-    var ct0 = document.cookie.split('; ').find(function(c) { return c.startsWith('ct0='); });
-    var csrf = ct0 ? ct0.split('=')[1] : null;
-    if (!csrf) return;
-
-    var entries = performance.getEntriesByType('resource');
-    var mainUrl = null;
-    for (var i = 0; i < entries.length; i++) {
-      var n = entries[i].name;
-      if (n.indexOf('/main.') !== -1 && n.endsWith('.js')) { mainUrl = n; break; }
-    }
-    if (!mainUrl) return;
-
-    var bundleXhr = new XMLHttpRequest();
-    _origOpen.call(bundleXhr, 'GET', mainUrl, true);
-    bundleXhr.addEventListener('load', function () {
-      if (window.__betterxUserStats) return;
-      var text = this.responseText;
-      var patterns = [
-        /queryId:"([^"]+)",operationName:"UserByRestId"/,
-        /"queryId":"([^"]+)","operationName":"UserByRestId"/,
-        /operationName:"UserByRestId",queryId:"([^"]+)"/,
-        /"operationName":"UserByRestId","queryId":"([^"]+)"/
-      ];
-      var queryId = null;
-      for (var p = 0; p < patterns.length; p++) {
-        var m = text.match(patterns[p]);
-        if (m) { queryId = m[1]; break; }
-      }
-      console.log('[BetterX STATS] UserByRestId queryId:', queryId);
-      if (!queryId) return;
-
-      var vars = encodeURIComponent(JSON.stringify({ userId: userId, withSafetyModeUserFields: true }));
-      var apiXhr = new XMLHttpRequest();
-      _origOpen.call(apiXhr, 'GET', '/i/api/graphql/' + queryId + '/UserByRestId?variables=' + vars, true);
-      apiXhr.setRequestHeader('Authorization', 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA');
-      apiXhr.setRequestHeader('x-csrf-token', csrf);
-      apiXhr.setRequestHeader('x-twitter-auth-type', 'OAuth2Session');
-      apiXhr.setRequestHeader('x-twitter-active-user', 'yes');
-      apiXhr.withCredentials = true;
-      apiXhr.addEventListener('load', function () {
-        if (window.__betterxUserStats) return;
-        try {
-          var stats = bxFind(JSON.parse(this.responseText), 0);
-          if (stats) bxEmit(stats);
-          else console.log('[BetterX STATS] UserByRestId no match, status=' + this.status + ', body=' + this.responseText.substring(0, 300));
-        } catch(e) { console.log('[BetterX STATS] UserByRestId parse error:', e); }
-      });
-      _origSend.call(apiXhr, null);
-    });
-    _origSend.call(bundleXhr, null);
-  });
 })();`;
+
+let cachedUserStats: { followers: number; following: number } | null = null;
+window.addEventListener("betterx:user-stats", (event) => {
+  const detail = (event as CustomEvent<{ followers: number; following: number }>).detail;
+  if (detail) cachedUserStats = detail;
+});
 
 function injectStatsPatch(): void {
   void webFrame.executeJavaScript(STATS_PATCH).catch(() => undefined);
 }
 
-console.log("[BetterX STATS] calling injectStatsPatch");
-injectStatsPatch();
+function setStatsEnabled(enabled: boolean): void {
+  if (enabled) {
+    injectStatsPatch();
+  } else {
+    void webFrame.executeJavaScript("window.__betterxStatsEnabled = false").catch(() => undefined);
+  }
+}
+
+const initialDiscordRPCEnabled =
+  ipcRenderer.sendSync("settings:get-sync", "enableDiscordRPC") === true;
+if (initialDiscordRPCEnabled) injectStatsPatch();
 
 // ─── Preload ──────────────────────────────────────────────────────────────────
 // Exposes ONLY typed ipcRenderer calls via contextBridge.
@@ -254,12 +254,20 @@ injectStatsPatch();
 const api: ElectronAPI = {
   themes: {
     list: () => ipcRenderer.invoke("themes:list"),
-    read: (id) => ipcRenderer.invoke("themes:read", id),
-    write: (id, css) => ipcRenderer.invoke("themes:write", id, css),
-    delete: (id) => ipcRenderer.invoke("themes:delete", id),
+    read: (id) => readThemeCached(id),
+    write: async (id, css) => {
+      await ipcRenderer.invoke("themes:write", id, css);
+      themeCache.set(id, css);
+    },
+    delete: async (id) => {
+      await ipcRenderer.invoke("themes:delete", id);
+      themeCache.delete(id);
+    },
     onChanged: (callback) => {
-      const handler = (_event: Electron.IpcRendererEvent, id: string, css: string): void =>
+      const handler = (_event: Electron.IpcRendererEvent, id: string, css: string): void => {
+        themeCache.set(id, css);
         callback(id, css);
+      };
       ipcRenderer.on("themes:changed", handler);
       return () => ipcRenderer.removeListener("themes:changed", handler);
     },
@@ -267,10 +275,36 @@ const api: ElectronAPI = {
   },
 
   settings: {
-    getAll: () => ipcRenderer.invoke("settings:get-all"),
-    get: (key) => ipcRenderer.invoke("settings:get", key),
-    set: (key, value) => ipcRenderer.invoke("settings:set", key, value),
-    chooseBundlePath: () => ipcRenderer.invoke("settings:choose-bundle-path"),
+    getAll: async () => {
+      const settings = (await ipcRenderer.invoke("settings:get-all")) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(settings)) settingCache.set(key, value);
+      return settings;
+    },
+    get: (key) => getSettingCached(key),
+    set: async (key, value) => {
+      await ipcRenderer.invoke("settings:set", key, value);
+      settingCache.set(key, value);
+    },
+    chooseBundlePath: async () => {
+      const path = (await ipcRenderer.invoke("settings:choose-bundle-path")) as string | null;
+      if (path) settingCache.set("bundlePath", path);
+      return path;
+    },
+    onChanged: (callback) => {
+      const handler = (_event: Electron.IpcRendererEvent, key: string, value: unknown): void => {
+        settingCache.set(key, value);
+        callback(key, value);
+      };
+      ipcRenderer.on("settings:changed", handler);
+      return () => ipcRenderer.removeListener("settings:changed", handler);
+    },
+  },
+
+  loadRendererModule: (name) => ipcRenderer.invoke("bx:renderer-module:load", name),
+  onNavigation: (callback) => {
+    const handler = (): void => callback();
+    ipcRenderer.on("bx:navigation", handler);
+    return () => ipcRenderer.removeListener("bx:navigation", handler);
   },
 
   captureElement: (rect) => ipcRenderer.invoke("capture:element", rect),
@@ -293,6 +327,8 @@ const api: ElectronAPI = {
   discordRPC: {
     updateActivity: (details, state) =>
       ipcRenderer.send("discord-rpc:update-activity", details, state),
+    setStatsEnabled,
+    getCachedStats: () => cachedUserStats,
   },
 };
 
@@ -328,28 +364,32 @@ function prioritizeThemeRules(rules: CSSRuleList): void {
   }
 }
 
-ipcRenderer
-  .invoke("settings:get", "themeState")
+getSettingCached("themeState")
   .then(async (val: unknown) => {
     const state = val as { order?: string[]; active?: string[] } | undefined;
     if (!state?.active?.length) return;
 
     const root = document.head || document.documentElement;
-    for (const id of state.active) {
-      try {
-        const css = (await ipcRenderer.invoke("themes:read", id)) as string;
-        if (!css) continue;
-        const style = document.createElement("style");
-        style.id = STYLE_PREFIX + id;
-        style.textContent = processCSS(css);
-        root.appendChild(style);
+    const themes = await Promise.all(
+      state.active.map(async (id): Promise<{ id: string; css: string } | null> => {
         try {
-          if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
+          const css = await readThemeCached(id);
+          return css ? { id, css } : null;
         } catch {
-          // Keep the authored CSS if this Electron build cannot rewrite a rule.
+          return null;
         }
+      })
+    );
+    for (const theme of themes) {
+      if (!theme) continue;
+      const style = document.createElement("style");
+      style.id = STYLE_PREFIX + theme.id;
+      style.textContent = processCSS(theme.css);
+      root.appendChild(style);
+      try {
+        if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
       } catch {
-        /* theme not available - skip */
+        // Keep the authored CSS if this Electron build cannot rewrite a rule.
       }
     }
   })
@@ -375,8 +415,7 @@ const EARLY_LOGOS: Record<string, { path: string; viewBox: string; scale?: strin
   },
 };
 
-ipcRenderer
-  .invoke("settings:get", "pluginStates")
+getSettingCached("pluginStates")
   .then((val: unknown) => {
     const states = val as
       | Record<string, { enabled?: boolean; settings?: Record<string, unknown> }>

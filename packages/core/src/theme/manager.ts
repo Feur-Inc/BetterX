@@ -44,20 +44,24 @@ export class ThemeManager {
     ]);
 
     // Load CSS for each theme id
-    const loaded: Theme[] = [];
-    for (const id of ids) {
-      try {
-        const css = await this.storage.readTheme(id);
-        loaded.push({
-          id,
-          name: id.replace(/\.css$/i, ""),
-          css,
-          enabled: state.active.includes(id),
-        });
-      } catch (err) {
-        logger.warn(`ThemeManager: failed to load theme "${id}"`, err);
-      }
-    }
+    const loaded = (
+      await Promise.all(
+        ids.map(async (id): Promise<Theme | null> => {
+          try {
+            const css = await this.storage.readTheme(id);
+            return {
+              id,
+              name: id.replace(/\.css$/i, ""),
+              css,
+              enabled: state.active.includes(id),
+            };
+          } catch (err) {
+            logger.warn(`ThemeManager: failed to load theme "${id}"`, err);
+            return null;
+          }
+        })
+      )
+    ).filter((theme): theme is Theme => theme !== null);
 
     // Respect saved order
     this.themes = this.sortByOrder(loaded, state.order);

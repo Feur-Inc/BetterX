@@ -21,6 +21,7 @@ type ElectronAPISettings = {
   get(key: string): Promise<unknown>;
   set(key: string, value: unknown): Promise<void>;
   chooseBundlePath(): Promise<string | null>;
+  onChanged(callback: (key: string, value: unknown) => void): () => void;
 };
 
 declare global {
@@ -45,7 +46,6 @@ declare global {
       ): Promise<{
         ok: boolean;
         status: number;
-        json: unknown;
         text: string;
       }>;
       proxyFetch(
@@ -54,12 +54,15 @@ declare global {
       ): Promise<{
         ok: boolean;
         status: number;
-        json: unknown;
         text: string;
       }>;
       discordRPC?: {
         updateActivity(details: string, state: string): void;
+        setStatsEnabled(enabled: boolean): void;
+        getCachedStats(): { followers: number; following: number } | null;
       };
+      loadRendererModule(name: "editor" | "emoji"): Promise<void>;
+      onNavigation(callback: () => void): () => void;
     };
   }
 }

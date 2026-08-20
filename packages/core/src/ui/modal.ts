@@ -135,12 +135,13 @@ export class SettingsModal {
     );
     if (!panel) return;
 
-    if (!this.initialized.has(id)) {
+    const alreadyInitialized = this.initialized.has(id);
+    if (!alreadyInitialized) {
       this.initialized.add(id);
       tab.initialize(panel, this.ctx);
     }
 
-    tab.onActivate?.(panel, this.ctx);
+    if (alreadyInitialized) tab.onActivate?.(panel, this.ctx);
     this.activeTabId = id;
   }
 
