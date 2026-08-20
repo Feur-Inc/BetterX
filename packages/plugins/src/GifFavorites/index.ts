@@ -1,4 +1,5 @@
 import { Devs, definePlugin } from "@betterx/core";
+import { DOMObserver } from "../SharedObserver/index.js";
 
 const STORAGE_KEY = "xcomGifFavorites";
 
@@ -119,7 +120,7 @@ function unpatchXHR(): void {
   origSend = null;
 }
 
-let gifObserver: MutationObserver | null = null;
+let unsubscribeObserver: (() => void) | null = null;
 const positionedParents = new Map<HTMLElement, string>();
 
 function injectStars(): void {
@@ -159,20 +160,20 @@ export default definePlugin({
   name: "GifFavorites",
   description: "Add a favorites category to the GIF picker (like Discord)",
   authors: [Devs.Mopi, Devs.TPM28],
+  dependencies: ["SharedObserver"],
   requiresRestart: true,
 
   start() {
     patchXHR();
 
-    gifObserver = new MutationObserver(injectStars);
-    gifObserver.observe(document.body, { childList: true, subtree: true });
+    unsubscribeObserver = DOMObserver.subscribe(injectStars);
     injectStars();
   },
 
   stop() {
     unpatchXHR();
-    gifObserver?.disconnect();
-    gifObserver = null;
+    unsubscribeObserver?.();
+    unsubscribeObserver = null;
     document.querySelectorAll("[data-bx-gif-star]").forEach((el) => el.remove());
     for (const [parent, position] of positionedParents) parent.style.position = position;
     positionedParents.clear();

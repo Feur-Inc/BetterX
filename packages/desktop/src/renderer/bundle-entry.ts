@@ -55,12 +55,21 @@ async function init(): Promise<void> {
   //    inside plugin start() hooks (cloudFetch routes through main process, bypassing X's CSP)
   const electronAPI = window.electronAPI;
   if (!electronAPI) throw new Error("BetterX desktop API is unavailable");
+  Object.assign(globalThis, {
+    __betterxLoadRendererModule: (name: "editor" | "emoji") => electronAPI.loadRendererModule(name),
+  });
   setFetchProxy(async (url: string, init?: ProxyFetchInit) => {
     const u = new URL(url);
-    if (["/api/config", "/api/me", "/auth/logout"].includes(u.pathname)) {
-      return electronAPI.cloudFetch(u.origin, u.pathname + u.search, init);
+    const response = ["/api/config", "/api/me", "/auth/logout"].includes(u.pathname)
+      ? await electronAPI.cloudFetch(u.origin, u.pathname + u.search, init)
+      : await electronAPI.proxyFetch(u.toString(), init);
+    let json: unknown = null;
+    try {
+      json = JSON.parse(response.text);
+    } catch {
+      // Non-JSON responses are valid.
     }
-    return electronAPI.proxyFetch(u.toString(), init);
+    return { ...response, json };
   });
 
   // 6. Init plugins

@@ -1,4 +1,5 @@
 import { Devs, definePlugin, notifications } from "@betterx/core";
+import { DOMObserver } from "../SharedObserver/index.js";
 
 const SCREENSHOT_BTN_HTML = `
 <button aria-label="Screenshot" role="button"
@@ -14,7 +15,7 @@ const SCREENSHOT_BTN_HTML = `
 </button>
 `.trim();
 
-let screenshotObserver: MutationObserver | null = null;
+let unsubscribeObserver: (() => void) | null = null;
 let screenshotFrame: number | null = null;
 
 function dataUrlToBlob(dataUrl: string): Blob {
@@ -103,12 +104,13 @@ export default definePlugin({
   description: "Adds a screenshot button to tweets that copies the tweet as an image",
   authors: [Devs.TPM28],
   platform: "desktop",
+  dependencies: ["SharedObserver"],
 
   start() {
     const pending = new Set<HTMLElement>();
     let scheduled = false;
 
-    screenshotObserver = new MutationObserver((mutations) => {
+    unsubscribeObserver = DOMObserver.subscribe((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
@@ -130,15 +132,14 @@ export default definePlugin({
         });
       }
     });
-    screenshotObserver.observe(document.body, { childList: true, subtree: true });
     document
       .querySelectorAll<HTMLElement>('article[data-testid="tweet"]')
       .forEach((t) => addScreenshotButton(t));
   },
 
   stop() {
-    screenshotObserver?.disconnect();
-    screenshotObserver = null;
+    unsubscribeObserver?.();
+    unsubscribeObserver = null;
     if (screenshotFrame !== null) cancelAnimationFrame(screenshotFrame);
     screenshotFrame = null;
     document.querySelectorAll('[data-testid="bx-screenshot"]').forEach((btn) => btn.remove());

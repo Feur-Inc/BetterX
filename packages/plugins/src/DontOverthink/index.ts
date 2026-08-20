@@ -1,12 +1,14 @@
 import { Devs, OptionType, definePlugin } from "@betterx/core";
+import { DOMObserver } from "../SharedObserver/index.js";
 
-let dontOverthinkObserver: MutationObserver | null = null;
+let unsubscribeObserver: (() => void) | null = null;
 const dontOverthinkTimers = new Set<ReturnType<typeof setInterval>>();
 
 export default definePlugin({
   name: "DontOverthink",
   description: "Adds a timer to automatically send tweets after a customizable duration",
   authors: [Devs.Mopi, Devs.TPM28],
+  dependencies: ["SharedObserver"],
   requiresRestart: true,
   options: {
     timerDuration: {
@@ -83,16 +85,13 @@ export default definePlugin({
         });
     };
 
-    dontOverthinkObserver = new MutationObserver(checkForComposer);
-    if (document.body) {
-      dontOverthinkObserver.observe(document.body, { childList: true, subtree: true });
-    }
+    unsubscribeObserver = DOMObserver.subscribe(checkForComposer);
     checkForComposer();
   },
 
   stop() {
-    dontOverthinkObserver?.disconnect();
-    dontOverthinkObserver = null;
+    unsubscribeObserver?.();
+    unsubscribeObserver = null;
     for (const id of dontOverthinkTimers) clearInterval(id);
     dontOverthinkTimers.clear();
     document.querySelectorAll("[data-betterx-tweet-timer]").forEach((timer) => timer.remove());

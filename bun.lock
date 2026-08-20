@@ -55,7 +55,10 @@
       "dependencies": {
         "@betterx/core": "*",
         "@betterx/plugins": "*",
+        "@codemirror/lang-css": "^6.3.1",
+        "@codemirror/theme-one-dark": "^6.1.3",
         "@xhayper/discord-rpc": "^1.3.0",
+        "codemirror": "^6.0.2",
         "electron-store": "^10.0.0",
       },
       "devDependencies": {

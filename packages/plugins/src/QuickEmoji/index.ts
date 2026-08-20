@@ -1,5 +1,7 @@
 import { Devs, OptionType, definePlugin, injectStyle, removeStyle } from "@betterx/core";
-import { gemoji, nameToEmoji } from "gemoji";
+import { DOMObserver } from "../SharedObserver/index.js";
+
+declare const __BETTERX_DESKTOP__: boolean;
 
 // ─── Emoji search index built from gemoji ─────────────────────────────────────
 // Each entry maps a searchable name to its emoji character.
@@ -7,11 +9,30 @@ import { gemoji, nameToEmoji } from "gemoji";
 
 type EmojiEntry = { name: string; emoji: string; tags: string[] };
 
-const emojiEntries: EmojiEntry[] = [];
-for (const g of gemoji) {
-  for (const name of g.names) {
-    emojiEntries.push({ name, emoji: g.emoji, tags: g.tags });
+let emojiEntries: EmojiEntry[] = [];
+let nameToEmoji: Record<string, string> = {};
+
+async function loadEmojiIndex(): Promise<void> {
+  if (emojiEntries.length > 0) return;
+  let data: {
+    gemoji: Array<{ names: string[]; emoji: string; tags: string[] }>;
+    nameToEmoji: Record<string, string>;
+  };
+  if (typeof __BETTERX_DESKTOP__ !== "undefined" && __BETTERX_DESKTOP__) {
+    const root = globalThis as typeof globalThis & {
+      __betterxLoadRendererModule?: (name: "emoji") => Promise<void>;
+      __betterxEmojiData?: typeof data;
+    };
+    if (!root.__betterxEmojiData) await root.__betterxLoadRendererModule?.("emoji");
+    if (!root.__betterxEmojiData) throw new Error("Desktop emoji module was not loaded");
+    data = root.__betterxEmojiData;
+  } else {
+    data = await import("gemoji");
   }
+  nameToEmoji = data.nameToEmoji;
+  emojiEntries = data.gemoji.flatMap((emoji) =>
+    emoji.names.map((name) => ({ name, emoji: emoji.emoji, tags: emoji.tags }))
+  );
 }
 
 /** Search emojis by prefix, returns up to `limit` results */
@@ -397,6 +418,7 @@ export default definePlugin({
   name: "QuickEmoji",
   description: "Type :emoji_name: to search and insert emojis - Discord-style autocomplete",
   authors: [Devs.Mopi],
+  dependencies: ["SharedObserver"],
   options: {
     maxResults: {
       type: OptionType.NUMBER,
@@ -411,7 +433,8 @@ export default definePlugin({
     },
   },
 
-  start() {
+  async start() {
+    await loadEmojiIndex();
     maxResults = this.settings.store.maxResults;
     injectStyle(CSS, STYLE_ID);
     dropdown = createDropdown();
@@ -434,9 +457,7 @@ export default definePlugin({
         .forEach(attachToComposer);
     };
 
-    const observer = new MutationObserver(tryAttach);
-    observer.observe(document.body, { childList: true, subtree: true });
-    cleanupFns.push(() => observer.disconnect());
+    cleanupFns.push(DOMObserver.subscribe(tryAttach));
     tryAttach();
   },
 
@@ -447,6 +468,8 @@ export default definePlugin({
     dropdown?.remove();
     dropdown = null;
     activeComposer = null;
+    emojiEntries = [];
+    nameToEmoji = {};
     removeStyle(STYLE_ID);
   },
 });

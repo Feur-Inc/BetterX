@@ -1,4 +1,5 @@
 import { Devs, definePlugin } from "@betterx/core";
+import { DOMObserver } from "../SharedObserver/index.js";
 
 let curW = 469;
 let curH = 530;
@@ -10,7 +11,7 @@ let startY = 0;
 let startW = 0;
 let startH = 0;
 
-let discoveryObserver: MutationObserver | null = null;
+let unsubscribeDiscovery: (() => void) | null = null;
 let drawerObserver: MutationObserver | null = null;
 let currentDrawer: HTMLElement | null = null;
 let style: HTMLStyleElement | null = null;
@@ -140,6 +141,7 @@ export default definePlugin({
   name: "DMDrawerResizer",
   description: "Allows resizing the DM drawer",
   authors: [Devs.TPM28, Devs.Mopi],
+  dependencies: ["SharedObserver"],
 
   start() {
     style = document.createElement("style");
@@ -199,14 +201,13 @@ export default definePlugin({
     const findDrawer = (): void => {
       attachDrawer(document.querySelector<HTMLElement>('[data-testid="chat-drawer-root"]'));
     };
-    discoveryObserver = new MutationObserver(findDrawer);
-    discoveryObserver.observe(document.body, { childList: true, subtree: true });
+    unsubscribeDiscovery = DOMObserver.subscribe(findDrawer);
     findDrawer();
   },
 
   stop() {
-    discoveryObserver?.disconnect();
-    discoveryObserver = null;
+    unsubscribeDiscovery?.();
+    unsubscribeDiscovery = null;
     drawerObserver?.disconnect();
     drawerObserver = null;
     currentDrawer = null;

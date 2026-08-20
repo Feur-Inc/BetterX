@@ -18,7 +18,12 @@ export type ElectronAPI = {
     get(key: string): Promise<unknown>;
     set(key: string, value: unknown): Promise<void>;
     chooseBundlePath(): Promise<string | null>;
+    onChanged(callback: (key: string, value: unknown) => void): () => void;
   };
+
+  /** Load an optional renderer module into BetterX's isolated world. */
+  loadRendererModule(name: "editor" | "emoji"): Promise<void>;
+  onNavigation(callback: () => void): () => void;
 
   // Screenshot capture
   captureElement(rect: { x: number; y: number; width: number; height: number }): Promise<string>;
@@ -41,7 +46,6 @@ export type ElectronAPI = {
   ): Promise<{
     ok: boolean;
     status: number;
-    json: unknown;
     text: string;
   }>;
 
@@ -51,12 +55,13 @@ export type ElectronAPI = {
   ): Promise<{
     ok: boolean;
     status: number;
-    json: unknown;
     text: string;
   }>;
 
   // Discord RPC
   discordRPC: {
     updateActivity(details: string, state: string): void;
+    setStatsEnabled(enabled: boolean): void;
+    getCachedStats(): { followers: number; following: number } | null;
   };
 };

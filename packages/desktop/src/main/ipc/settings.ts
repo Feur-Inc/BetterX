@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain } from "electron";
+import { BrowserWindow, app, dialog, ipcMain } from "electron";
 import { getAllSettings, getSetting, setSetting } from "../services/settings.js";
 import type { DesktopSettings } from "../services/settings.js";
 import { assertTrustedSender } from "./security.js";
@@ -17,12 +17,21 @@ export function registerSettingsHandlers(): void {
     return getSetting(key);
   });
 
+  ipcMain.on("settings:get-sync", (event, key: keyof DesktopSettings) => {
+    assertTrustedSender(event);
+    assertSettingKey(key);
+    event.returnValue = getSetting(key);
+  });
+
   ipcMain.handle(
     "settings:set",
     (event, key: keyof DesktopSettings, value: DesktopSettings[typeof key]) => {
       assertTrustedSender(event);
       assertSettingValue(key, value);
       setSetting(key, value);
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send("settings:changed", key, value);
+      }
       if (key === "autoStart") {
         app.setLoginItemSettings({ openAtLogin: value as boolean });
       }

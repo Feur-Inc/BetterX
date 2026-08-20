@@ -1,6 +1,33 @@
 import type { Theme } from "../../types/theme.js";
 import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
+declare const __BETTERX_DESKTOP__: boolean;
+
+type EditorModules = {
+  EditorView: typeof import("codemirror").EditorView;
+  basicSetup: typeof import("codemirror").basicSetup;
+  css: typeof import("@codemirror/lang-css").css;
+  oneDark: typeof import("@codemirror/theme-one-dark").oneDark;
+};
+
+async function loadEditorModules(): Promise<EditorModules> {
+  if (typeof __BETTERX_DESKTOP__ !== "undefined" && __BETTERX_DESKTOP__) {
+    const root = globalThis as typeof globalThis & {
+      __betterxLoadRendererModule?: (name: "editor") => Promise<void>;
+      __betterxEditorModules?: EditorModules;
+    };
+    if (!root.__betterxEditorModules) await root.__betterxLoadRendererModule?.("editor");
+    if (!root.__betterxEditorModules) throw new Error("Desktop editor module was not loaded");
+    return root.__betterxEditorModules;
+  }
+  const [{ EditorView, basicSetup }, { css }, { oneDark }] = await Promise.all([
+    import("codemirror"),
+    import("@codemirror/lang-css"),
+    import("@codemirror/theme-one-dark"),
+  ]);
+  return { EditorView, basicSetup, css, oneDark };
+}
+
 // ─── Themes Tab ───────────────────────────────────────────────────────────────
 
 const EDITOR_OVERLAY_ID = "betterx-editor-overlay";
@@ -351,12 +378,8 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   };
 
   // Lazy load CodeMirror
-  Promise.all([
-    import("codemirror"),
-    import("@codemirror/lang-css"),
-    import("@codemirror/theme-one-dark"),
-  ])
-    .then(([{ EditorView, basicSetup }, { css }, { oneDark }]) => {
+  loadEditorModules()
+    .then(({ EditorView, basicSetup, css, oneDark }) => {
       if (closed || !editorEl.isConnected) return;
       const view = new EditorView({
         doc: theme.css,

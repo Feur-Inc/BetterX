@@ -1,4 +1,5 @@
 import { Devs, definePlugin, injectStyle, removeStyle } from "@betterx/core";
+import { DOMObserver } from "../SharedObserver/index.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ const CSS = `
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let observer: MutationObserver | null = null;
+let unsubscribeObserver: (() => void) | null = null;
 let cleanupFns: (() => void)[] = [];
 let hiddenIds: Set<string> = new Set();
 let currentNav: HTMLElement | null = null;
@@ -443,6 +444,7 @@ export default definePlugin({
   name: "MenuReorder",
   description: "Drag-and-drop reordering and hiding of navigation menu items",
   authors: [Devs.TPM28, Devs.Mopi],
+  dependencies: ["SharedObserver"],
   start() {
     injectStyle(CSS, STYLE_ID);
     hiddenIds = loadHidden();
@@ -465,14 +467,13 @@ export default definePlugin({
       setupReorder(nav);
     };
 
-    observer = new MutationObserver(tryInit);
-    observer.observe(document.body, { childList: true, subtree: true });
+    unsubscribeObserver = DOMObserver.subscribe(tryInit);
     tryInit();
   },
 
   stop() {
-    observer?.disconnect();
-    observer = null;
+    unsubscribeObserver?.();
+    unsubscribeObserver = null;
     for (const fn of cleanupFns) fn();
     cleanupFns = [];
     document.querySelector(".bx-reorder-ctx")?.remove();

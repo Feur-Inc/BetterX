@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { existsSync, watch } from "node:fs";
+import type { FSWatcher } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,9 +29,12 @@ import { createTray } from "./tray.js";
 import {
   createMainWindow,
   handleBetterxProtocol,
+  invalidateBundleCache,
+  loadOptionalRendererModule,
   registerBetterxProtocol,
   setAssetsPath,
   setBundlePath,
+  setOptionalBundlePath,
 } from "./window.js";
 
 // ─── App Paths ────────────────────────────────────────────────────────────────
@@ -39,6 +43,8 @@ import { BETTERX_DIR } from "./paths.js";
 
 // Default to the bundle packaged with the desktop application.
 const BUNDLE_PATH = join(__dirname, "../bundle/bundle.iife.js");
+const EDITOR_BUNDLE_PATH = join(__dirname, "../bundle/editor.iife.js");
+const EMOJI_BUNDLE_PATH = join(__dirname, "../bundle/emoji.iife.js");
 // Older releases downloaded executable bundles here. Never load that legacy path implicitly.
 const LEGACY_SAVED_BUNDLE_PATH = join(BETTERX_DIR, "bundle.iife.js");
 const PRELOAD_PATH = join(__dirname, "../preload/preload.js");
@@ -51,7 +57,7 @@ async function readLimitedText(response: Response, limit: number): Promise<strin
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let total = 0;
-  let text = "";
+  const chunks: string[] = [];
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -60,9 +66,10 @@ async function readLimitedText(response: Response, limit: number): Promise<strin
       await reader.cancel();
       throw new Error("Response is too large");
     }
-    text += decoder.decode(value, { stream: true });
+    chunks.push(decoder.decode(value, { stream: true }));
   }
-  return text + decoder.decode();
+  chunks.push(decoder.decode());
+  return chunks.join("");
 }
 
 async function assertPublicProxyHost(url: URL): Promise<void> {
@@ -131,6 +138,7 @@ function handleDeepLink(url: string): void {
 const launchDeepLink = process.argv.find((arg) => arg.startsWith("betterx://"));
 
 let mainWindow: BrowserWindow | null = null;
+let bundleWatcher: FSWatcher | null = null;
 
 app.whenReady().then(async () => {
   // Ensure BetterX directory exists
@@ -149,11 +157,18 @@ app.whenReady().then(async () => {
   const bundlePath = hasCustomBundle ? storedPath : BUNDLE_PATH;
   setAssetsPath(join(__dirname, "../../assets"));
   setBundlePath(bundlePath);
+  setOptionalBundlePath("editor", EDITOR_BUNDLE_PATH);
+  setOptionalBundlePath("emoji", EMOJI_BUNDLE_PATH);
 
   // Register IPC handlers
   registerThemeHandlers();
   registerSettingsHandlers();
   registerDiscordRPCHandlers();
+  ipcMain.handle("bx:renderer-module:load", async (event, name: unknown) => {
+    assertTrustedSender(event);
+    if (name !== "editor" && name !== "emoji") throw new Error("Invalid renderer module");
+    await loadOptionalRendererModule(event.sender, name);
+  });
   ipcMain.on("app:get-version", (event) => {
     assertTrustedSender(event);
     event.returnValue = app.getVersion();
@@ -308,15 +323,9 @@ app.whenReady().then(async () => {
         }
 
         const text = await readLimitedText(res, 2_000_000);
-        let json: unknown = null;
-        try {
-          json = JSON.parse(text);
-        } catch {
-          /* not JSON */
-        }
-        return { ok: res.ok, status: res.status, json, text };
+        return { ok: res.ok, status: res.status, text };
       } catch {
-        return { ok: false, status: 0, json: null, text: "Connection failed" };
+        return { ok: false, status: 0, text: "Connection failed" };
       }
     }
   );
@@ -349,18 +358,11 @@ app.whenReady().then(async () => {
           signal: AbortSignal.timeout(20_000),
         });
         const text = await readLimitedText(response, MAX_PROXY_RESPONSE_BYTES);
-        let json: unknown = null;
-        try {
-          json = JSON.parse(text);
-        } catch {
-          // Non-JSON responses are valid.
-        }
-        return { ok: response.ok, status: response.status, json, text };
+        return { ok: response.ok, status: response.status, text };
       } catch (error) {
         return {
           ok: false,
           status: 0,
-          json: null,
           text: error instanceof Error ? error.message : "Proxy request failed",
         };
       }
@@ -426,17 +428,19 @@ app.whenReady().then(async () => {
   // watching the file itself is unreliable - watch the dir instead).
   let reloadTimer: ReturnType<typeof setTimeout> | null = null;
   try {
-    watch(dirname(bundlePath), (_, filename) => {
-      if (filename !== basename(bundlePath)) return;
-      if (reloadTimer) clearTimeout(reloadTimer);
-      reloadTimer = setTimeout(() => {
-        reloadTimer = null;
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.reload();
-          logger.info("[BetterX] Bundle changed - reloading page");
-        }
-      }, 300);
-    });
+    if (process.env.BETTERX_DEV === "1" || hasCustomBundle)
+      bundleWatcher = watch(dirname(bundlePath), (_, filename) => {
+        if (filename !== basename(bundlePath)) return;
+        if (reloadTimer) clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(() => {
+          reloadTimer = null;
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            invalidateBundleCache();
+            mainWindow.webContents.reload();
+            logger.info("[BetterX] Bundle changed - reloading page");
+          }
+        }, 300);
+      });
   } catch {
     // Non-fatal: bundle watching unavailable
   }
@@ -463,6 +467,8 @@ app.on("open-url", (event, url) => {
 app.on("before-quit", () => {
   (app as typeof app & { isQuitting: boolean }).isQuitting = true;
   void destroyDiscordRPC();
+  bundleWatcher?.close();
+  bundleWatcher = null;
 });
 
 app.on("window-all-closed", () => {

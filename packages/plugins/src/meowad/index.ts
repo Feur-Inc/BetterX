@@ -1,4 +1,5 @@
 import { Devs, definePlugin } from "@betterx/core";
+import { DOMObserver } from "../SharedObserver/index.js";
 
 const CAT_PFP =
   "https://lh3.googleusercontent.com/uKLDTLmDr98dhxSjpNa3X4BuLLcPRLncbY9KCvPodXuIg4-Hj0hYfZWcRc29td0Aksm1EoQgHqYA3lf8wlzvugXnAs0";
@@ -10,7 +11,7 @@ mrow meow purrrrr :3 mrow meow mrrrow mrowwww meow meow mrrrrrr mrowww mrow meow
 
 meoww mrrow :3 purrrrr meow :3 meow mrow meowww mrrrow :3`;
 
-let meowadInterval: ReturnType<typeof setInterval> | null = null;
+let unsubscribeObserver: (() => void) | null = null;
 
 function getAds(): HTMLElement[] {
   const ads: HTMLElement[] = [];
@@ -85,17 +86,16 @@ export default definePlugin({
   name: "MeowAd",
   description: "Replaces ads with cute cats :3",
   authors: [Devs.Mopi, Devs.IHateSpawn],
+  dependencies: ["SharedObserver"],
   requiresRestart: true,
 
   start() {
     replaceAds();
-    meowadInterval = setInterval(replaceAds, 500);
+    unsubscribeObserver = DOMObserver.subscribe(replaceAds);
   },
 
   stop() {
-    if (meowadInterval) {
-      clearInterval(meowadInterval);
-      meowadInterval = null;
-    }
+    unsubscribeObserver?.();
+    unsubscribeObserver = null;
   },
 });

@@ -12,11 +12,14 @@ export default defineConfig({
     },
     outDir: "dist/bundle",
     emptyOutDir: false,
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       // All deps bundled into the IIFE
       external: [],
     },
+  },
+  define: {
+    __BETTERX_DESKTOP__: "true",
   },
   resolve: {
     alias: {
