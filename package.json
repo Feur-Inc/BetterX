@@ -28,7 +28,9 @@
     "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/extension/tsconfig.json packages/desktop/tsconfig.json packages/cloud-sync/tsconfig.json && bun run --cwd packages/android typecheck"
   },
   "devDependencies": {
+    "@betterx/core": "*",
     "@biomejs/biome": "^1.9.4",
+    "@types/bun": "1.3.11",
     "typescript": "^5.7.2"
   },
   "dependencies": {
