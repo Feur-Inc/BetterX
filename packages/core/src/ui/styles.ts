@@ -1489,44 +1489,12 @@ export const BETTERX_STYLES = `
 }
 
 /* === BetterX Nav Button === */
-.betterx-nav-button {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px;
-  border-radius: 9999px;
-  cursor: pointer;
-  transition: background 0.15s;
-  text-decoration: none;
-  width: 100%;
+#betterx-nav-btn:hover > div:first-child {
+  background-color: color-mix(in srgb, currentColor 10%, transparent) !important;
 }
 
-.betterx-nav-button:hover {
-  background: var(--betterx-hoverBg);
-}
-
-.betterx-nav-icon {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.betterx-nav-icon svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.betterx-nav-label {
-  font-size: 20px;
-  font-weight: 400;
-  font-family: "TwitterChirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-.betterx-nav-compact .betterx-nav-label {
-  display: none;
+#betterx-nav-btn:hover [dir="ltr"] {
+  color: var(--betterx-textColor) !important;
 }
 
 /* === Focus Indicators === */
