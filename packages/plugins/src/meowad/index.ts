@@ -1,6 +1,7 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 
-const CAT_PFP = "https://lh3.googleusercontent.com/uKLDTLmDr98dhxSjpNa3X4BuLLcPRLncbY9KCvPodXuIg4-Hj0hYfZWcRc29td0Aksm1EoQgHqYA3lf8wlzvugXnAs0";
+const CAT_PFP =
+  "https://lh3.googleusercontent.com/uKLDTLmDr98dhxSjpNa3X4BuLLcPRLncbY9KCvPodXuIg4-Hj0hYfZWcRc29td0Aksm1EoQgHqYA3lf8wlzvugXnAs0";
 const CAT_IMG = "https://pbs.twimg.com/media/GMLPkawXcAAvWiQ?format=jpg&name=small";
 
 const MEOW_TEXT = `meow meow mrrow meow mprrr :3 mrow meow :3 mrowww mrrrow :3
@@ -13,12 +14,14 @@ let meowadInterval: ReturnType<typeof setInterval> | null = null;
 
 function getAds(): HTMLElement[] {
   const ads: HTMLElement[] = [];
-  document.querySelectorAll<HTMLElement>("article[data-testid=tweet]:not(.meowified)").forEach((tweet) => {
-    const span = tweet.querySelector("div.r-1kkk96v span.r-bcqeeo.r-1ttztb7.r-qvutc0.r-poiln3");
-    if (span && (span as HTMLElement).innerText === "Ad") {
-      ads.push(tweet);
-    }
-  });
+  document
+    .querySelectorAll<HTMLElement>("article[data-testid=tweet]:not(.meowified)")
+    .forEach((tweet) => {
+      const span = tweet.querySelector("div.r-1kkk96v span.r-bcqeeo.r-1ttztb7.r-qvutc0.r-poiln3");
+      if (span && (span as HTMLElement).innerText === "Ad") {
+        ads.push(tweet);
+      }
+    });
   return ads;
 }
 
@@ -28,7 +31,9 @@ function replaceAds(): void {
 
     const pfp = tweet.querySelector<HTMLElement>("[style*=profile_images]");
     const tweetText = tweet.querySelector<HTMLElement>("[data-testid=tweetText]");
-    const cardContainer = tweet.querySelector<HTMLElement>("div:has(> [data-testid='card.wrapper'])");
+    const cardContainer = tweet.querySelector<HTMLElement>(
+      "div:has(> [data-testid='card.wrapper'])"
+    );
     const card = cardContainer?.querySelector<HTMLElement>("[data-testid='card.wrapper']");
     const profile = tweet.querySelector<HTMLElement>("[data-testid=User-Name]");
     const displayName = profile?.querySelector<HTMLElement>("a:not([tabindex='-1']) span");
@@ -36,7 +41,9 @@ function replaceAds(): void {
 
     // Replace background images (tweet photos)
     tweet.querySelectorAll<HTMLElement>("div:has(> img)").forEach((imageDiv) => {
-      const image = imageDiv.querySelector<HTMLElement>("div[style*=twimg]:not([style*=profile_images])");
+      const image = imageDiv.querySelector<HTMLElement>(
+        "div[style*=twimg]:not([style*=profile_images])"
+      );
       if (image) {
         image.style.backgroundImage = `url(${CAT_IMG})`;
         image.style.backgroundSize = "100% 100%";
@@ -78,6 +85,7 @@ export default definePlugin({
   name: "MeowAd",
   description: "Replaces ads with cute cats :3",
   authors: [Devs.Mopi, Devs.IHateSpawn],
+  requiresRestart: true,
 
   start() {
     replaceAds();

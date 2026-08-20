@@ -1,7 +1,8 @@
-import { BrowserWindow, protocol, app, shell } from "electron";
-import { join, resolve } from "path";
-import { readFile, access } from "fs/promises";
+import { access, readFile } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { logger } from "@betterx/core";
+import { BrowserWindow, app, protocol, shell } from "electron";
+import { isTrustedRendererUrl, parseExternalHttpUrl } from "./ipc/security.js";
 
 // ─── Window Management ────────────────────────────────────────────────────────
 
@@ -62,9 +63,11 @@ export function handleBetterxProtocol(): void {
     // Serve static assets (logo, icons, etc.)
     if (url.hostname === "assets" && assetsPath) {
       const filename = url.pathname.slice(1); // strip leading /
-      const filePath = resolve(assetsPath, filename);
+      const rootPath = resolve(assetsPath);
+      const filePath = resolve(rootPath, filename);
       // Security: prevent path traversal
-      if (!filePath.startsWith(resolve(assetsPath))) {
+      const relativePath = relative(rootPath, filePath);
+      if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
         return new Response("Forbidden", { status: 403 });
       }
       try {
@@ -107,33 +110,48 @@ export function createMainWindow(preloadPath: string, enableTransparency: boolea
     },
   });
 
-  // Inject BetterX bundle after page load via custom protocol
-  win.webContents.on("did-finish-load", () => {
+  // Run BetterX in an isolated world so X's page scripts cannot access its
+  // privileged Electron API.
+  win.webContents.on("did-finish-load", async () => {
     if (!bundlePath) return;
-    win.webContents
-      .executeJavaScript(`
-        (function() {
-          if (document.getElementById('__betterx__')) return;
-          const s = document.createElement('script');
-          s.id = '__betterx__';
-          s.src = 'betterx://bundle/bundle.js';
-          document.head.appendChild(s);
-        })();
-      `)
-      .catch((err) => logger.error("Failed to inject BetterX script:", err));
+    try {
+      const code = await readFile(bundlePath, "utf8");
+      await win.webContents.executeJavaScriptInIsolatedWorld(1000, [{ code }]);
+    } catch (err) {
+      logger.error("Failed to inject BetterX script:", err);
+    }
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    if (isTrustedRendererUrl(url)) return;
+    event.preventDefault();
+    try {
+      void shell.openExternal(parseExternalHttpUrl(url).toString());
+    } catch {
+      logger.warn("Blocked navigation to unsafe URL:", url);
+    }
   });
 
   // Allow OAuth popups to open inside the app so postMessage works back to the opener
   win.webContents.setWindowOpenHandler(({ url }) => {
     try {
-      const { hostname } = new URL(url);
-      if (hostname === "accounts.google.com" || hostname.endsWith(".google.com") && hostname.includes("accounts")) {
-        return { action: "allow" };
+      const external = parseExternalHttpUrl(url);
+      if (external.hostname === "accounts.google.com") {
+        return {
+          action: "allow",
+          overrideBrowserWindowOptions: {
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              sandbox: true,
+            },
+          },
+        };
       }
+      void shell.openExternal(external.toString());
     } catch {
-      // Malformed URL - fall through to open externally
+      logger.warn("Blocked unsafe popup URL:", url);
     }
-    void shell.openExternal(url);
     return { action: "deny" };
   });
 

@@ -1,4 +1,5 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
+import { DOMObserver } from "../SharedObserver/index.js";
 
 const SELECTORS = [
   'a[href="/i/grok"]',
@@ -11,46 +12,62 @@ const SELECTORS = [
   'div.css-175oi2r.r-1777fci.r-1wzrnnt button[role="button"]',
 ];
 
-let observer: MutationObserver | null = null;
+let grokUnsub: (() => void) | null = null;
+let grokSetupTimer: ReturnType<typeof setTimeout> | null = null;
+let grokDomReady: (() => void) | null = null;
+const hiddenElements = new Map<HTMLElement, { display: string; width: string; height: string }>();
 
 export default definePlugin({
   name: "RemoveGrok",
   description: "Remove all Grok AI elements from the interface",
   authors: [Devs.TPM28],
+  dependencies: ["SharedObserver"],
 
   start() {
     const removeElements = (): void => {
       for (const selector of SELECTORS) {
-        document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+        for (const el of document.querySelectorAll<HTMLElement>(selector)) {
+          if (!hiddenElements.has(el)) {
+            hiddenElements.set(el, {
+              display: el.style.display,
+              width: el.style.width,
+              height: el.style.height,
+            });
+          }
           el.style.display = "none";
           el.style.width = "0px";
           el.style.height = "0px";
-        });
+        }
       }
     };
 
     const setup = (): void => {
       removeElements();
-      observer = new MutationObserver(removeElements);
-      observer.observe(document.body, { childList: true, subtree: true });
+      grokUnsub = DOMObserver.subscribe(removeElements);
     };
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => setTimeout(setup, 400));
+      grokDomReady = () => {
+        grokSetupTimer = setTimeout(setup, 400);
+      };
+      document.addEventListener("DOMContentLoaded", grokDomReady, { once: true });
     } else {
-      setTimeout(setup, 400);
+      grokSetupTimer = setTimeout(setup, 400);
     }
   },
 
   stop() {
-    observer?.disconnect();
-    observer = null;
-    for (const selector of SELECTORS) {
-      document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
-        el.style.removeProperty("display");
-        el.style.removeProperty("width");
-        el.style.removeProperty("height");
-      });
+    grokUnsub?.();
+    grokUnsub = null;
+    if (grokSetupTimer) clearTimeout(grokSetupTimer);
+    grokSetupTimer = null;
+    if (grokDomReady) document.removeEventListener("DOMContentLoaded", grokDomReady);
+    grokDomReady = null;
+    for (const [element, original] of hiddenElements) {
+      element.style.display = original.display;
+      element.style.width = original.width;
+      element.style.height = original.height;
     }
+    hiddenElements.clear();
   },
 });

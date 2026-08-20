@@ -1,5 +1,5 @@
-import type { SettingsTab, BetterXContext } from "../tab-registry.js";
 import type { Theme } from "../../types/theme.js";
+import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
 // ─── Themes Tab ───────────────────────────────────────────────────────────────
 
@@ -58,9 +58,9 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   const modeBtns = new Map<EditorMode, HTMLButtonElement>();
   for (const m of modes) {
     const btn = document.createElement("button");
-    btn.className = "betterx-editor-mode-btn" + (m.key === "full" ? " betterx-editor-mode-active" : "");
+    btn.className = `betterx-editor-mode-btn${m.key === "full" ? " betterx-editor-mode-active" : ""}`;
     btn.textContent = m.label;
-    btn.dataset["mode"] = m.key;
+    btn.dataset.mode = m.key;
     modeBtns.set(m.key, btn);
     modeGroup.appendChild(btn);
   }
@@ -106,8 +106,7 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     const w = splitWidth;
     modal.style.width = `${w}vw`;
     modal.style.maxWidth = `${w}vw`;
-    splitStyle.textContent =
-      `body > #react-root { max-width: ${100 - w}vw !important; overflow-x: hidden !important; }`;
+    splitStyle.textContent = `body > #react-root { max-width: ${100 - w}vw !important; overflow-x: hidden !important; }`;
   };
 
   const clearInlineSize = (): void => {
@@ -383,7 +382,10 @@ export const ThemesTab: SettingsTab = {
 
       const confirm = async () => {
         const name = input.value.trim();
-        if (!name) { restore(); return; }
+        if (!name) {
+          restore();
+          return;
+        }
         restore();
         await ctx.themeManager.create(name);
         this.render(container, ctx);
@@ -407,7 +409,7 @@ export const ThemesTab: SettingsTab = {
       openFolderBtn.style.alignItems = "center";
       openFolderBtn.style.gap = "5px";
       openFolderBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>Open Folder</span>`;
-      openFolderBtn.addEventListener("click", () => ctx.openThemesFolder!());
+      openFolderBtn.addEventListener("click", () => ctx.openThemesFolder?.());
       toolbar.appendChild(openFolderBtn);
     }
 
@@ -476,14 +478,10 @@ export const ThemesTab: SettingsTab = {
     container.appendChild(list);
   },
 
-  buildThemeItem(
-    theme: Theme,
-    ctx: BetterXContext,
-    onRefresh: () => void
-  ): HTMLElement {
+  buildThemeItem(theme: Theme, ctx: BetterXContext, onRefresh: () => void): HTMLElement {
     const item = document.createElement("div");
     item.className = "betterx-theme-item";
-    item.dataset["themeId"] = theme.id;
+    item.dataset.themeId = theme.id;
 
     const drag = document.createElement("span");
     drag.textContent = "⠿";

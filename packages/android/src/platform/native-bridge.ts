@@ -14,7 +14,21 @@ export type NativePayload = {
   method?: string | undefined;
   headers?: Record<string, string> | undefined;
   body?: string | undefined;
+  credentials?: "include" | "omit" | undefined;
 };
+
+const BRIDGE_TOKEN = "__BETTERX_NATIVE_TOKEN__";
+const initialBridge = (
+  globalThis as typeof globalThis & { BetterXAndroid?: NativeBridge | undefined }
+).BetterXAndroid;
+const nativePostMessage = initialBridge?.postMessage.bind(initialBridge);
+try {
+  (globalThis as typeof globalThis & { BetterXAndroid?: NativeBridge | undefined }).BetterXAndroid =
+    undefined;
+} catch {
+  // Some WebView versions expose the bridge as non-configurable. The native
+  // capability token still rejects calls made outside this closure.
+}
 
 type NativeResponse = {
   id: string;
@@ -23,13 +37,16 @@ type NativeResponse = {
   error?: string;
 };
 
-const pendingRequests = new Map<string, { resolve: (value: unknown) => void; reject: (reason: Error) => void }>();
+const pendingRequests = new Map<
+  string,
+  { resolve: (value: unknown) => void; reject: (reason: Error) => void }
+>();
 
 let requestSeq = 0;
 let hookedNativeBridge = false;
 
 export function getBridge(): NativeBridge | undefined {
-  return (globalThis as typeof globalThis & { BetterXAndroid?: NativeBridge }).BetterXAndroid;
+  return initialBridge;
 }
 
 export async function requestNative<T>(payload: NativePayload): Promise<T> {
@@ -62,7 +79,7 @@ export async function requestNative<T>(payload: NativePayload): Promise<T> {
   }
 
   const id = `${Date.now().toString(36)}-${++requestSeq}`;
-  const request = { id, ...payload };
+  const request = { id, token: BRIDGE_TOKEN, ...payload };
 
   return await new Promise<T>((resolve, reject) => {
     const timeout = window.setTimeout(() => {
@@ -82,7 +99,8 @@ export async function requestNative<T>(payload: NativePayload): Promise<T> {
     });
 
     try {
-      bridge.postMessage(JSON.stringify(request));
+      if (!nativePostMessage) throw new Error("BetterXAndroid bridge unavailable");
+      nativePostMessage(JSON.stringify(request));
     } catch (error) {
       pendingRequests.delete(id);
       window.clearTimeout(timeout);

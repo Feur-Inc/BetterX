@@ -1,29 +1,30 @@
 // ─── BetterX Content Script ───────────────────────────────────────────────────
 // Runs in ISOLATED world - has browser.* API access while still sharing the DOM.
 
-import browser from "webextension-polyfill";
 import {
-  PluginManager,
-  ThemeManager,
-  NotificationManager,
-  TabRegistry,
-  PluginsTab,
-  ThemesTab,
+  AboutTab,
+  type BetterXContext,
   CloudTab,
   DeveloperTab,
-  AboutTab,
-  SettingsModal,
-  type BetterXContext,
-  injectNavButton,
-  watchNavButton,
-  applyAccentColor,
-  injectStyle,
-  setImageProxy,
-  setFetchProxy,
+  NotificationManager,
+  PluginManager,
+  PluginsTab,
   type ProxyFetchInit,
+  SettingsModal,
+  TabRegistry,
+  ThemeManager,
+  ThemesTab,
+  applyAccentColor,
+  injectNavButton,
+  injectStyle,
+  setFetchProxy,
+  setImageProxy,
+  startCloudAutoSync,
+  watchNavButton,
 } from "@betterx/core";
 import { BETTERX_STYLES } from "@betterx/core";
 import { allPlugins } from "@betterx/plugins";
+import browser from "webextension-polyfill";
 import { ExtensionStorage } from "../background/storage.js";
 import { registerMainWorldBridge } from "./bridge.js";
 
@@ -50,18 +51,14 @@ async function init(): Promise<void> {
   // 4. Init themes first (applies CSS before plugins run)
   await themeManager.initialize();
 
-  // 5. Init plugins
-  await pluginManager.initialize(allPlugins, "extension");
-
-  // 6. Apply accent color
-  applyAccentColor();
-
   const logoUrl = browser.runtime.getURL("icons/icon.svg");
 
   // 7. Register image proxy so plugins can bypass X's CSP
   const proxyImageFn = async (url: string): Promise<string> => {
     try {
-      const res = await browser.runtime.sendMessage({ type: "PROXY_IMAGE", url }) as { dataUrl?: string };
+      const res = (await browser.runtime.sendMessage({ type: "PROXY_IMAGE", url })) as {
+        dataUrl?: string;
+      };
       return res?.dataUrl ?? url;
     } catch {
       return url;
@@ -70,19 +67,27 @@ async function init(): Promise<void> {
   setImageProxy(proxyImageFn);
   setFetchProxy(async (url: string, init?: ProxyFetchInit) => {
     try {
-      return await browser.runtime.sendMessage({ type: "PROXY_FETCH", url, ...init }) as
-        { ok: boolean; status: number; text: string; json: unknown };
+      return (await browser.runtime.sendMessage({ type: "PROXY_FETCH", url, ...init })) as {
+        ok: boolean;
+        status: number;
+        text: string;
+        json: unknown;
+      };
     } catch {
       return { ok: false, status: 0, text: "Extension messaging failed", json: null };
     }
   });
+
+  // Proxies must be registered before plugin start hooks run.
+  await pluginManager.initialize(allPlugins, "extension");
+  applyAccentColor();
 
   // OAuth completion callbacks — fired when the background SW closes the OAuth tab
   const oauthCallbacks: Array<() => void> = [];
   browser.runtime.onMessage.addListener((message) => {
     const msg = message as { type?: string };
     if (msg.type === "OAUTH_COMPLETE") {
-      oauthCallbacks.forEach((cb) => cb());
+      for (const callback of oauthCallbacks) callback();
       return Promise.resolve({ ok: true });
     }
     return undefined;
@@ -113,6 +118,7 @@ async function init(): Promise<void> {
       };
     },
   };
+  startCloudAutoSync(ctx);
 
   // 8. Create modal
   const modal = new SettingsModal(ctx);

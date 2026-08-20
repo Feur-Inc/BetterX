@@ -20,14 +20,39 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 34
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test
+        run: bun run test
 
       - name: Typecheck
         run: bun run typecheck
 
       - name: Build all
         run: bun run build
+
+      - name: Build Android web bundle
+        run: bun run --cwd packages/android build:web
+
+      - name: Build Android APK
+        run: ./gradlew assembleDebug
+        working-directory: packages/android
 
       - name: Upload extension artifact
         uses: actions/upload-artifact@v4
@@ -75,11 +100,11 @@ jobs:
         working-directory: packages/desktop
 
       - name: Create release
-        uses: actions/gitea-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GITEA_TOKEN }}
+          token: ${{ github.token }}
           tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}
-          release_name: "BetterX V3 v${{ steps.version.outputs.version }}"
+          name: "BetterX V3 v${{ steps.version.outputs.version }}"
           files: |
             betterx-extension.zip
           body: |

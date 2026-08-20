@@ -1,4 +1,4 @@
-import { definePlugin, Devs, OptionType } from "@betterx/core";
+import { Devs, OptionType, definePlugin } from "@betterx/core";
 
 let dontOverthinkObserver: MutationObserver | null = null;
 const dontOverthinkTimers = new Set<ReturnType<typeof setInterval>>();

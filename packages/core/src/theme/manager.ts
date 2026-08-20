@@ -123,9 +123,7 @@ export class ThemeManager {
 
   async reorder(ids: string[]): Promise<void> {
     const map = new Map(this.themes.map((t) => [t.id, t]));
-    this.themes = ids
-      .map((id) => map.get(id))
-      .filter((t): t is Theme => t !== undefined);
+    this.themes = ids.map((id) => map.get(id)).filter((t): t is Theme => t !== undefined);
 
     await this.persistState();
   }
@@ -176,7 +174,10 @@ export class ThemeManager {
   }
 
   private uniqueId(name: string): string {
-    const base = name.trim().replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+    const base = name
+      .trim()
+      .replace(/[^a-z0-9_-]/gi, "_")
+      .toLowerCase();
     const id = base.endsWith(".css") ? base : `${base}.css`;
 
     if (!this.themes.some((t) => t.id === id)) return id;

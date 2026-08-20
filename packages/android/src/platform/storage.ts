@@ -1,7 +1,7 @@
-import browser from "./browser.js";
 import type { IStorage } from "@betterx/core";
 import type { PluginStorageData } from "@betterx/core";
 import type { ThemeStorageState } from "@betterx/core";
+import browser from "./browser.js";
 
 // ─── Android Storage (IStorage impl) ─────────────────────────────────────────
 // Plugin states + theme metadata → browser.storage.sync

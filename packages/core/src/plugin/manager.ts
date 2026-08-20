@@ -20,16 +20,8 @@ export class PluginManager {
     this.storage = storage;
   }
 
-  /**
-   * Initialize all plugins from the barrel export.
-   * Reads persisted states, merges with defaults, starts enabled plugins.
-   *
-   * Accepts PluginDefinition<any>[] because each plugin has a unique options
-   * generic that is invariant due to the typed `this` parameter.
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async initialize(
-    definitions: ReadonlyArray<PluginDefinition<any>>,
+    definitions: ReadonlyArray<PluginDefinition<PluginOptionDefs>>,
     platform?: PluginPlatform
   ): Promise<void> {
     const saved = await this.storage.getPluginStates();
@@ -50,7 +42,7 @@ export class PluginManager {
     this.initialized = true;
 
     // Start enabled plugins in dependency order so deps are running before dependents.
-    this.startInOrder();
+    await this.startInOrder();
 
     logger.info(`PluginManager: ${this.plugins.size} plugins loaded`);
   }
@@ -96,20 +88,31 @@ export class PluginManager {
     if (!plugin || plugin.unavailable || plugin.isLibrary || plugin.isMeta) return;
 
     if (plugin.enabled) {
-      const disabled = this.disableWithDependents(name);
-      this.disableOrphanedLibraries();
+      const disabled = await this.disableWithDependents(name);
+      await this.disableOrphanedLibraries();
       const cascade = disabled.filter((n) => n !== name);
       if (cascade.length > 0) {
         notifications.showWarning(
-          `Also disabled: ${cascade.join(", ")} (depend on "${plugin.name}")`,
+          `Also disabled: ${cascade.join(", ")} (depend on "${plugin.name}")`
         );
       }
     } else {
-      const enabled = this.enableWithDependencies(name);
+      const dependencyIssue = this.findDependencyIssue(name);
+      if (dependencyIssue) {
+        notifications.showError(`Cannot enable "${plugin.name}": ${dependencyIssue}`);
+        return;
+      }
+      const enabled = await this.enableWithDependencies(name);
+      if (!plugin.enabled) {
+        await this.disableOrphanedLibraries();
+        await this.persist();
+        notifications.showError(`Could not enable "${plugin.name}" because a dependency failed.`);
+        return;
+      }
       const auto = enabled.filter((n) => n !== name);
       if (auto.length > 0) {
         notifications.showWarning(
-          `Also enabled: ${auto.join(", ")} (required by "${plugin.name}")`,
+          `Also enabled: ${auto.join(", ")} (required by "${plugin.name}")`
         );
       }
     }
@@ -136,8 +139,31 @@ export class PluginManager {
       .map((p) => p.name);
   }
 
+  private findDependencyIssue(
+    name: string,
+    visiting = new Set<string>(),
+    visited = new Set<string>()
+  ): string | null {
+    if (visiting.has(name)) return `dependency cycle includes "${name}"`;
+    if (visited.has(name)) return null;
+    const plugin = this.plugins.get(name);
+    if (!plugin || plugin.unavailable) return `dependency "${name}" is unavailable`;
+
+    visiting.add(name);
+    for (const dependencyName of plugin.dependencies ?? []) {
+      const issue = this.findDependencyIssue(dependencyName, visiting, visited);
+      if (issue) return issue;
+    }
+    visiting.delete(name);
+    visited.add(name);
+    return null;
+  }
+
   /** Enable a plugin after enabling its dependencies. Returns all newly-enabled names. */
-  private enableWithDependencies(name: string, visited = new Set<string>()): string[] {
+  private async enableWithDependencies(
+    name: string,
+    visited = new Set<string>()
+  ): Promise<string[]> {
     if (visited.has(name)) return [];
     visited.add(name);
 
@@ -149,49 +175,66 @@ export class PluginManager {
     for (const depName of plugin.dependencies ?? []) {
       const dep = this.plugins.get(depName);
       if (!dep || dep.unavailable || dep.enabled) continue;
-      enabled.push(...this.enableWithDependencies(depName, visited));
+      enabled.push(...(await this.enableWithDependencies(depName, visited)));
+      if (!dep.enabled) {
+        await this.rollbackEnabled(enabled);
+        return [];
+      }
     }
 
     plugin.enabled = true;
-    this.safeCall(plugin, "start");
-    enabled.push(name);
+    if (await this.safeCall(plugin, "start")) enabled.push(name);
     return enabled;
   }
 
+  private async rollbackEnabled(names: string[]): Promise<void> {
+    for (const name of names.reverse()) {
+      const plugin = this.plugins.get(name);
+      if (!plugin?.enabled) continue;
+      plugin.enabled = false;
+      await this.safeCall(plugin, "stop");
+    }
+  }
+
   /** Disable a plugin and cascade to anything that depends on it. Returns all disabled names. */
-  private disableWithDependents(name: string, visited = new Set<string>()): string[] {
+  private async disableWithDependents(
+    name: string,
+    visited = new Set<string>()
+  ): Promise<string[]> {
     if (visited.has(name)) return [];
     visited.add(name);
 
     const plugin = this.plugins.get(name);
     if (!plugin || !plugin.enabled) return [];
 
-    plugin.enabled = false;
-    this.safeCall(plugin, "stop");
-    const disabled = [name];
+    const disabled: string[] = [];
 
     for (const [depName, dep] of this.plugins) {
       if (dep.enabled && dep.dependencies?.includes(name)) {
-        disabled.push(...this.disableWithDependents(depName, visited));
+        disabled.push(...(await this.disableWithDependents(depName, visited)));
       }
     }
+
+    plugin.enabled = false;
+    await this.safeCall(plugin, "stop");
+    disabled.push(name);
 
     return disabled;
   }
 
   /** Disable any library plugin that has no enabled dependents. Iterates until stable. */
-  private disableOrphanedLibraries(): void {
+  private async disableOrphanedLibraries(): Promise<void> {
     let changed = true;
     while (changed) {
       changed = false;
       for (const [name, plugin] of this.plugins) {
         if (!plugin.isLibrary || !plugin.enabled) continue;
         const hasActiveDependents = Array.from(this.plugins.values()).some(
-          (p) => p.enabled && p.dependencies?.includes(name),
+          (p) => p.enabled && p.dependencies?.includes(name)
         );
         if (!hasActiveDependents) {
           plugin.enabled = false;
-          this.safeCall(plugin, "stop");
+          await this.safeCall(plugin, "stop");
           changed = true;
         }
       }
@@ -199,22 +242,42 @@ export class PluginManager {
   }
 
   /** Start all enabled plugins respecting dependency order. */
-  private startInOrder(): void {
+  private async startInOrder(): Promise<void> {
     const started = new Set<string>();
+    const failed = new Set<string>();
 
-    const start = (name: string, visiting = new Set<string>()): void => {
-      if (started.has(name) || visiting.has(name)) return;
+    const start = async (name: string, visiting = new Set<string>()): Promise<boolean> => {
+      if (started.has(name)) return true;
+      if (failed.has(name)) return false;
+      if (visiting.has(name)) {
+        logger.error(`Plugin dependency cycle detected at "${name}"`);
+        failed.add(name);
+        return false;
+      }
       visiting.add(name);
       const plugin = this.plugins.get(name);
-      if (!plugin || !plugin.enabled) return;
+      if (!plugin || !plugin.enabled) return false;
       for (const depName of plugin.dependencies ?? []) {
-        start(depName, visiting);
+        const dependency = this.plugins.get(depName);
+        if (!dependency || dependency.unavailable || !(await start(depName, visiting))) {
+          logger.error(`Plugin "${plugin.name}" requires unavailable dependency "${depName}"`);
+          plugin.enabled = false;
+          failed.add(name);
+          visiting.delete(name);
+          return false;
+        }
+      }
+      visiting.delete(name);
+      if (!(await this.safeCall(plugin, "start"))) {
+        failed.add(name);
+        return false;
       }
       started.add(name);
-      this.safeCall(plugin, "start");
+      return true;
     };
 
-    for (const name of this.plugins.keys()) start(name);
+    for (const name of this.plugins.keys()) await start(name);
+    if (failed.size > 0) await this.persist();
   }
 
   async updateOption(pluginName: string, key: string, value: unknown): Promise<void> {
@@ -230,7 +293,7 @@ export class PluginManager {
     const onChange = (optDef as { onChange?: (n: unknown, o: unknown) => void }).onChange;
     if (onChange) {
       try {
-        onChange(value, oldValue);
+        await onChange(value, oldValue);
       } catch (err) {
         logger.error(`Plugin "${pluginName}" onChange for "${key}" threw:`, err);
       }
@@ -239,17 +302,18 @@ export class PluginManager {
     await this.persist();
   }
 
-  private safeCall(plugin: Plugin, method: "start" | "stop"): void {
+  private async safeCall(plugin: Plugin, method: "start" | "stop"): Promise<boolean> {
     const fn = plugin[method];
-    if (typeof fn !== "function") return;
+    if (typeof fn !== "function") return true;
     try {
-      fn.call(plugin);
+      await fn.call(plugin);
+      return true;
     } catch (err) {
       logger.error(`Plugin "${plugin.name}" threw during ${method}():`, err);
       if (method === "start") {
         plugin.enabled = false;
-        this.persist().catch(() => undefined);
       }
+      return false;
     }
   }
 

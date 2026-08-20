@@ -274,7 +274,9 @@ function buildMobileButton(drawer: HTMLElement, onClick: OnClickFn): HTMLElement
 }
 
 function insertMobileButton(drawer: HTMLElement, row: HTMLElement): void {
-  const logoutRow = drawer.querySelector('a[href="/logout"], a[data-testid="logout"]')?.parentElement;
+  const logoutRow = drawer.querySelector(
+    'a[href="/logout"], a[data-testid="logout"]'
+  )?.parentElement;
   const separatorWrapper = drawer.querySelector('[role="separator"]')?.parentElement;
   if (separatorWrapper?.parentElement) {
     separatorWrapper.parentElement.insertBefore(row, separatorWrapper);
@@ -308,7 +310,11 @@ function injectMobileNavButton(onClick: OnClickFn): void {
   insertMobileButton(drawer, row);
 }
 
-export function injectNavButton(onClick: OnClickFn, logoUrl: string, platform: Platform = "desktop"): void {
+export function injectNavButton(
+  onClick: OnClickFn,
+  logoUrl: string,
+  platform: Platform = "desktop"
+): void {
   if (platform === "android") {
     injectMobileNavButton(onClick);
     return;
@@ -332,7 +338,11 @@ export function removeNavButton(): void {
   removeStyle(MOBILE_STYLE_ID);
 }
 
-export function ensureNavButton(onClick: OnClickFn, logoUrl: string, platform: Platform = "desktop"): void {
+export function ensureNavButton(
+  onClick: OnClickFn,
+  logoUrl: string,
+  platform: Platform = "desktop"
+): void {
   if (!document.getElementById(BUTTON_ID)) {
     injectNavButton(onClick, logoUrl, platform);
   }
@@ -341,7 +351,11 @@ export function ensureNavButton(onClick: OnClickFn, logoUrl: string, platform: P
 /**
  * Watch for the BetterX nav item being removed by SPA rerenders.
  */
-export function watchNavButton(onClick: OnClickFn, logoUrl: string, platform: Platform = "desktop"): () => void {
+export function watchNavButton(
+  onClick: OnClickFn,
+  logoUrl: string,
+  platform: Platform = "desktop"
+): () => void {
   if (platform === "android") {
     ensureMobileStyles();
   }

@@ -6,7 +6,8 @@
     "packages/plugins",
     "packages/extension",
     "packages/desktop",
-    "packages/cloud-sync"
+    "packages/cloud-sync",
+    "packages/android"
   ],
   "scripts": {
     "build": "bun run build:core && bun run build:plugins && bun run build:extension && bun run build:desktop && bun run build:cloud-sync",
@@ -20,9 +21,10 @@
     "start:desktop": "bun run --cwd packages/desktop start",
     "dev:extension": "bun run --cwd packages/extension dev",
     "dev:desktop": "bun run --cwd packages/desktop dev:all",
+    "test": "bun test packages/core/src packages/desktop/src",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/extension/tsconfig.json packages/desktop/tsconfig.json packages/cloud-sync/tsconfig.json"
+    "typecheck": "tsc --build packages/core/tsconfig.json packages/plugins/tsconfig.json packages/extension/tsconfig.json packages/desktop/tsconfig.json packages/cloud-sync/tsconfig.json && bun run --cwd packages/android typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

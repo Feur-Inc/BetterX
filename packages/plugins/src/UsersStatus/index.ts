@@ -1,4 +1,4 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 import { DOMObserver } from "../SharedObserver/index.js";
 
 // UsersStatus: Shows BetterX badge on profiles.

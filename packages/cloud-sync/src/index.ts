@@ -1,56 +1,96 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { serveStatic } from "hono/bun";
-import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
-import { db } from "./db/schema.js";
 import { SignJWT, jwtVerify } from "jose";
+import { db } from "./db/schema.js";
 
 type Env = {
   Variables: {
-    user: any;
+    user: { id: string; username?: string };
   };
 };
 
+function requiredEnv(name: string, minLength = 1): string {
+  const value = process.env[name]?.trim();
+  if (!value || value.length < minLength) {
+    throw new Error(
+      `${name} must be configured${minLength > 1 ? ` with at least ${minLength} characters` : ""}`
+    );
+  }
+  return value;
+}
+
+const BASE_URL = new URL(requiredEnv("BASE_URL"));
+if (
+  BASE_URL.protocol !== "https:" &&
+  BASE_URL.hostname !== "localhost" &&
+  BASE_URL.hostname !== "127.0.0.1"
+) {
+  throw new Error("BASE_URL must use HTTPS outside local development");
+}
+const TWITTER_CLIENT_ID = requiredEnv("TWITTER_CLIENT_ID");
+const TWITTER_CLIENT_SECRET = requiredEnv("TWITTER_CLIENT_SECRET");
+const ALLOWED_ORIGINS = new Set([
+  BASE_URL.origin,
+  ...(process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+]);
 const app = new Hono<Env>();
-const JWT_SECRET = new TextEncoder().encode(process.env.SESSION_SECRET || "default_secret_change_me");
+const JWT_SECRET = new TextEncoder().encode(requiredEnv("SESSION_SECRET", 32));
+const MAX_CONFIG_BYTES = 5_000_000;
+const MAX_PLUGINS = 250;
+const MAX_THEMES = 100;
+const MAX_THEME_BYTES = 2_000_000;
 
 app.use("*", honoLogger());
-app.use("*", cors({
-  origin: (origin) => {
-    if (!origin) return null;
-    if (
-      origin.startsWith("chrome-extension://") || 
-      origin.startsWith("moz-extension://") || 
-      origin === process.env.BASE_URL ||
-      origin.includes("twitter.com") ||
-      origin.includes("x.com")
-    ) {
-      return origin;
-    }
-    return null;
-  },
-  allowMethods: ["GET", "POST", "OPTIONS"],
-  allowHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-}));
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("X-Frame-Options", "DENY");
+  c.header(
+    "Content-Security-Policy",
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src https: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+  );
+});
+app.use(
+  "*",
+  cors({
+    origin: (origin) => (origin && ALLOWED_ORIGINS.has(origin) ? origin : null),
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 // ─── Middleware for Auth ─────────────────────────────────────────────────────
-const authMiddleware = async (c: any, next: any) => {
+const authMiddleware: MiddlewareHandler<Env> = async (c, next) => {
   const token = getCookie(c, "bx_session");
   const path = c.req.path;
   const isApi = path.startsWith("/api/");
-  
+
   if (!token) {
     if (isApi) return c.json({ error: "Unauthorized", reason: "no_token" }, 401);
     return c.redirect("/auth/twitter");
   }
 
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    c.set("user", payload);
+    const { payload } = await jwtVerify(token, JWT_SECRET, {
+      issuer: BASE_URL.origin,
+      audience: "betterx-cloud",
+    });
+    if (typeof payload.id !== "string" || payload.id.length === 0) {
+      throw new Error("Session is missing a user id");
+    }
+    const user = { id: payload.id } as { id: string; username?: string };
+    if (typeof payload.username === "string") user.username = payload.username;
+    c.set("user", user);
     await next();
-  } catch (e) {
+  } catch {
     if (isApi) return c.json({ error: "Unauthorized", reason: "invalid_token" }, 401);
     return c.redirect("/auth/twitter");
   }
@@ -81,7 +121,13 @@ async function pkceChallenge(verifier: string): Promise<string> {
 }
 
 // SameSite=Lax so the cookies survive Twitter's top-level GET redirect back to /auth/callback
-const OAUTH_COOKIE = { httpOnly: true, maxAge: 600, path: "/", sameSite: "Lax" } as const;
+const OAUTH_COOKIE = {
+  httpOnly: true,
+  maxAge: 600,
+  path: "/",
+  sameSite: "Lax",
+  secure: BASE_URL.protocol === "https:",
+} as const;
 
 app.get("/auth/twitter", async (c) => {
   const state = randomToken();
@@ -92,9 +138,9 @@ app.get("/auth/twitter", async (c) => {
 
   const url = new URL(TWITTER_OAUTH_URL);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", process.env.TWITTER_CLIENT_ID!);
-  url.searchParams.set("redirect_uri", `${process.env.BASE_URL}/auth/callback`);
-  url.searchParams.set("scope", "tweet.read users.read offline.access");
+  url.searchParams.set("client_id", TWITTER_CLIENT_ID);
+  url.searchParams.set("redirect_uri", `${BASE_URL.origin}/auth/callback`);
+  url.searchParams.set("scope", "tweet.read users.read");
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", await pkceChallenge(codeVerifier));
   url.searchParams.set("code_challenge_method", "S256");
@@ -120,95 +166,172 @@ app.get("/auth/callback", async (c) => {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${btoa(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`)}`,
+      Authorization: `Basic ${btoa(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`)}`,
     },
     body: new URLSearchParams({
       code,
       grant_type: "authorization_code",
-      redirect_uri: `${process.env.BASE_URL}/auth/callback`,
+      redirect_uri: `${BASE_URL.origin}/auth/callback`,
       code_verifier: codeVerifier,
     }),
   });
 
-  const data: any = await response.json();
-  if (!data.access_token) return c.json(data, 400);
+  const data = (await response.json()) as Record<string, unknown>;
+  if (!response.ok || typeof data.access_token !== "string") {
+    return c.json({ error: "Twitter token exchange failed" }, 400);
+  }
 
   // Get user info
   const userRes = await fetch(`${TWITTER_USER_URL}?user.fields=profile_image_url`, {
     headers: { Authorization: `Bearer ${data.access_token}` },
   });
-  const userData: any = await userRes.json();
+  const userData = (await userRes.json()) as { data?: Record<string, unknown> };
   const twitterUser = userData.data;
 
-  if (!twitterUser?.id) {
-    console.error("Twitter user fetch failed:", JSON.stringify(userData));
-    return c.json({ error: "Failed to fetch Twitter user", details: userData }, 500);
+  if (!userRes.ok || typeof twitterUser?.id !== "string") {
+    console.error(`Twitter user fetch failed (${userRes.status})`);
+    return c.json({ error: "Failed to fetch Twitter user" }, 502);
   }
 
   // Sync with DB — update username + pfp on re-login
-  db.run(`
+  const username = typeof twitterUser.username === "string" ? twitterUser.username : "unknown";
+  const profileImageUrl =
+    typeof twitterUser.profile_image_url === "string" ? twitterUser.profile_image_url : null;
+
+  db.run(
+    `
     INSERT INTO users (id, twitter_id, username, profile_image_url)
     VALUES (?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       username = excluded.username,
       profile_image_url = excluded.profile_image_url
-  `, [twitterUser.id, twitterUser.id, twitterUser.username, twitterUser.profile_image_url ?? null]);
+  `,
+    [twitterUser.id, twitterUser.id, username, profileImageUrl]
+  );
 
-  const token = await new SignJWT({ id: twitterUser.id, username: twitterUser.username })
+  const token = await new SignJWT({ id: twitterUser.id, username })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(BASE_URL.origin)
+    .setAudience("betterx-cloud")
     .setExpirationTime("30d")
     .sign(JWT_SECRET);
 
-  setCookie(c, "bx_session", token, { httpOnly: true, maxAge: 30 * 24 * 3600, sameSite: "None", secure: true });
+  const secure = BASE_URL.protocol === "https:";
+  setCookie(c, "bx_session", token, {
+    httpOnly: true,
+    maxAge: 30 * 24 * 3600,
+    path: "/",
+    sameSite: secure ? "None" : "Lax",
+    secure,
+  });
   return c.redirect("/");
 });
 
 app.get("/auth/logout", (c) => {
-  deleteCookie(c, "bx_session");
+  deleteCookie(c, "bx_session", { path: "/" });
   return c.redirect("/auth/twitter");
 });
 
 // ─── Validation Helpers ──────────────────────────────────────────────────────
-function validateConfig(data: any): { plugin_states: any, theme_state: any } | null {
-  if (!data || typeof data !== "object") return null;
+type JsonObject = Record<string, unknown>;
+type StoredConfig = {
+  plugin_states: Record<string, { enabled: boolean; settings: JsonObject }>;
+  theme_state: { order: string[]; active: string[]; themes: Record<string, string> };
+};
 
-  const plugin_states: Record<string, any> = {};
-  if (data.plugin_states && typeof data.plugin_states === "object") {
-    for (const [key, value] of Object.entries(data.plugin_states)) {
-      if (typeof key !== "string" || !value || typeof value !== "object") continue;
-      const v = value as any;
-      // Accept both "settings" (actual app format) and "store" (legacy)
-      const settings = (v.settings && typeof v.settings === "object") ? v.settings
-        : (v.store && typeof v.store === "object") ? v.store
-        : {};
-      plugin_states[key] = {
-        enabled: Boolean(v.enabled),
-        settings,
+function isObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validThemeId(value: unknown): value is string {
+  return typeof value === "string" && /^[a-zA-Z0-9_-]{1,100}\.css$/.test(value);
+}
+
+function validateConfig(data: unknown): StoredConfig | null {
+  if (!isObject(data)) return null;
+
+  const pluginStates: StoredConfig["plugin_states"] = {};
+  if (isObject(data.plugin_states)) {
+    const entries = Object.entries(data.plugin_states);
+    if (entries.length > MAX_PLUGINS) return null;
+    for (const [key, value] of entries) {
+      if (key.length === 0 || key.length > 100 || !isObject(value)) return null;
+      const candidateSettings = isObject(value.settings)
+        ? value.settings
+        : isObject(value.store)
+          ? value.store
+          : {};
+      pluginStates[key] = {
+        enabled: value.enabled === true,
+        settings: candidateSettings,
       };
     }
   }
 
-  const theme_state = {
-    order: Array.isArray(data.theme_state?.order) ? data.theme_state.order.filter((i: any) => typeof i === "string") : [],
-    active: Array.isArray(data.theme_state?.active) ? data.theme_state.active.filter((i: any) => typeof i === "string") : []
-  };
+  const rawThemeState = isObject(data.theme_state) ? data.theme_state : {};
+  const themes: Record<string, string> = {};
+  if (isObject(rawThemeState.themes)) {
+    const entries = Object.entries(rawThemeState.themes);
+    if (entries.length > MAX_THEMES) return null;
+    for (const [id, css] of entries) {
+      if (!validThemeId(id) || typeof css !== "string" || css.length > MAX_THEME_BYTES) {
+        return null;
+      }
+      themes[id] = css;
+    }
+  }
 
-  return { plugin_states, theme_state };
+  const normalizeIds = (value: unknown): string[] =>
+    Array.isArray(value) ? [...new Set(value.filter(validThemeId))].slice(0, MAX_THEMES) : [];
+
+  return {
+    plugin_states: pluginStates,
+    theme_state: {
+      order: normalizeIds(rawThemeState.order),
+      active: normalizeIds(rawThemeState.active),
+      themes,
+    },
+  };
+}
+
+function emptyConfig(): StoredConfig {
+  return { plugin_states: {}, theme_state: { order: [], active: [], themes: {} } };
+}
+
+function readStoredConfig(row: unknown): StoredConfig {
+  if (
+    !isObject(row) ||
+    typeof row.plugin_states !== "string" ||
+    typeof row.theme_state !== "string"
+  ) {
+    return emptyConfig();
+  }
+  try {
+    return (
+      validateConfig({
+        plugin_states: JSON.parse(row.plugin_states),
+        theme_state: JSON.parse(row.theme_state),
+      }) ?? emptyConfig()
+    );
+  } catch {
+    return emptyConfig();
+  }
 }
 
 // ─── API Endpoints ───────────────────────────────────────────────────────────
 app.get("/api/config", authMiddleware, (c) => {
-  const user = c.get("user") as any;
-  const config = db.query("SELECT * FROM configs WHERE user_id = ?").get(user.id) as any;
-  return c.json(config ? {
-    plugin_states: JSON.parse(config.plugin_states),
-    theme_state: JSON.parse(config.theme_state)
-  } : { plugin_states: {}, theme_state: { order: [], active: [] } });
+  const user = c.get("user");
+  const config = db
+    .query("SELECT plugin_states, theme_state FROM configs WHERE user_id = ?")
+    .get(user.id);
+  return c.json(readStoredConfig(config));
 });
 
 app.get("/api/me", authMiddleware, (c) => {
-  const user = c.get("user") as any;
-  const row = db.query("SELECT username, profile_image_url FROM users WHERE id = ?").get(user.id) as any;
+  const user = c.get("user");
+  const row = db
+    .query("SELECT username, profile_image_url FROM users WHERE id = ?")
+    .get(user.id) as { username?: string; profile_image_url?: string } | null;
   return c.json({
     id: user.id,
     username: row?.username ?? user.username,
@@ -217,36 +340,48 @@ app.get("/api/me", authMiddleware, (c) => {
 });
 
 app.post("/api/config", authMiddleware, async (c) => {
-  const user = c.get("user") as any;
-  let body: any;
+  const user = c.get("user");
+  const contentLength = Number(c.req.header("content-length") ?? 0);
+  if (contentLength > MAX_CONFIG_BYTES) return c.json({ error: "Config is too large" }, 413);
+
+  let body: unknown;
   try {
     body = await c.req.json();
-  } catch (e) {
+  } catch {
     return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (JSON.stringify(body).length > MAX_CONFIG_BYTES) {
+    return c.json({ error: "Config is too large" }, 413);
   }
 
   const validated = validateConfig(body);
   if (!validated) return c.json({ error: "Invalid config format" }, 400);
-  
-  db.run(`
+
+  db.run(
+    `
     INSERT INTO configs (user_id, plugin_states, theme_state, updated_at)
     VALUES (?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(user_id) DO UPDATE SET
       plugin_states = excluded.plugin_states,
       theme_state = excluded.theme_state,
       updated_at = CURRENT_TIMESTAMP
-  `, [
-    user.id,
-    JSON.stringify(validated.plugin_states),
-    JSON.stringify(validated.theme_state)
-  ]);
+  `,
+    [user.id, JSON.stringify(validated.plugin_states), JSON.stringify(validated.theme_state)]
+  );
 
   return c.json({ success: true });
 });
 
 // ─── Frontend SSR ────────────────────────────────────────────────────────────
 app.get("/", authMiddleware, (c) => {
-  const user = c.get("user") as any;
+  const user = c.get("user");
+  const displayUsername = (user.username ?? "unknown")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
   return c.html(`
     <!DOCTYPE html>
     <html>
@@ -265,7 +400,7 @@ app.get("/", authMiddleware, (c) => {
       <body>
         <h1>BetterX Sync</h1>
         <div class="card">
-          <p>Logged in as <strong>@${user.username}</strong> &nbsp; <a href="/auth/logout" style="color:#f4212e;font-size:14px;">Logout</a></p>
+          <p>Logged in as <strong>@${displayUsername}</strong> &nbsp; <a href="/auth/logout" style="color:#f4212e;font-size:14px;">Logout</a></p>
           <h3>Export Config</h3>
           <p>Download your current cloud settings as a JSON file.</p>
           <button onclick="exportConfig()">Download betterx-config.json</button>

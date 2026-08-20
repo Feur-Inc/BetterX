@@ -6,12 +6,12 @@
 const ACCENT_CSS_ID = "betterx-accent-color";
 
 const ACCENT_COLORS: Record<string, string> = {
-  blue:    "#1d9bf0",
-  yellow:  "#ffd400",
+  blue: "#1d9bf0",
+  yellow: "#ffd400",
   magenta: "#f91880",
-  purple:  "#7856ff",
-  orange:  "#ff7a00",
-  green:   "#00ba7c",
+  purple: "#7856ff",
+  orange: "#ff7a00",
+  green: "#00ba7c",
 };
 
 const DEFAULT_COLOR = "#1d9bf0";

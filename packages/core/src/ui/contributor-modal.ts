@@ -1,6 +1,6 @@
-import type { BetterXContext } from "./tab-registry.js";
 import type { Developer, Plugin } from "../types/plugin.js";
 import { getSettingsModal } from "./modal.js";
+import type { BetterXContext } from "./tab-registry.js";
 import { renderPluginBody } from "./tabs/plugins-tab.js";
 
 // ─── Contributor Modal ────────────────────────────────────────────────────────
@@ -22,16 +22,16 @@ function platformLabel(platform: string): string {
 function buildPluginCard(
   plugin: Plugin,
   ctx: BetterXContext,
-  onOpenDetail: (plugin: Plugin) => void,
+  onOpenDetail: (plugin: Plugin) => void
 ): HTMLElement {
   const item = document.createElement("div");
   item.className = plugin.unavailable
     ? "betterx-plugin-item betterx-plugin-item-unavailable"
     : plugin.isMeta
-    ? "betterx-plugin-item betterx-plugin-item-meta"
-    : plugin.isLibrary
-    ? "betterx-plugin-item betterx-plugin-item-library"
-    : "betterx-plugin-item";
+      ? "betterx-plugin-item betterx-plugin-item-meta"
+      : plugin.isLibrary
+        ? "betterx-plugin-item betterx-plugin-item-library"
+        : "betterx-plugin-item";
   item.style.marginBottom = "0";
 
   const header = document.createElement("div");
@@ -115,7 +115,11 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
   overlay.id = OVERLAY_ID;
   overlay.className = "bx-cm-overlay";
 
-  let unsubClose: (() => void) | undefined;
+  // If BetterX modal closes while contributor modal is open → remove contributor too
+  const unsubClose = bxModal?.onClose(() => {
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  });
 
   const closeSelf = (restoreBx = true) => {
     overlay.remove();
@@ -124,13 +128,9 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
     if (restoreBx) bxModal?.show();
   };
 
-  // If BetterX modal closes while contributor modal is open → remove contributor too
-  unsubClose = bxModal?.onClose(() => {
-    overlay.remove();
-    document.removeEventListener("keydown", onKey);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeSelf();
   });
-
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSelf(); });
 
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Escape") closeSelf();
@@ -147,10 +147,19 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
   const avatar = document.createElement("img");
   avatar.className = "bx-cm-avatar";
   avatar.alt = dev.name;
-  avatar.addEventListener("error", () => { avatar.style.display = "none"; });
+  avatar.addEventListener("error", () => {
+    avatar.style.display = "none";
+  });
   const avatarUrl = `https://unavatar.io/twitter/${dev.handle}`;
   if (ctx.proxyImage) {
-    ctx.proxyImage(avatarUrl).then((src) => { avatar.src = src; }).catch(() => { avatar.src = avatarUrl; });
+    ctx
+      .proxyImage(avatarUrl)
+      .then((src) => {
+        avatar.src = src;
+      })
+      .catch(() => {
+        avatar.src = avatarUrl;
+      });
   } else {
     avatar.src = avatarUrl;
   }
@@ -222,7 +231,9 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
 
     if (plugin.isLibrary) {
       const autoBadge = document.createElement("span");
-      autoBadge.className = plugin.enabled ? "betterx-auto-badge betterx-auto-badge-on" : "betterx-auto-badge betterx-auto-badge-off";
+      autoBadge.className = plugin.enabled
+        ? "betterx-auto-badge betterx-auto-badge-on"
+        : "betterx-auto-badge betterx-auto-badge-off";
       autoBadge.textContent = plugin.enabled ? "Active" : "Standby";
       heroTop.append(pluginNameEl, autoBadge);
     } else if (plugin.isMeta) {
@@ -261,9 +272,14 @@ export function openContributorModal(dev: Developer, ctx: BetterXContext): void 
     pdOverlay.appendChild(pdModal);
     document.body.appendChild(pdOverlay);
 
-    pdOverlay.addEventListener("click", (e) => { if (e.target === pdOverlay) pdOverlay.remove(); });
+    pdOverlay.addEventListener("click", (e) => {
+      if (e.target === pdOverlay) pdOverlay.remove();
+    });
     const onPdKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { pdOverlay.remove(); document.removeEventListener("keydown", onPdKey); }
+      if (e.key === "Escape") {
+        pdOverlay.remove();
+        document.removeEventListener("keydown", onPdKey);
+      }
     };
     document.addEventListener("keydown", onPdKey);
     pdOverlay.addEventListener("remove", () => document.removeEventListener("keydown", onPdKey));

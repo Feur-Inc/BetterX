@@ -23,6 +23,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
   private val tag = "BetterXAndroid"
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     """.trimIndent()
   private lateinit var webView: WebView
   private lateinit var bridge: BetterXBridge
+  private val bridgeToken = UUID.randomUUID().toString()
   private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
   private var popupDialog: Dialog? = null
   private var popupWebView: WebView? = null
@@ -51,7 +53,7 @@ class MainActivity : AppCompatActivity() {
 
     WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
-    bridge = BetterXBridge(this)
+    bridge = BetterXBridge(this, bridgeToken)
     webView = WebView(this)
     setContentView(
       webView,
@@ -84,7 +86,7 @@ class MainActivity : AppCompatActivity() {
       useWideViewPort = true
       loadWithOverviewMode = true
       cacheMode = WebSettings.LOAD_DEFAULT
-      mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+      mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
       userAgentString = mobileChromeUserAgent
     }
 
@@ -112,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         return when (url.scheme) {
           "http", "https" -> false
           else -> {
-            openExternally(url)
+            Log.w(tag, "Blocked non-HTTP navigation: ${url.scheme}")
             if (isPopup) destroyPopupWindow()
             true
           }
@@ -258,6 +260,7 @@ class MainActivity : AppCompatActivity() {
   private fun shouldOpenExternally(uri: Uri, isPopup: Boolean): Boolean {
     val isHttp = uri.scheme == "http" || uri.scheme == "https"
     if (!isHttp) return false
+    if (uri.scheme != "https") return true
 
     if (!isXHost(uri)) {
       return true
@@ -295,6 +298,7 @@ class MainActivity : AppCompatActivity() {
             isMainFrame: Boolean,
             replyProxy: androidx.webkit.JavaScriptReplyProxy,
           ) {
+            if (!isMainFrame) return
             val payload = message.data?.toString() ?: return
             bridge.handle(payload) { reply -> replyProxy.postMessage(reply) }
           }
@@ -315,7 +319,10 @@ class MainActivity : AppCompatActivity() {
   }
 
   private fun addDocumentStartScript(assetName: String, origins: Set<String>) {
-    val script = assets.open("betterx/$assetName").bufferedReader(Charsets.UTF_8).use { it.readText() }
+    var script = assets.open("betterx/$assetName").bufferedReader(Charsets.UTF_8).use { it.readText() }
+    if (assetName == "content.js") {
+      script = script.replace("__BETTERX_NATIVE_TOKEN__", bridgeToken)
+    }
     WebViewCompat.addDocumentStartJavaScript(webView, script, origins)
   }
 
@@ -337,6 +344,7 @@ class MainActivity : AppCompatActivity() {
 
   override fun onDestroy() {
     destroyPopupWindow()
+    bridge.close()
     webView.destroy()
     super.onDestroy()
   }

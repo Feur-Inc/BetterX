@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type { ElectronAPI } from "./api.js";
 
 // ─── Sensitive-media patch injection ─────────────────────────────────────────
@@ -103,24 +103,7 @@ const SENSITIVE_MEDIA_PATCH = `(function () {
 })();`;
 
 function injectSensitiveMediaPatch(): void {
-  // The nonce has been stripped from the CSP by security.ts, so 'unsafe-inline'
-  // is now active and we can inject a plain inline script without a nonce.
-  function doInject(root: Element): void {
-    const s = document.createElement("script");
-    s.textContent = SENSITIVE_MEDIA_PATCH;
-    root.appendChild(s);
-    s.remove();
-  }
-  const el = document.documentElement;
-  if (el) {
-    doInject(el);
-  } else {
-    const mo = new MutationObserver(() => {
-      const root = document.documentElement;
-      if (root) { mo.disconnect(); doInject(root); }
-    });
-    mo.observe(document, { childList: true });
-  }
+  void webFrame.executeJavaScript(SENSITIVE_MEDIA_PATCH).catch(() => undefined);
 }
 
 injectSensitiveMediaPatch();
@@ -258,25 +241,10 @@ const STATS_PATCH = `(function () {
 })();`;
 
 function injectStatsPatch(): void {
-  function doInject(root: Element): void {
-    const s = document.createElement("script");
-    s.textContent = STATS_PATCH;
-    root.appendChild(s);
-    s.remove();
-  }
-  const el = document.documentElement;
-  if (el) {
-    doInject(el);
-  } else {
-    const mo = new MutationObserver(() => {
-      const root = document.documentElement;
-      if (root) { mo.disconnect(); doInject(root); }
-    });
-    mo.observe(document, { childList: true });
-  }
+  void webFrame.executeJavaScript(STATS_PATCH).catch(() => undefined);
 }
 
-console.log('[BetterX STATS] calling injectStatsPatch');
+console.log("[BetterX STATS] calling injectStatsPatch");
 injectStatsPatch();
 
 // ─── Preload ──────────────────────────────────────────────────────────────────
@@ -328,74 +296,56 @@ const api: ElectronAPI = {
     return () => ipcRenderer.removeListener("bx:oauth:complete", handler);
   },
 
-  cloudFetch: (serverUrl, path, options) => ipcRenderer.invoke("bx:cloud:fetch", serverUrl, path, options),
+  cloudFetch: (serverUrl, path, options) =>
+    ipcRenderer.invoke("bx:cloud:fetch", serverUrl, path, options),
+  proxyFetch: (url, options) => ipcRenderer.invoke("bx:proxy:fetch", url, options),
 
   discordRPC: {
-    updateActivity: (details, state) => ipcRenderer.send("discord-rpc:update-activity", details, state),
+    updateActivity: (details, state) =>
+      ipcRenderer.send("discord-rpc:update-activity", details, state),
   },
 };
 
-contextBridge.exposeInMainWorld("electronAPI", api);
+// Keep privileged APIs out of X's main world. The BetterX renderer bundle runs
+// in this same isolated world (see main/window.ts).
+contextBridge.exposeInIsolatedWorld(1000, "electronAPI", api);
 
 // ─── Early Injection ─────────────────────────────────────────────────────────
 // Runs at document_start (preload timing) to:
 // 1. Inject active theme CSS before the page paints (no FOUC)
 // 2. Replace the X loading screen logo before it's visible
 
-// ─── CSS Processor (inlined from core) ──────────────────────────────────────
-const ANIMATION_PROPS = new Set([
-  "animation", "animation-name", "animation-duration",
-  "animation-timing-function", "animation-delay",
-  "animation-iteration-count", "animation-direction",
-  "animation-fill-mode", "animation-play-state",
-]);
-
+// Preserve authored CSS; see core/theme/processor.ts.
 function processCSS(css: string): string {
-  const lines = css.split("\n");
-  const result: string[] = [];
-  let inKeyframes = 0;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (/@keyframes\s/i.test(trimmed)) { inKeyframes++; result.push(line); continue; }
-    if (inKeyframes > 0) {
-      if (trimmed === "{") inKeyframes++;
-      if (trimmed === "}") { inKeyframes--; result.push(line); continue; }
-      result.push(line); continue;
-    }
-    if (trimmed.includes(":") && !trimmed.startsWith("//") && !trimmed.startsWith("/*")) {
-      const prop = trimmed.slice(0, trimmed.indexOf(":")).trim().toLowerCase();
-      if (!ANIMATION_PROPS.has(prop) && !trimmed.endsWith("{")) {
-        const w = line.replace(/\s*!important\s*;?\s*$/, "");
-        const hasSemi = w.trimEnd().endsWith(";");
-        result.push(hasSemi ? w.replace(/;(\s*)$/, " !important;$1") : w + " !important;");
-        continue;
-      }
-    }
-    result.push(line);
-  }
-  return result.join("\n");
+  return css;
 }
 
 // ─── Theme Injection ────────────────────────────────────────────────────────
 const STYLE_PREFIX = "betterx-theme-";
 
-ipcRenderer.invoke("settings:get", "themeState").then(async (val: unknown) => {
-  const state = val as { order?: string[]; active?: string[] } | undefined;
-  if (!state?.active?.length) return;
+ipcRenderer
+  .invoke("settings:get", "themeState")
+  .then(async (val: unknown) => {
+    const state = val as { order?: string[]; active?: string[] } | undefined;
+    if (!state?.active?.length) return;
 
-  const root = document.head || document.documentElement;
-  for (const id of state.active) {
-    try {
-      const css = await ipcRenderer.invoke("themes:read", id) as string;
-      if (!css) continue;
-      const style = document.createElement("style");
-      style.id = STYLE_PREFIX + id;
-      style.textContent = processCSS(css);
-      root.appendChild(style);
-    } catch { /* theme not available - skip */ }
-  }
-}).catch(() => { /* settings not available - skip early themes */ });
+    const root = document.head || document.documentElement;
+    for (const id of state.active) {
+      try {
+        const css = (await ipcRenderer.invoke("themes:read", id)) as string;
+        if (!css) continue;
+        const style = document.createElement("style");
+        style.id = STYLE_PREFIX + id;
+        style.textContent = processCSS(css);
+        root.appendChild(style);
+      } catch {
+        /* theme not available - skip */
+      }
+    }
+  })
+  .catch(() => {
+    /* settings not available - skip early themes */
+  });
 
 // ─── Logo Replacement ───────────────────────────────────────────────────────
 const EARLY_LOGOS: Record<string, { path: string; viewBox: string; scale?: string }> = {
@@ -415,47 +365,52 @@ const EARLY_LOGOS: Record<string, { path: string; viewBox: string; scale?: strin
   },
 };
 
-ipcRenderer.invoke("settings:get", "pluginStates").then((val: unknown) => {
-  const states = val as Record<string, { enabled?: boolean; settings?: Record<string, unknown> }> | undefined;
-  if (!states) return;
+ipcRenderer
+  .invoke("settings:get", "pluginStates")
+  .then((val: unknown) => {
+    const states = val as
+      | Record<string, { enabled?: boolean; settings?: Record<string, unknown> }>
+      | undefined;
+    if (!states) return;
 
-  const btb = states["BringTwitterBack"];
-  if (!btb?.enabled) return;
+    const btb = states.BringTwitterBack;
+    if (!btb?.enabled) return;
 
-  const choice = (btb.settings?.logoChoice as string) ?? "twitter";
-  if (!(choice in EARLY_LOGOS)) return;
-  const logo = EARLY_LOGOS[choice]!;
+    const choice = (btb.settings?.logoChoice as string) ?? "twitter";
+    const logo = EARLY_LOGOS[choice];
+    if (!logo) return;
 
-  const style = document.createElement("style");
-  style.textContent =
-    `#placeholder svg path { visibility: hidden; }` +
-    (logo.scale ? `#placeholder svg { transform: scale(${logo.scale}); }` : "");
-  (document.head || document.documentElement).appendChild(style);
+    const style = document.createElement("style");
+    style.textContent = `#placeholder svg path { visibility: hidden; }${logo.scale ? `#placeholder svg { transform: scale(${logo.scale}); }` : ""}`;
+    (document.head || document.documentElement).appendChild(style);
 
-  function replaceLogo(): boolean {
-    const pathEl = document.querySelector<SVGPathElement>("#placeholder svg path");
-    if (!pathEl) return false;
+    function replaceLogo(selectedLogo: (typeof EARLY_LOGOS)[string]): boolean {
+      const pathEl = document.querySelector<SVGPathElement>("#placeholder svg path");
+      if (!pathEl) return false;
 
-    const svg = pathEl.closest("svg");
-    pathEl.setAttribute("d", logo.path);
-    if (svg) svg.setAttribute("viewBox", logo.viewBox);
+      const svg = pathEl.closest("svg");
+      pathEl.setAttribute("d", selectedLogo.path);
+      if (svg) svg.setAttribute("viewBox", selectedLogo.viewBox);
 
-    style.textContent = logo.scale
-      ? `#placeholder svg { transform: scale(${logo.scale}); }`
-      : "";
-    return true;
-  }
+      style.textContent = selectedLogo.scale
+        ? `#placeholder svg { transform: scale(${selectedLogo.scale}); }`
+        : "";
+      return true;
+    }
 
-  if (replaceLogo()) return;
+    if (replaceLogo(logo)) return;
 
-  const obs = new MutationObserver(() => {
-    if (replaceLogo()) obs.disconnect();
+    const obs = new MutationObserver(() => {
+      if (replaceLogo(logo)) obs.disconnect();
+    });
+
+    const waitForBody = setInterval(() => {
+      if (!document.body) return;
+      clearInterval(waitForBody);
+      if (replaceLogo(logo)) return;
+      obs.observe(document.body, { childList: true, subtree: true });
+    }, 10);
+  })
+  .catch(() => {
+    /* settings not available - skip early logo */
   });
-
-  const waitForBody = setInterval(() => {
-    if (!document.body) return;
-    clearInterval(waitForBody);
-    if (replaceLogo()) return;
-    obs.observe(document.body, { childList: true, subtree: true });
-  }, 10);
-}).catch(() => { /* settings not available - skip early logo */ });

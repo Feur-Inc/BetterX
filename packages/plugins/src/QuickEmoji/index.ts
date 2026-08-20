@@ -1,4 +1,4 @@
-import { definePlugin, Devs, OptionType, injectStyle, removeStyle } from "@betterx/core";
+import { Devs, OptionType, definePlugin, injectStyle, removeStyle } from "@betterx/core";
 import { gemoji, nameToEmoji } from "gemoji";
 
 // ─── Emoji search index built from gemoji ─────────────────────────────────────
@@ -188,24 +188,26 @@ function renderResults(query: string, results: [string, string][]): void {
     return;
   }
 
-  const itemsHtml = results.map(([name, char], i) => {
-    // Highlight the matching portion
-    const idx = name.indexOf(query);
-    let nameHtml: string;
-    if (idx >= 0) {
-      const before = name.slice(0, idx);
-      const matched = name.slice(idx, idx + query.length);
-      const after = name.slice(idx + query.length);
-      nameHtml = `${before}<span class="bx-emoji-name-match">${matched}</span>${after}`;
-    } else {
-      nameHtml = name;
-    }
+  const itemsHtml = results
+    .map(([name, char], i) => {
+      // Highlight the matching portion
+      const idx = name.indexOf(query);
+      let nameHtml: string;
+      if (idx >= 0) {
+        const before = name.slice(0, idx);
+        const matched = name.slice(idx, idx + query.length);
+        const after = name.slice(idx + query.length);
+        nameHtml = `${before}<span class="bx-emoji-name-match">${matched}</span>${after}`;
+      } else {
+        nameHtml = name;
+      }
 
-    return `<div class="bx-emoji-item" data-index="${i}" data-selected="${i === 0}">
+      return `<div class="bx-emoji-item" data-index="${i}" data-selected="${i === 0}">
       <span class="bx-emoji-char">${char}</span>
       <span class="bx-emoji-name">:${nameHtml}:</span>
     </div>`;
-  }).join("");
+    })
+    .join("");
 
   const hintHtml = `<div class="bx-emoji-hint">
     <span><kbd>↑↓</kbd> navigate</span>
@@ -222,7 +224,7 @@ function renderResults(query: string, results: [string, string][]): void {
     item.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const idx = parseInt(item.dataset["index"] ?? "0", 10);
+      const idx = Number.parseInt(item.dataset.index ?? "0", 10);
       insertEmoji(idx);
     });
   });
@@ -230,7 +232,8 @@ function renderResults(query: string, results: [string, string][]): void {
 
 function updateSelection(newIndex: number): void {
   if (!dropdown || currentResults.length === 0) return;
-  selectedIndex = ((newIndex % currentResults.length) + currentResults.length) % currentResults.length;
+  selectedIndex =
+    ((newIndex % currentResults.length) + currentResults.length) % currentResults.length;
   dropdown.querySelectorAll<HTMLDivElement>(".bx-emoji-item").forEach((item, i) => {
     item.setAttribute("data-selected", String(i === selectedIndex));
   });
@@ -325,14 +328,14 @@ function insertEmoji(index: number): void {
   sel.addRange(range);
 
   // Use execCommand to keep React/Draft.js state in sync
-  document.execCommand("insertText", false, emojiChar + " ");
+  document.execCommand("insertText", false, `${emojiChar} `);
 
   hideDropdown();
 }
 
 function attachToComposer(composer: HTMLElement): void {
-  if (composer.dataset["bxEmoji"]) return;
-  composer.dataset["bxEmoji"] = "1";
+  if (composer.dataset.bxEmoji) return;
+  composer.dataset.bxEmoji = "1";
 
   const checkQuery = (): void => {
     activeComposer = composer;
@@ -367,8 +370,12 @@ function attachToComposer(composer: HTMLElement): void {
   };
 
   // Re-check after every keyup too - Draft.js sometimes doesn't fire input on backspace
-  const onKeyup = (): void => { checkQuery(); };
-  const onBlur = (): void => { hideDropdown(); };
+  const onKeyup = (): void => {
+    checkQuery();
+  };
+  const onBlur = (): void => {
+    hideDropdown();
+  };
 
   composer.addEventListener("input", checkQuery);
   composer.addEventListener("keyup", onKeyup);
@@ -379,7 +386,7 @@ function attachToComposer(composer: HTMLElement): void {
     composer.removeEventListener("keyup", onKeyup);
     composer.removeEventListener("keydown", onKeydown, true);
     composer.removeEventListener("blur", onBlur);
-    delete composer.dataset["bxEmoji"];
+    delete composer.dataset.bxEmoji;
   });
 }
 
@@ -413,9 +420,11 @@ export default definePlugin({
 
     // Observe for tweet composers appearing
     const tryAttach = (): void => {
-      document.querySelectorAll<HTMLElement>(
-        '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea_1"], [data-testid="dmComposerTextInput"]'
-      ).forEach(attachToComposer);
+      document
+        .querySelectorAll<HTMLElement>(
+          '[data-testid="tweetTextarea_0"], [data-testid="tweetTextarea_1"], [data-testid="dmComposerTextInput"]'
+        )
+        .forEach(attachToComposer);
     };
 
     const observer = new MutationObserver(tryAttach);

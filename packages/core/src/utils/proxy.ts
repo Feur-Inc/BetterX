@@ -41,6 +41,8 @@ export type ProxyFetchInit = {
   method?: string;
   headers?: Record<string, string>;
   body?: string;
+  /** Include the target origin's cookies. Reserved for authenticated services such as Cloud Sync. */
+  credentials?: "include" | "omit";
 };
 
 let _imageFn: ((url: string) => Promise<string>) | undefined;
@@ -60,7 +62,9 @@ export function setImageProxy(fn: (url: string) => Promise<string>): void {
  * Called once by the platform layer (extension content script / desktop preload).
  * Plugins should not call this directly - use {@link proxyFetch} instead.
  */
-export function setFetchProxy(fn: (url: string, init?: ProxyFetchInit) => Promise<ProxyFetchResult>): void {
+export function setFetchProxy(
+  fn: (url: string, init?: ProxyFetchInit) => Promise<ProxyFetchResult>
+): void {
   _fetchFn = fn;
 }
 
@@ -108,6 +112,10 @@ export async function proxyFetch(url: string, init?: ProxyFetchInit): Promise<Pr
   const res = await fetch(url, init);
   const text = await res.text();
   let json: unknown = null;
-  try { json = JSON.parse(text); } catch { /* not JSON */ }
+  try {
+    json = JSON.parse(text);
+  } catch {
+    /* not JSON */
+  }
   return { ok: res.ok, status: res.status, text, json };
 }

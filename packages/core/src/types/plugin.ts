@@ -49,7 +49,7 @@ export type Developer = {
 
 export type PluginPlatform = "desktop" | "extension" | "android";
 
-export type PluginDefinition<O extends PluginOptionDefs = Record<string, never>> = {
+export type PluginDefinition<O extends PluginOptionDefs = PluginOptionDefs> = {
   name: string;
   description?: string;
   authors?: Developer[];
@@ -79,12 +79,12 @@ export type PluginDefinition<O extends PluginOptionDefs = Record<string, never>>
    * and cannot be toggled off.
    */
   isMeta?: boolean;
-  start: (this: Plugin<O>) => void;
-  stop?: (this: Plugin<O>) => void;
+  start(this: Plugin<O>): void | Promise<void>;
+  stop?(this: Plugin<O>): void | Promise<void>;
   renderSettings?: (container: HTMLElement) => void;
 };
 
-export type Plugin<O extends PluginOptionDefs = Record<string, never>> = PluginDefinition<O> & {
+export type Plugin<O extends PluginOptionDefs = PluginOptionDefs> = PluginDefinition<O> & {
   enabled: boolean;
   isUserPlugin: boolean;
   /** Set when the plugin targets a different platform than the current one. */

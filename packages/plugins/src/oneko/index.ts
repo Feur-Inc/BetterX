@@ -1,4 +1,4 @@
-import { definePlugin, Devs, OptionType, proxyImage } from "@betterx/core";
+import { Devs, OptionType, definePlugin, proxyImage } from "@betterx/core";
 
 // Oneko - the classic cat that follows your cursor
 // Ported from adryd325/oneko.js, MIT license
@@ -10,21 +10,64 @@ const DEFAULT_GIF_URL =
 const SPRITE_SETS: Record<string, number[][]> = {
   idle: [[-3, -3]],
   alert: [[-7, -3]],
-  scratchSelf: [[-5, 0], [-6, 0], [-7, 0]],
-  scratchWallN: [[0, 0], [0, -1]],
-  scratchWallS: [[-7, -1], [-6, -2]],
-  scratchWallE: [[-2, -2], [-2, -3]],
-  scratchWallW: [[-4, 0], [-4, -1]],
+  scratchSelf: [
+    [-5, 0],
+    [-6, 0],
+    [-7, 0],
+  ],
+  scratchWallN: [
+    [0, 0],
+    [0, -1],
+  ],
+  scratchWallS: [
+    [-7, -1],
+    [-6, -2],
+  ],
+  scratchWallE: [
+    [-2, -2],
+    [-2, -3],
+  ],
+  scratchWallW: [
+    [-4, 0],
+    [-4, -1],
+  ],
   tired: [[-3, -2]],
-  sleeping: [[-2, 0], [-2, -1]],
-  N:  [[-1, -2], [-1, -3]],
-  NE: [[0, -2],  [0, -3]],
-  E:  [[-3, 0],  [-3, -1]],
-  SE: [[-5, -1], [-5, -2]],
-  S:  [[-6, -3], [-7, -2]],
-  SW: [[-5, -3], [-6, -1]],
-  W:  [[-4, -2], [-4, -3]],
-  NW: [[-1, 0],  [-1, -1]],
+  sleeping: [
+    [-2, 0],
+    [-2, -1],
+  ],
+  N: [
+    [-1, -2],
+    [-1, -3],
+  ],
+  NE: [
+    [0, -2],
+    [0, -3],
+  ],
+  E: [
+    [-3, 0],
+    [-3, -1],
+  ],
+  SE: [
+    [-5, -1],
+    [-5, -2],
+  ],
+  S: [
+    [-6, -3],
+    [-7, -2],
+  ],
+  SW: [
+    [-5, -3],
+    [-6, -1],
+  ],
+  W: [
+    [-4, -2],
+    [-4, -3],
+  ],
+  NW: [
+    [-1, 0],
+    [-1, -1],
+  ],
 };
 
 // Module-level state

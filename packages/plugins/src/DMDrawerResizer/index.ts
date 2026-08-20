@@ -1,4 +1,4 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 
 let curW = 469;
 let curH = 530;
@@ -10,7 +10,9 @@ let startY = 0;
 let startW = 0;
 let startH = 0;
 
-let observer: MutationObserver | null = null;
+let discoveryObserver: MutationObserver | null = null;
+let drawerObserver: MutationObserver | null = null;
+let currentDrawer: HTMLElement | null = null;
 let style: HTMLStyleElement | null = null;
 let wrapper: HTMLDivElement | null = null;
 let leftHandle: HTMLDivElement | null = null;
@@ -20,7 +22,7 @@ let cornerHandle: HTMLDivElement | null = null;
 function isOpen(target: HTMLElement): boolean {
   const bubble = target.querySelector<HTMLElement>(".rounded-2xl");
   if (!bubble) return false;
-  const h = parseInt(bubble.style.height || "0");
+  const h = Number.parseInt(bubble.style.height || "0");
   return h > 100; // 55px = fermé, >100 = ouvert
 }
 
@@ -123,8 +125,8 @@ const onMouseMove = (e: MouseEvent): void => {
   if (!isResizing) return;
   const dx = startX - e.clientX;
   const dy = startY - e.clientY;
-  let w = curW,
-    h = curH;
+  let w = curW;
+  let h = curH;
   if (resizeType === "left" || resizeType === "corner") w = Math.max(300, startW + dx);
   if (resizeType === "top" || resizeType === "corner") h = Math.max(200, startH + dy);
   applySize(w, h);
@@ -140,9 +142,6 @@ export default definePlugin({
   authors: [Devs.TPM28, Devs.Mopi],
 
   start() {
-    const target = document.querySelector<HTMLElement>('[data-testid="chat-drawer-root"]');
-    if (!target) return;
-
     style = document.createElement("style");
     style.id = "twitter-resize-style";
     document.head.appendChild(style);
@@ -173,26 +172,44 @@ export default definePlugin({
     wrapper.appendChild(cornerHandle);
     document.body.appendChild(wrapper);
 
-    observer = new MutationObserver(() => {
-      if (isOpen(target)) enableResize();
-      else disableResize();
-    });
-
-    observer.observe(target, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["style"],
-    });
-
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
 
-    if (isOpen(target)) enableResize();
+    const attachDrawer = (target: HTMLElement | null): void => {
+      if (target === currentDrawer) return;
+      drawerObserver?.disconnect();
+      currentDrawer = target;
+      if (!target) {
+        disableResize();
+        return;
+      }
+      drawerObserver = new MutationObserver(() => {
+        if (isOpen(target)) enableResize();
+        else disableResize();
+      });
+      drawerObserver.observe(target, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style"],
+      });
+      if (isOpen(target)) enableResize();
+      else disableResize();
+    };
+
+    const findDrawer = (): void => {
+      attachDrawer(document.querySelector<HTMLElement>('[data-testid="chat-drawer-root"]'));
+    };
+    discoveryObserver = new MutationObserver(findDrawer);
+    discoveryObserver.observe(document.body, { childList: true, subtree: true });
+    findDrawer();
   },
 
   stop() {
-    observer?.disconnect();
-    observer = null;
+    discoveryObserver?.disconnect();
+    discoveryObserver = null;
+    drawerObserver?.disconnect();
+    drawerObserver = null;
+    currentDrawer = null;
 
     style?.remove();
     style = null;

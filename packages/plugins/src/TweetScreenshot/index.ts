@@ -1,4 +1,4 @@
-import { definePlugin, Devs, notifications } from "@betterx/core";
+import { Devs, definePlugin, notifications } from "@betterx/core";
 
 const SCREENSHOT_BTN_HTML = `
 <button aria-label="Screenshot" role="button"
@@ -34,14 +34,21 @@ async function captureTweet(tweet: HTMLElement): Promise<void> {
   try {
     // Use html2canvas if available, otherwise notify that we need it
     const win = window as unknown as Record<string, unknown>;
-    const h2c = win["html2canvas"] as
+    const h2c = win.html2canvas as
       | ((el: HTMLElement, opts?: Record<string, unknown>) => Promise<HTMLCanvasElement>)
       | undefined;
 
     if (!h2c) {
       // In Electron, use the IPC capture API
-      const electronAPI = win["electronAPI"] as
-        | { captureElement?: (rect: { x: number; y: number; width: number; height: number }) => Promise<string> }
+      const electronAPI = win.electronAPI as
+        | {
+            captureElement?: (rect: {
+              x: number;
+              y: number;
+              width: number;
+              height: number;
+            }) => Promise<string>;
+          }
         | undefined;
 
       if (electronAPI?.captureElement) {

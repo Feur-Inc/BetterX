@@ -41,7 +41,21 @@ export type ElectronAPI = {
   onOAuthComplete(callback: () => void): () => void;
 
   // Cloud Sync proxy (bypasses CSP by routing through main process)
-  cloudFetch(serverUrl: string, path: string, options?: { method?: string; body?: string; headers?: Record<string, string> }): Promise<{
+  cloudFetch(
+    serverUrl: string,
+    path: string,
+    options?: { method?: string; body?: string; headers?: Record<string, string> }
+  ): Promise<{
+    ok: boolean;
+    status: number;
+    json: unknown;
+    text: string;
+  }>;
+
+  proxyFetch(
+    url: string,
+    options?: { method?: string; body?: string; headers?: Record<string, string> }
+  ): Promise<{
     ok: boolean;
     status: number;
     json: unknown;

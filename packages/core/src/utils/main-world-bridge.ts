@@ -47,11 +47,11 @@ export function callMainWorld<T = unknown>(action: string, ...args: unknown[]): 
 export async function dispatchReactState(
   el: Element,
   from: unknown,
-  to: unknown,
+  to: unknown
 ): Promise<boolean> {
   // Stamp a temporary unique attribute so the main world can find the element
   const attr = "data-betterx-fiber-target";
-  const id   = Math.random().toString(36).slice(2);
+  const id = crypto.randomUUID();
   el.setAttribute(attr, id);
   try {
     return await callMainWorld<boolean>("dispatchReactState", `[${attr}="${id}"]`, from, to);

@@ -1,3 +1,4 @@
+import type { PluginStorageData, ThemeStorageState } from "@betterx/core";
 import Store from "electron-store";
 import { BETTERX_DIR } from "../paths.js";
 
@@ -12,6 +13,8 @@ export type DesktopSettings = {
   autoStart: boolean;
   checkForUpdates: boolean;
   enableDiscordRPC: boolean;
+  pluginStates: Record<string, PluginStorageData>;
+  themeState: ThemeStorageState;
 };
 
 const DEFAULT_SETTINGS: DesktopSettings = {
@@ -23,6 +26,8 @@ const DEFAULT_SETTINGS: DesktopSettings = {
   autoStart: false,
   checkForUpdates: true,
   enableDiscordRPC: false,
+  pluginStates: {},
+  themeState: { order: [], active: [] },
 };
 
 export const settingsStore = new Store<DesktopSettings>({

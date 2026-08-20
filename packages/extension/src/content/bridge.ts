@@ -6,21 +6,21 @@
 import { setMainWorldBridge } from "@betterx/core";
 
 export function registerMainWorldBridge(): void {
-  setMainWorldBridge((action, args) =>
-    new Promise((resolve, reject) => {
-      const id = Math.random().toString(36).slice(2);
-      const timer = setTimeout(
-        () => reject(new Error(`[BetterX] callMainWorld timeout: ${action}`)),
-        5_000,
-      );
-      document.addEventListener(
-        `betterx:result:${id}`,
-        (e) => { clearTimeout(timer); resolve((e as CustomEvent).detail); },
-        { once: true },
-      );
-      document.dispatchEvent(
-        new CustomEvent("betterx:call", { detail: { id, action, args } }),
-      );
-    }),
+  setMainWorldBridge(
+    (action, args) =>
+      new Promise((resolve, reject) => {
+        const id = crypto.randomUUID();
+        const eventName = `betterx:result:${id}`;
+        const onResult = (event: Event): void => {
+          clearTimeout(timer);
+          resolve((event as CustomEvent).detail);
+        };
+        const timer = setTimeout(() => {
+          document.removeEventListener(eventName, onResult);
+          reject(new Error(`[BetterX] callMainWorld timeout: ${action}`));
+        }, 5_000);
+        document.addEventListener(eventName, onResult, { once: true });
+        document.dispatchEvent(new CustomEvent("betterx:call", { detail: { id, action, args } }));
+      })
   );
 }

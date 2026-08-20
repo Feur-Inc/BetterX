@@ -1,6 +1,6 @@
-import type { SettingsTab, BetterXContext } from "../tab-registry.js";
-import { logger } from "../../utils/logger.js";
 import { BETTERX_VERSION } from "../../utils/constants.js";
+import { logger } from "../../utils/logger.js";
+import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
 // ─── Developer Tab ────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ export const DeveloperTab: SettingsTab = {
     // Plugin states debug
     const pluginSection = document.createElement("div");
     pluginSection.className = "betterx-dev-section";
-    pluginSection.innerHTML = `<h3>Plugin States</h3>`;
+    pluginSection.innerHTML = "<h3>Plugin States</h3>";
 
     const pluginList = document.createElement("div");
     pluginList.className = "betterx-dev-plugin-list";
@@ -41,7 +41,7 @@ export const DeveloperTab: SettingsTab = {
     // Notification testing
     const notifSection = document.createElement("div");
     notifSection.className = "betterx-dev-section";
-    notifSection.innerHTML = `<h3>Test Notifications</h3>`;
+    notifSection.innerHTML = "<h3>Test Notifications</h3>";
 
     const actions = document.createElement("div");
     actions.className = "betterx-dev-actions";
@@ -69,7 +69,7 @@ export const DeveloperTab: SettingsTab = {
     // Logger testing
     const logSection = document.createElement("div");
     logSection.className = "betterx-dev-section";
-    logSection.innerHTML = `<h3>Logger</h3>`;
+    logSection.innerHTML = "<h3>Logger</h3>";
 
     const logActions = document.createElement("div");
     logActions.className = "betterx-dev-actions";

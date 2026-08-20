@@ -1,7 +1,7 @@
 import type {
+  NotificationAction,
   NotificationOptions,
   NotificationType,
-  NotificationAction,
 } from "../types/notification.js";
 
 // ─── Notification Manager ─────────────────────────────────────────────────────
@@ -268,7 +268,7 @@ export class NotificationManager {
 
     const actionBtns = el.querySelectorAll<HTMLButtonElement>(".betterx-notification-action");
     actionBtns.forEach((btn) => {
-      const idx = parseInt(btn.dataset["actionIndex"] ?? "0", 10);
+      const idx = Number.parseInt(btn.dataset.actionIndex ?? "0", 10);
       btn.addEventListener("click", () => {
         const action = opts.actions[idx];
         if (action) {

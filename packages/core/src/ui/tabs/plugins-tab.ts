@@ -1,7 +1,7 @@
-import type { SettingsTab, BetterXContext } from "../tab-registry.js";
 import type { Plugin, PluginOptionDef } from "../../types/plugin.js";
 import { OptionType } from "../../types/plugin.js";
 import { openContributorModal } from "../contributor-modal.js";
+import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
 let _openDetailFn: ((plugin: Plugin, onBack?: () => void) => void) | null = null;
 export function openPluginDetail(plugin: Plugin, onBack?: () => void): void {
@@ -134,7 +134,11 @@ function platformLabel(platform: string): string {
 }
 
 // Renders authors + settings into an arbitrary container (reused by inline body and detail panel)
-export function renderPluginBody(container: HTMLElement, plugin: Plugin, ctx: BetterXContext): void {
+export function renderPluginBody(
+  container: HTMLElement,
+  plugin: Plugin,
+  ctx: BetterXContext
+): void {
   if (plugin.authors && plugin.authors.length > 0) {
     const authors = document.createElement("div");
     authors.className = "betterx-plugin-authors";
@@ -148,10 +152,19 @@ export function renderPluginBody(container: HTMLElement, plugin: Plugin, ctx: Be
       badge.addEventListener("click", () => openContributorModal(author, ctx));
       const avatar = badge.querySelector<HTMLImageElement>("img");
       if (avatar) {
-        avatar.addEventListener("error", () => { avatar.style.display = "none"; });
+        avatar.addEventListener("error", () => {
+          avatar.style.display = "none";
+        });
         const url = `https://unavatar.io/twitter/${author.handle}`;
         if (ctx.proxyImage) {
-          ctx.proxyImage(url).then((src) => { avatar.src = src; }).catch(() => { avatar.src = url; });
+          ctx
+            .proxyImage(url)
+            .then((src) => {
+              avatar.src = src;
+            })
+            .catch(() => {
+              avatar.src = url;
+            });
         } else {
           avatar.src = url;
         }
@@ -174,7 +187,7 @@ function renderDetailPanel(
   plugin: Plugin,
   ctx: BetterXContext,
   onBack: () => void,
-  openDetail: (plugin: Plugin) => void,
+  openDetail: (plugin: Plugin) => void
 ): void {
   detailView.innerHTML = "";
 
@@ -254,7 +267,7 @@ function renderDetailPanel(
     const makeBadge = (name: string, label: string) => {
       const target = ctx.pluginManager.get(name);
       const btn = document.createElement("button");
-      btn.className = "betterx-dep-badge" + (target?.enabled ? " betterx-dep-badge-on" : " betterx-dep-badge-off");
+      btn.className = `betterx-dep-badge${target?.enabled ? " betterx-dep-badge-on" : " betterx-dep-badge-off"}`;
       btn.textContent = label;
       if (target) {
         btn.addEventListener("click", () => openDetail(target));
@@ -298,16 +311,16 @@ function renderDetailPanel(
 function renderPlugin(
   plugin: Plugin,
   ctx: BetterXContext,
-  onOpenDetail: (plugin: Plugin) => void,
+  onOpenDetail: (plugin: Plugin) => void
 ): HTMLElement {
   const item = document.createElement("div");
   item.className = plugin.unavailable
     ? "betterx-plugin-item betterx-plugin-item-unavailable"
     : plugin.isMeta
-    ? "betterx-plugin-item betterx-plugin-item-meta"
-    : plugin.isLibrary
-    ? "betterx-plugin-item betterx-plugin-item-library"
-    : "betterx-plugin-item";
+      ? "betterx-plugin-item betterx-plugin-item-meta"
+      : plugin.isLibrary
+        ? "betterx-plugin-item betterx-plugin-item-library"
+        : "betterx-plugin-item";
   item.dataset.pluginName = plugin.name;
 
   const header = document.createElement("div");
@@ -394,10 +407,19 @@ function renderPlugin(
         `;
         const avatar = badge.querySelector<HTMLImageElement>("img");
         if (avatar) {
-          avatar.addEventListener("error", () => { avatar.style.display = "none"; });
+          avatar.addEventListener("error", () => {
+            avatar.style.display = "none";
+          });
           const url = `https://unavatar.io/twitter/${author.handle}`;
           if (ctx.proxyImage) {
-            ctx.proxyImage(url).then((src) => { avatar.src = src; }).catch(() => { avatar.src = url; });
+            ctx
+              .proxyImage(url)
+              .then((src) => {
+                avatar.src = src;
+              })
+              .catch(() => {
+                avatar.src = url;
+              });
           } else {
             avatar.src = url;
           }
@@ -475,10 +497,17 @@ export const PluginsTab: SettingsTab = {
 
     const openDetail = (plugin: Plugin, customOnBack?: () => void) => {
       listView.style.display = "none";
-      renderDetailPanel(detailView, plugin, ctx, customOnBack ?? (() => {
-        detailView.style.display = "none";
-        listView.style.display = "";
-      }), openDetail);
+      renderDetailPanel(
+        detailView,
+        plugin,
+        ctx,
+        customOnBack ??
+          (() => {
+            detailView.style.display = "none";
+            listView.style.display = "";
+          }),
+        openDetail
+      );
       detailView.style.display = "";
     };
     _openDetailFn = openDetail;

@@ -12,6 +12,18 @@
         "typescript": "^5.7.2",
       },
     },
+    "packages/android": {
+      "name": "@betterx/android",
+      "version": "3.0.0",
+      "dependencies": {
+        "@betterx/core": "*",
+        "@betterx/plugins": "*",
+      },
+      "devDependencies": {
+        "typescript": "^5.7.2",
+        "vite": "^6.0.0",
+      },
+    },
     "packages/cloud-sync": {
       "name": "@betterx/cloud-sync",
       "version": "1.0.0",
@@ -96,6 +108,8 @@
     "@babel/runtime": ["@babel/runtime@7.28.4", "", {}, "sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ=="],
 
     "@babel/types": ["@babel/types@7.29.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A=="],
+
+    "@betterx/android": ["@betterx/android@workspace:packages/android"],
 
     "@betterx/cloud-sync": ["@betterx/cloud-sync@workspace:packages/cloud-sync"],
 

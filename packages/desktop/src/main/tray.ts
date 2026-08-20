@@ -1,35 +1,41 @@
-import { Tray, Menu, nativeImage, BrowserWindow, app } from "electron";
-import { getSetting } from "./services/settings.js";
+import { type BrowserWindow, Menu, Tray, app, nativeImage } from "electron";
 
 // ─── System Tray ──────────────────────────────────────────────────────────────
 
 let tray: Tray | null = null;
 
-function buildMenu(win: BrowserWindow): Menu {
+type WindowProvider = () => BrowserWindow | null;
+
+function withWindow(getWindow: WindowProvider, callback: (window: BrowserWindow) => void): void {
+  const window = getWindow();
+  if (window && !window.isDestroyed()) callback(window);
+}
+
+function buildMenu(getWindow: WindowProvider, checkForUpdates: () => Promise<void>): Menu {
   return Menu.buildFromTemplate([
     {
       label: "Open BetterX",
-      click: () => {
-        win.show();
-        win.focus();
-      },
+      click: () =>
+        withWindow(getWindow, (window) => {
+          window.show();
+          window.focus();
+        }),
     },
     {
       label: "Settings",
-      click: () => {
-        win.show();
-        win.focus();
-        win.webContents.executeJavaScript(
-          "window.__betterx_open_settings && window.__betterx_open_settings()"
-        ).catch(() => {});
-      },
+      click: () =>
+        withWindow(getWindow, (window) => {
+          window.show();
+          window.focus();
+          void window.webContents.executeJavaScriptInIsolatedWorld(1000, [
+            { code: "window.__betterx_open_settings?.()" },
+          ]);
+        }),
     },
     { type: "separator" },
     {
       label: "Check for Updates",
-      click: () => {
-        win.webContents.send("betterx:check-updates");
-      },
+      click: () => void checkForUpdates(),
     },
     { type: "separator" },
     {
@@ -48,30 +54,28 @@ function buildMenu(win: BrowserWindow): Menu {
   ]);
 }
 
-export function createTray(iconPath: string, win: BrowserWindow): void {
+export function createTray(
+  iconPath: string,
+  getWindow: WindowProvider,
+  checkForUpdates: () => Promise<void>
+): void {
   if (tray) return;
 
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
   tray.setToolTip("BetterX V3");
-  tray.setContextMenu(buildMenu(win));
+  tray.setContextMenu(buildMenu(getWindow, checkForUpdates));
 
   // Click toggles show/hide (Linux/Windows - macOS shows context menu)
   tray.on("click", () => {
-    if (win.isVisible() && win.isFocused()) {
-      win.hide();
-    } else {
-      win.show();
-      win.focus();
-    }
-  });
-
-  // Minimize to tray instead of closing (when setting is enabled)
-  win.on("close", (e) => {
-    if (!(app as typeof app & { isQuitting?: boolean }).isQuitting && getSetting("minimizeToTray")) {
-      e.preventDefault();
-      win.hide();
-    }
+    withWindow(getWindow, (window) => {
+      if (window.isVisible() && window.isFocused()) {
+        window.hide();
+      } else {
+        window.show();
+        window.focus();
+      }
+    });
   });
 }
 

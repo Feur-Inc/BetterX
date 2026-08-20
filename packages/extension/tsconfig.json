@@ -7,9 +7,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["chrome", "webextension-polyfill"]
   },
-  "references": [
-    { "path": "../core" },
-    { "path": "../plugins" }
-  ],
+  "references": [{ "path": "../core" }, { "path": "../plugins" }],
   "include": ["src/**/*"]
 }

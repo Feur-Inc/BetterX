@@ -23,7 +23,8 @@ function formatCount(n: number): string {
 /** Get the logged-in user's numeric ID from the twid cookie. */
 function getLoggedInUserId(): string | null {
   const twid = document.cookie.split("; ").find((c) => c.startsWith("twid="));
-  return twid ? decodeURIComponent(twid.split("=")[1]!).replace("u=", "") : null;
+  const value = twid?.split("=")[1];
+  return value ? decodeURIComponent(value).replace("u=", "") : null;
 }
 
 /** Search a response for the logged-in user's stats, matched by user ID. */
@@ -45,8 +46,11 @@ function findUserStats(data: unknown, userId: string, depth = 0): UserStats | nu
     }
   }
   // REST: { id_str: "123", followers_count, friends_count }
-  if (obj.id_str === userId &&
-      typeof obj.followers_count === "number" && typeof obj.friends_count === "number") {
+  if (
+    obj.id_str === userId &&
+    typeof obj.followers_count === "number" &&
+    typeof obj.friends_count === "number"
+  ) {
     return { followers: obj.followers_count as number, following: obj.friends_count as number };
   }
   for (const val of Object.values(obj)) {
@@ -87,20 +91,27 @@ function hookXHRForStats(): void {
     this: XMLHttpRequest & { __bxUrl?: string },
     method: string,
     url: string | URL,
+    async?: boolean,
+    username?: string | null,
+    password?: string | null
   ) {
     this.__bxUrl = typeof url === "string" ? url : url.toString();
-    return _origOpen.apply(this, arguments as unknown as Parameters<typeof _origOpen>);
+    if (async === undefined) return Reflect.apply(_origOpen, this, [method, url]);
+    return Reflect.apply(_origOpen, this, [method, url, async, username, password]);
   };
 
   const userId = getLoggedInUserId();
 
   XMLHttpRequest.prototype.send = function (
     this: XMLHttpRequest & { __bxUrl?: string },
-    body?: Document | XMLHttpRequestBodyInit | null,
+    ...args: Parameters<typeof _origSend>
   ) {
     const url = this.__bxUrl ?? "";
-    if (!cachedStats && userId &&
-        (url.includes("/i/api/graphql/") || url.includes("/account/multi/list.json"))) {
+    if (
+      !cachedStats &&
+      userId &&
+      (url.includes("/i/api/graphql/") || url.includes("/account/multi/list.json"))
+    ) {
       this.addEventListener("load", function (this: XMLHttpRequest) {
         if (cachedStats) return;
         try {
@@ -111,10 +122,12 @@ function hookXHRForStats(): void {
             lastState = "";
             sendUpdate();
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       });
     }
-    return _origSend.apply(this, arguments as unknown as Parameters<typeof _origSend>);
+    return _origSend.apply(this, args);
   };
 }
 
@@ -222,7 +235,7 @@ export function startPageTracker(): void {
         sendUpdate();
       }
     },
-    { once: true },
+    { once: true }
   );
 
   void fetchUserStats();

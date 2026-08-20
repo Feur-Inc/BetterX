@@ -1,7 +1,7 @@
 import type { PluginManager } from "../plugin/manager.js";
 import type { ThemeManager } from "../theme/manager.js";
-import type { NotificationManager } from "./notification.js";
 import type { IStorage } from "../types/storage.js";
+import type { NotificationManager } from "./notification.js";
 
 // ─── Settings Tab Interface ────────────────────────────────────────────────────
 

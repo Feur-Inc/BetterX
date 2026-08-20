@@ -1,4 +1,4 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 
 const STORAGE_KEY = "xcomGifFavorites";
 
@@ -45,7 +45,13 @@ function buildFavoritesResponse(): unknown {
 // XHR interception helpers - module-level to avoid `this` binding issues
 type PatchedXHR = XMLHttpRequest & { _bxUrl?: string };
 // Simplified open signature without overloads, for safe .call() usage
-type OpenFn = (method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null) => void;
+type OpenFn = (
+  method: string,
+  url: string | URL,
+  async?: boolean,
+  username?: string | null,
+  password?: string | null
+) => void;
 
 let origOpen: typeof XMLHttpRequest.prototype.open | null = null;
 let origSend: typeof XMLHttpRequest.prototype.send | null = null;
@@ -80,16 +86,23 @@ function patchXHR(): void {
             const data = JSON.parse(self.responseText) as { data?: { groups?: unknown[] } };
             if (data.data?.groups) {
               data.data.groups.unshift(FAVORITES_GROUP);
-              Object.defineProperty(self, "responseText", { writable: true, value: JSON.stringify(data) });
+              Object.defineProperty(self, "responseText", {
+                writable: true,
+                value: JSON.stringify(data),
+              });
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         } else if (self._bxUrl.includes("/foundmedia/categories/_favorites_.json")) {
           try {
             Object.defineProperty(self, "responseText", {
               writable: true,
               value: JSON.stringify(buildFavoritesResponse()),
             });
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
       }
       origOnready?.call(this, ev);
@@ -114,7 +127,7 @@ function injectStars(): void {
     .forEach((img) => {
       if (img.parentElement?.querySelector("[data-bx-gif-star]")) return;
       const btn = document.createElement("button");
-      btn.dataset["bxGifStar"] = "1";
+      btn.dataset.bxGifStar = "1";
       const favs = getFavorites();
       btn.textContent = favs[img.alt ?? ""] ? "★" : "☆";
       btn.style.cssText =

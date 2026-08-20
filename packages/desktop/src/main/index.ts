@@ -1,35 +1,42 @@
-import { app, BrowserWindow, ipcMain, session } from "electron";
-import { join, dirname, basename } from "path";
-import { fileURLToPath } from "url";
-import { existsSync, watch } from "fs";
-import { mkdir } from "fs/promises";
+import { existsSync, watch } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { BrowserWindow, app, ipcMain, session, shell } from "electron";
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { logger } from "@betterx/core";
 
-import {
-  registerBetterxProtocol,
-  handleBetterxProtocol,
-  createMainWindow,
-  setBundlePath,
-  setAssetsPath,
-} from "./window.js";
-import { setupCSP } from "./security.js";
-import { createTray } from "./tray.js";
-import { registerThemeHandlers } from "./ipc/themes.js";
-import { registerSettingsHandlers } from "./ipc/settings.js";
-import { registerUpdateHandlers } from "./ipc/update.js";
 import { registerCaptureHandlers } from "./ipc/capture.js";
 import { registerDiscordRPCHandlers } from "./ipc/discord-rpc.js";
-import { getSetting, setSetting, settingsStore } from "./services/settings.js";
-import { initializeDiscordRPC, destroyDiscordRPC } from "./services/discord-rpc.js";
 import {
-  checkForBundleUpdate,
+  assertTrustedSender,
+  parseCloudServerUrl,
+  parsePublicProxyUrl,
+  validateCloudRequest,
+  validateProxyMethod,
+} from "./ipc/security.js";
+import { registerSettingsHandlers } from "./ipc/settings.js";
+import { registerThemeHandlers } from "./ipc/themes.js";
+import { registerUpdateHandlers } from "./ipc/update.js";
+import { setupCSP } from "./security.js";
+import {
   applyBundleUpdate,
+  checkForBundleUpdate,
   readPersistedHash,
 } from "./services/bundle-updater.js";
+import { destroyDiscordRPC, initializeDiscordRPC } from "./services/discord-rpc.js";
+import { getSetting, setSetting, settingsStore } from "./services/settings.js";
+import { createTray } from "./tray.js";
+import {
+  createMainWindow,
+  handleBetterxProtocol,
+  registerBetterxProtocol,
+  setAssetsPath,
+  setBundlePath,
+} from "./window.js";
 
 // ─── App Paths ────────────────────────────────────────────────────────────────
 
@@ -39,6 +46,21 @@ import { BETTERX_DIR } from "./paths.js";
 const BUNDLE_PATH = join(__dirname, "../bundle/bundle.iife.js");
 // Where remote bundle updates are saved (userData, persists across app updates)
 const SAVED_BUNDLE_PATH = join(BETTERX_DIR, "bundle.iife.js");
+const PRELOAD_PATH = join(__dirname, "../preload/preload.js");
+
+async function updateManagedBundle(): Promise<boolean> {
+  const currentHash = (await readPersistedHash(SAVED_BUNDLE_PATH)) ?? getSetting("currentHash");
+  const result = await checkForBundleUpdate(currentHash);
+  if (!result.updateAvailable) return false;
+
+  logger.info("BetterX bundle update available, downloading...");
+  await applyBundleUpdate(SAVED_BUNDLE_PATH, result.remoteHash);
+  setSetting("currentHash", result.remoteHash);
+  setSetting("bundlePath", SAVED_BUNDLE_PATH);
+  setBundlePath(SAVED_BUNDLE_PATH);
+  logger.info("Bundle updated successfully");
+  return true;
+}
 
 // ─── Wayland support ──────────────────────────────────────────────────────────
 
@@ -50,7 +72,10 @@ if (process.platform === "linux") {
   // Disable GBM video buffer allocation - YUV_420_BIPLANAR SCANOUT not
   // supported on many Mesa drivers, causing a spam of GPU errors.
   app.commandLine.appendSwitch("disable-gpu-memory-buffer-video-frames");
-  app.commandLine.appendSwitch("disable-features", "UseChromeOSDirectVideoDecoder,VaapiVideoDecoder");
+  app.commandLine.appendSwitch(
+    "disable-features",
+    "UseChromeOSDirectVideoDecoder,VaapiVideoDecoder"
+  );
 }
 
 // ─── Single Instance Lock ─────────────────────────────────────────────────────
@@ -107,41 +132,68 @@ app.whenReady().then(async () => {
   // Set up CSP
   setupCSP();
 
-  // Configure bundle path - fall back to local build if stored path no longer exists
+  // Configure bundle path. A user-selected custom path is never overwritten by
+  // automatic updates; managed updates always live under BetterX's user-data directory.
   const storedPath = getSetting("bundlePath");
-  const bundlePath = (storedPath && existsSync(storedPath)) ? storedPath : BUNDLE_PATH;
-  setSetting("bundlePath", bundlePath);
-  setBundlePath(bundlePath);
+  const hasCustomBundle =
+    !!storedPath &&
+    storedPath !== BUNDLE_PATH &&
+    storedPath !== SAVED_BUNDLE_PATH &&
+    existsSync(storedPath);
+  let bundlePath = hasCustomBundle
+    ? storedPath
+    : existsSync(SAVED_BUNDLE_PATH)
+      ? SAVED_BUNDLE_PATH
+      : BUNDLE_PATH;
   setAssetsPath(join(__dirname, "../../assets"));
 
   // Check/update bundle
-  if (getSetting("checkForUpdates")) {
+  if (getSetting("checkForUpdates") && !hasCustomBundle) {
     try {
-      const currentHash = await readPersistedHash(SAVED_BUNDLE_PATH) ?? getSetting("currentHash");
-      const result = await checkForBundleUpdate(currentHash);
-      if (result.updateAvailable) {
-        logger.info("BetterX bundle update available, downloading...");
-        await applyBundleUpdate(SAVED_BUNDLE_PATH, result.remoteHash);
-        setSetting("currentHash", result.remoteHash);
-        logger.info("Bundle updated successfully");
-      }
+      if (await updateManagedBundle()) bundlePath = SAVED_BUNDLE_PATH;
     } catch (err) {
       logger.warn("Bundle update check failed:", err);
       // Non-fatal: use existing bundle if available
     }
   }
+  setBundlePath(bundlePath);
 
   // Register IPC handlers
   registerThemeHandlers();
   registerSettingsHandlers();
-  registerUpdateHandlers();
+  registerUpdateHandlers({
+    managedBundlePath: SAVED_BUNDLE_PATH,
+    onApplied: (remoteHash) => {
+      setSetting("currentHash", remoteHash);
+      setSetting("bundlePath", SAVED_BUNDLE_PATH);
+      setBundlePath(SAVED_BUNDLE_PATH);
+    },
+  });
   registerDiscordRPCHandlers();
-  ipcMain.on("app:restart", () => {
+  ipcMain.on("app:get-version", (event) => {
+    assertTrustedSender(event);
+    event.returnValue = app.getVersion();
+  });
+  ipcMain.on("app:restart", (event) => {
+    assertTrustedSender(event);
     app.relaunch();
     app.exit(0);
   });
 
-  ipcMain.handle("bx:oauth:open", async (_event, url: string) => {
+  ipcMain.handle("bx:oauth:open", async (event, url: string) => {
+    assertTrustedSender(event);
+    const requestedOAuthUrl = new URL(url);
+    if (
+      requestedOAuthUrl.pathname !== "/auth/twitter" ||
+      requestedOAuthUrl.search ||
+      requestedOAuthUrl.hash
+    ) {
+      throw new Error("Invalid OAuth URL");
+    }
+    const oauthUrl = new URL(
+      "/auth/twitter",
+      parseCloudServerUrl(requestedOAuthUrl.origin).origin
+    ).toString();
     const oauthWindow = new BrowserWindow({
       width: 600,
       height: 800,
@@ -152,10 +204,30 @@ app.whenReady().then(async () => {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: true,
       },
     });
 
-    await oauthWindow.loadURL(url);
+    oauthWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    oauthWindow.webContents.on("will-navigate", (event, navigationUrl) => {
+      try {
+        const target = new URL(navigationUrl);
+        const allowed =
+          target.protocol === "https:" &&
+          (target.origin === new URL(oauthUrl).origin ||
+            target.hostname === "twitter.com" ||
+            target.hostname === "x.com");
+        if (allowed) return;
+        event.preventDefault();
+        if (target.protocol === "https:" || target.protocol === "http:") {
+          void shell.openExternal(target.toString());
+        }
+      } catch {
+        event.preventDefault();
+      }
+    });
+
+    await oauthWindow.loadURL(oauthUrl);
 
     // Auto-close the modal when the OAuth callback completes
     // The server returns a page with window.close(), but as a fallback
@@ -164,12 +236,17 @@ app.whenReady().then(async () => {
       try {
         const parsed = new URL(navUrl);
         // Close if we landed back on the server root or callback (auth completed)
-        if (parsed.pathname === "/" || parsed.pathname === "/auth/callback") {
+        if (
+          parsed.origin === new URL(oauthUrl).origin &&
+          (parsed.pathname === "/" || parsed.pathname === "/auth/callback")
+        ) {
           setTimeout(() => {
             if (!oauthWindow.isDestroyed()) oauthWindow.close();
           }, 500);
         }
-      } catch { /* ignore invalid URLs */ }
+      } catch {
+        /* ignore invalid URLs */
+      }
     });
 
     return new Promise<void>((resolve) => {
@@ -188,7 +265,7 @@ app.whenReady().then(async () => {
   // We proxy cloud sync API calls through the main process instead.
 
   async function getCloudCookie(serverUrl: string): Promise<string> {
-    const url = new URL(serverUrl);
+    const url = parseCloudServerUrl(serverUrl);
     const cookies = await session.defaultSession.cookies.get({
       domain: url.hostname,
       name: "bx_session",
@@ -196,67 +273,159 @@ app.whenReady().then(async () => {
     return cookies[0]?.value ? `bx_session=${cookies[0].value}` : "";
   }
 
-  ipcMain.handle("bx:cloud:fetch", async (_event, serverUrl: string, path: string, options?: { method?: string; body?: string; headers?: Record<string, string> }) => {
-    try {
-      const cookie = await getCloudCookie(serverUrl);
-      const headers: Record<string, string> = { ...options?.headers };
-      if (cookie) headers["Cookie"] = cookie;
-      if (options?.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-      const res = await fetch(`${serverUrl}${path}`, {
-        method: options?.method ?? "GET",
-        headers,
-        body: options?.body ?? null,
-        redirect: "manual",
-      });
+  ipcMain.handle(
+    "bx:cloud:fetch",
+    async (
+      event,
+      serverUrl: string,
+      path: string,
+      options?: { method?: string; body?: string; headers?: Record<string, string> }
+    ) => {
+      try {
+        assertTrustedSender(event);
+        const server = parseCloudServerUrl(serverUrl);
+        const request = validateCloudRequest(path, options?.method);
+        if (options?.body && options.body.length > 2_000_000)
+          throw new Error("Cloud request body is too large");
+        const cookie = await getCloudCookie(server.origin);
+        const headers: Record<string, string> = {};
+        if (cookie) headers.Cookie = cookie;
+        if (options?.body) headers["Content-Type"] = "application/json";
+        const res = await fetch(new URL(request.path, server.origin), {
+          method: request.method,
+          headers,
+          body: options?.body ?? null,
+          redirect: "manual",
+          signal: AbortSignal.timeout(20_000),
+        });
 
-      // Sync Set-Cookie back into Electron's session cookie jar so logout
-      // (which expires the cookie server-side) is reflected locally too.
-      const setCookie = res.headers.get("set-cookie");
-      if (setCookie?.includes("bx_session")) {
-        const url = new URL(serverUrl);
-        const maxAgeMatch = setCookie.match(/max-age=(\d+)/i);
-        if (maxAgeMatch && parseInt(maxAgeMatch[1]!) === 0) {
-          await session.defaultSession.cookies.remove(url.origin, "bx_session");
-        } else {
-          const valueMatch = setCookie.match(/bx_session=([^;]+)/);
-          if (valueMatch?.[1]) {
-            const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]!) : undefined;
-            await session.defaultSession.cookies.set({
-              url: url.origin,
-              name: "bx_session",
-              value: valueMatch[1],
-              httpOnly: true,
-              ...(maxAge ? { expirationDate: Math.floor(Date.now() / 1000) + maxAge } : {}),
-            });
+        // Sync Set-Cookie back into Electron's session cookie jar so logout
+        // (which expires the cookie server-side) is reflected locally too.
+        const setCookie = res.headers.get("set-cookie");
+        if (setCookie?.includes("bx_session")) {
+          const url = server;
+          const maxAgeMatch = setCookie.match(/max-age=(\d+)/i);
+          const maxAgeValue = maxAgeMatch?.[1];
+          if (maxAgeValue && Number.parseInt(maxAgeValue) === 0) {
+            await session.defaultSession.cookies.remove(url.origin, "bx_session");
+          } else {
+            const valueMatch = setCookie.match(/bx_session=([^;]+)/);
+            if (valueMatch?.[1]) {
+              const maxAge = maxAgeValue ? Number.parseInt(maxAgeValue) : undefined;
+              await session.defaultSession.cookies.set({
+                url: url.origin,
+                name: "bx_session",
+                value: valueMatch[1],
+                httpOnly: true,
+                ...(maxAge ? { expirationDate: Math.floor(Date.now() / 1000) + maxAge } : {}),
+              });
+            }
           }
         }
+
+        const text = await res.text();
+        if (text.length > 2_000_000) throw new Error("Cloud response is too large");
+        let json: unknown = null;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          /* not JSON */
+        }
+        return { ok: res.ok, status: res.status, json, text };
+      } catch {
+        return { ok: false, status: 0, json: null, text: "Connection failed" };
       }
-
-      const text = await res.text();
-      let json: unknown = null;
-      try { json = JSON.parse(text); } catch { /* not JSON */ }
-      return { ok: res.ok, status: res.status, json, text };
-    } catch {
-      return { ok: false, status: 0, json: null, text: "Connection failed" };
     }
-  });
+  );
 
-  // Create main window
-  const preloadPath = join(__dirname, "../preload/preload.js");
-  const enableTransparency = getSetting("enableTransparency");
-  mainWindow = createMainWindow(preloadPath, enableTransparency);
+  ipcMain.handle(
+    "bx:proxy:fetch",
+    async (
+      event,
+      url: string,
+      options?: { method?: string; body?: string; headers?: Record<string, string> }
+    ) => {
+      try {
+        assertTrustedSender(event);
+        const target = parsePublicProxyUrl(url);
+        const method = validateProxyMethod(options?.method);
+        if (options?.body && options.body.length > 2_000_000) {
+          throw new Error("Proxy request body is too large");
+        }
+        const headers = Object.fromEntries(
+          Object.entries(options?.headers ?? {}).filter(
+            ([key]) => !["cookie", "host", "origin", "referer"].includes(key.toLowerCase())
+          )
+        );
+        const response = await fetch(target, {
+          method,
+          headers,
+          body: options?.body ?? null,
+          redirect: "manual",
+          signal: AbortSignal.timeout(20_000),
+        });
+        const declaredSize = Number(response.headers.get("content-length") ?? 0);
+        if (declaredSize > 10_000_000) throw new Error("Proxy response is too large");
+        const text = await response.text();
+        if (text.length > 10_000_000) throw new Error("Proxy response is too large");
+        let json: unknown = null;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          // Non-JSON responses are valid.
+        }
+        return { ok: response.ok, status: response.status, json, text };
+      } catch (error) {
+        return {
+          ok: false,
+          status: 0,
+          json: null,
+          text: error instanceof Error ? error.message : "Proxy request failed",
+        };
+      }
+    }
+  );
 
   registerCaptureHandlers(() => mainWindow);
+
+  const openMainWindow = (startMinimized = false): BrowserWindow => {
+    const window = createMainWindow(PRELOAD_PATH, getSetting("enableTransparency"));
+    mainWindow = window;
+    window.on("close", (event) => {
+      if (
+        !(app as typeof app & { isQuitting?: boolean }).isQuitting &&
+        getSetting("minimizeToTray")
+      ) {
+        event.preventDefault();
+        window.hide();
+      }
+    });
+    window.on("closed", () => {
+      if (mainWindow === window) mainWindow = null;
+    });
+    if (startMinimized) window.minimize();
+    return window;
+  };
+
+  openMainWindow(getSetting("startMinimized"));
 
   // Tray
   const iconPath = join(__dirname, "../../assets/icon.png");
   if (existsSync(iconPath)) {
-    createTray(iconPath, mainWindow);
+    createTray(
+      iconPath,
+      () => mainWindow,
+      async () => {
+        try {
+          if (await updateManagedBundle()) {
+            mainWindow?.webContents.send("update:bundle-applied");
+          }
+        } catch (error) {
+          logger.warn("Tray update check failed:", error);
+        }
+      }
+    );
   }
-
-  mainWindow.on("closed", () => {
-    mainWindow = null;
-  });
 
   // If launched via deep link, navigate to the target URL
   if (launchDeepLink) {
@@ -264,9 +433,7 @@ app.whenReady().then(async () => {
   }
 
   // Start minimized?
-  if (getSetting("startMinimized") && mainWindow) {
-    mainWindow.minimize();
-  }
+  app.setLoginItemSettings({ openAtLogin: getSetting("autoStart") });
 
   // Discord RPC
   if (getSetting("enableDiscordRPC")) {
@@ -279,6 +446,10 @@ app.whenReady().then(async () => {
     } else {
       void destroyDiscordRPC();
     }
+  });
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) openMainWindow();
   });
 
   // ─── Bundle hot-reload ──────────────────────────────────────────────────────
@@ -327,10 +498,4 @@ app.on("before-quit", () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
-});
-
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0 && mainWindow === null) {
-    // Re-create window on macOS
-  }
 });

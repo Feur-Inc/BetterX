@@ -19,9 +19,10 @@ db.run(`
 try {
   db.run("ALTER TABLE users ADD COLUMN profile_image_url TEXT");
   console.log("[db] migration: added profile_image_url column");
-} catch (e: any) {
-  if (!e?.message?.includes("duplicate column")) {
-    console.error("[db] migration failed:", e?.message);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!message.includes("duplicate column")) {
+    console.error("[db] migration failed:", message);
   }
 }
 

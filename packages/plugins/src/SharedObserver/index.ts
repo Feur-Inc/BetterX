@@ -1,4 +1,4 @@
-import { definePlugin, Devs } from "@betterx/core";
+import { Devs, definePlugin } from "@betterx/core";
 
 // ─── DOMObserver API ──────────────────────────────────────────────────────────
 // A single shared MutationObserver that all DOM-watching plugins can subscribe
@@ -36,14 +36,19 @@ export const DOMObserver = {
 
 export default definePlugin({
   name: "SharedObserver",
-  description: "Provides a shared MutationObserver for DOM-watching plugins, reducing overhead on X's heavily-mutating DOM.",
+  description:
+    "Provides a shared MutationObserver for DOM-watching plugins, reducing overhead on X's heavily-mutating DOM.",
   authors: [Devs.Mopi],
   isLibrary: true,
 
   start() {
     sharedObs = new MutationObserver((mutations) => {
       for (const fn of subscribers) {
-        try { fn(mutations); } catch { /* don't let one bad subscriber break others */ }
+        try {
+          fn(mutations);
+        } catch {
+          /* don't let one bad subscriber break others */
+        }
       }
     });
     sharedObs.observe(document.body, { childList: true, subtree: true });

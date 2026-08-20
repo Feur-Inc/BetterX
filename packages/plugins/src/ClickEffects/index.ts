@@ -1,15 +1,18 @@
-import { definePlugin, Devs, OptionType, logger } from "@betterx/core";
+import { Devs, OptionType, definePlugin, logger } from "@betterx/core";
 
 class ClickEffect {
   private startTime = Date.now();
-  constructor(public x: number, public y: number) {}
+  constructor(
+    public x: number,
+    public y: number
+  ) {}
 
   draw(ctx: CanvasRenderingContext2D, color: string): void {
     const elapsed = Date.now() - this.startTime;
     const progress = Math.min(1, elapsed / 650);
     const c1 = 1.70158;
     const c3 = c1 + 1;
-    const eased = 1 + c3 * Math.pow(progress - 1, 3) + c1 * Math.pow(progress - 1, 2);
+    const eased = 1 + c3 * (progress - 1) ** 3 + c1 * (progress - 1) ** 2;
     const radius = eased * 30;
     const alpha = 1 - eased;
 
@@ -27,9 +30,9 @@ class ClickEffect {
 
 function applyAlpha(color: string, alpha: number): string {
   if (color.startsWith("#") && color.length === 7) {
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
+    const r = Number.parseInt(color.slice(1, 3), 16);
+    const g = Number.parseInt(color.slice(3, 5), 16);
+    const b = Number.parseInt(color.slice(5, 7), 16);
     return `rgba(${r},${g},${b},${alpha})`;
   }
   if (color.startsWith("rgba")) {
@@ -72,8 +75,7 @@ export default definePlugin({
       canvas = document.createElement("canvas");
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      canvas.style.cssText =
-        "position:fixed;top:0;left:0;pointer-events:none;z-index:9999;";
+      canvas.style.cssText = "position:fixed;top:0;left:0;pointer-events:none;z-index:9999;";
       document.body.appendChild(canvas);
       ctx = canvas.getContext("2d");
 
@@ -92,14 +94,17 @@ export default definePlugin({
 
       const store = this.settings.store;
       const render = (): void => {
-        if (!ctx || !canvas) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const renderContext = ctx;
+        if (!renderContext || !canvas) return;
+        renderContext.clearRect(0, 0, canvas.width, canvas.height);
         const color = store.useAccentColor
-          ? getComputedStyle(document.documentElement).getPropertyValue("--betterx-accentColor").trim() || "#1d9bf0"
+          ? getComputedStyle(document.documentElement)
+              .getPropertyValue("--betterx-accentColor")
+              .trim() || "#1d9bf0"
           : store.color;
         effects = effects.filter((fx: ClickEffect) => {
           if (fx.isDone()) return false;
-          fx.draw(ctx!, color);
+          fx.draw(renderContext, color);
           return true;
         });
         raf = requestAnimationFrame(render);

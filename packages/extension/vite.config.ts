@@ -1,6 +1,6 @@
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import webExtension from "vite-plugin-web-extension";
-import { resolve } from "path";
 
 const browser = process.env.BROWSER ?? "chrome";
 
@@ -23,9 +23,10 @@ export default defineConfig({
             type: bg.type as string,
           } as typeof manifest.background;
           const bss = manifest.browser_specific_settings as
-            Record<string, Record<string, unknown>> | undefined;
+            | Record<string, Record<string, unknown>>
+            | undefined;
           if (bss?.gecko) {
-            bss.gecko["data_collection_permissions"] = { required: ["none"], optional: [] };
+            bss.gecko.data_collection_permissions = { required: ["none"], optional: [] };
           }
         }
         return manifest;
@@ -34,7 +35,7 @@ export default defineConfig({
   ],
   build: {
     outDir: `dist/${browser}`,
-    emptyOutDir: true,
+    emptyOutDir: false,
     // Escape non-ASCII chars so Chrome's content script loader doesn't
     // reject the files with "It isn't UTF-8 encoded".
     cssTarget: "chrome120",

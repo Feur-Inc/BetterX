@@ -1,31 +1,31 @@
-import { ipcMain, BrowserWindow } from "electron";
-import {
-  checkForBundleUpdate,
-  applyBundleUpdate,
-} from "../services/bundle-updater.js";
-import { getSetting, setSetting } from "../services/settings.js";
+import { BrowserWindow, ipcMain } from "electron";
+import { applyBundleUpdate, checkForBundleUpdate } from "../services/bundle-updater.js";
+import { getSetting } from "../services/settings.js";
+import { assertTrustedSender } from "./security.js";
 
 // ─── Update IPC Handlers ──────────────────────────────────────────────────────
 
-export function registerUpdateHandlers(): void {
-  ipcMain.handle("update:check-bundle", async () => {
-    const currentHash = getSetting("currentHash");
-    const bundlePath = getSetting("bundlePath");
-    if (!bundlePath) return { updateAvailable: false };
+type UpdateHandlerOptions = {
+  managedBundlePath: string;
+  onApplied: (remoteHash: string) => void;
+};
 
+export function registerUpdateHandlers(options: UpdateHandlerOptions): void {
+  ipcMain.handle("update:check-bundle", async (event) => {
+    assertTrustedSender(event);
+    const currentHash = getSetting("currentHash");
     return checkForBundleUpdate(currentHash);
   });
 
-  ipcMain.handle("update:apply-bundle", async (_event, remoteHash: string) => {
-    const bundlePath = getSetting("bundlePath");
-    if (!bundlePath) throw new Error("Bundle path not configured");
-
-    await applyBundleUpdate(bundlePath, remoteHash);
-    setSetting("currentHash", remoteHash);
+  ipcMain.handle("update:apply-bundle", async (event, remoteHash: string) => {
+    assertTrustedSender(event);
+    if (!/^[a-f0-9]{64}$/.test(remoteHash)) throw new Error("Invalid bundle hash");
+    await applyBundleUpdate(options.managedBundlePath, remoteHash);
+    options.onApplied(remoteHash);
 
     // Notify all renderers to reload
-    BrowserWindow.getAllWindows().forEach((win) => {
+    for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send("update:bundle-applied");
-    });
+    }
   });
 }

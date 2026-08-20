@@ -5,39 +5,9 @@
 
 import browser from "../platform/browser.js";
 
-// ─── CSS Processor (inlined from core) ──────────────────────────────────────
-const ANIMATION_PROPS = new Set([
-  "animation", "animation-name", "animation-duration",
-  "animation-timing-function", "animation-delay",
-  "animation-iteration-count", "animation-direction",
-  "animation-fill-mode", "animation-play-state",
-]);
-
+// Preserve authored CSS; see core/theme/processor.ts.
 function processCSS(css: string): string {
-  const lines = css.split("\n");
-  const result: string[] = [];
-  let inKeyframes = 0;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (/@keyframes\s/i.test(trimmed)) { inKeyframes++; result.push(line); continue; }
-    if (inKeyframes > 0) {
-      if (trimmed === "{") inKeyframes++;
-      if (trimmed === "}") { inKeyframes--; result.push(line); continue; }
-      result.push(line); continue;
-    }
-    if (trimmed.includes(":") && !trimmed.startsWith("//") && !trimmed.startsWith("/*")) {
-      const prop = trimmed.slice(0, trimmed.indexOf(":")).trim().toLowerCase();
-      if (!ANIMATION_PROPS.has(prop) && !trimmed.endsWith("{")) {
-        const w = line.replace(/\s*!important\s*;?\s*$/, "");
-        const hasSemi = w.trimEnd().endsWith(";");
-        result.push(hasSemi ? w.replace(/;(\s*)$/, " !important;$1") : w + " !important;");
-        continue;
-      }
-    }
-    result.push(line);
-  }
-  return result.join("\n");
+  return css;
 }
 
 // ─── Theme Injection ────────────────────────────────────────────────────────
@@ -88,46 +58,46 @@ const PLUGIN_STATES_KEY = "bx_plugin_states";
 
 async function replaceLogo(): Promise<void> {
   const result = await browser.storage.sync.get(PLUGIN_STATES_KEY);
-  const states = result[PLUGIN_STATES_KEY] as Record<string, { enabled?: boolean; settings?: Record<string, unknown> }> | undefined;
+  const states = result[PLUGIN_STATES_KEY] as
+    | Record<string, { enabled?: boolean; settings?: Record<string, unknown> }>
+    | undefined;
   if (!states) return;
 
-  const btb = states["BringTwitterBack"];
+  const btb = states.BringTwitterBack;
   if (!btb?.enabled) return;
 
   const choice = (btb.settings?.logoChoice as string) ?? "twitter";
-  if (!(choice in LOGOS)) return;
-  const logo = LOGOS[choice]!;
+  const logo = LOGOS[choice];
+  if (!logo) return;
 
   const style = document.createElement("style");
-  style.textContent =
-    `#placeholder svg path { visibility: hidden; }` +
-    (logo.scale ? `#placeholder svg { transform: scale(${logo.scale}); }` : "");
+  style.textContent = `#placeholder svg path { visibility: hidden; }${logo.scale ? `#placeholder svg { transform: scale(${logo.scale}); }` : ""}`;
   (document.head || document.documentElement).appendChild(style);
 
-  function tryReplaceLogo() {
+  function tryReplaceLogo(selectedLogo: (typeof LOGOS)[string]) {
     const path = document.querySelector<SVGPathElement>("#placeholder svg path");
     if (!path) return false;
 
     const svg = path.closest("svg");
-    path.setAttribute("d", logo.path);
-    if (svg) svg.setAttribute("viewBox", logo.viewBox);
+    path.setAttribute("d", selectedLogo.path);
+    if (svg) svg.setAttribute("viewBox", selectedLogo.viewBox);
 
-    style.textContent = logo.scale
-      ? `#placeholder svg { transform: scale(${logo.scale}); }`
+    style.textContent = selectedLogo.scale
+      ? `#placeholder svg { transform: scale(${selectedLogo.scale}); }`
       : "";
     return true;
   }
 
-  if (tryReplaceLogo()) return;
+  if (tryReplaceLogo(logo)) return;
 
   const obs = new MutationObserver(() => {
-    if (tryReplaceLogo()) obs.disconnect();
+    if (tryReplaceLogo(logo)) obs.disconnect();
   });
 
   const waitForBody = setInterval(() => {
     if (!document.body) return;
     clearInterval(waitForBody);
-    if (tryReplaceLogo()) return;
+    if (tryReplaceLogo(logo)) return;
     obs.observe(document.body, { childList: true, subtree: true });
   }, 10);
 }
