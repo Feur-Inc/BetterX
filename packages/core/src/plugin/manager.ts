@@ -5,6 +5,7 @@ import type {
   PluginPlatform,
   PluginStorageData,
 } from "../types/plugin.js";
+import { OptionType } from "../types/plugin.js";
 import type { IStorage } from "../types/storage.js";
 import { notifications } from "../ui/notification.js";
 import { logger } from "../utils/logger.js";
@@ -15,6 +16,8 @@ export class PluginManager {
   private plugins = new Map<string, Plugin>();
   private storage: IStorage;
   private initialized = false;
+  private savedStates: Record<string, PluginStorageData> = {};
+  private toggling = new Set<string>();
 
   constructor(storage: IStorage) {
     this.storage = storage;
@@ -25,6 +28,7 @@ export class PluginManager {
     platform?: PluginPlatform
   ): Promise<void> {
     const saved = await this.storage.getPluginStates();
+    this.savedStates = { ...saved };
 
     for (const def of definitions) {
       const incompatible = !!(def.platform && platform && def.platform !== platform);
@@ -56,7 +60,7 @@ export class PluginManager {
 
     if (def.options) {
       for (const [key, opt] of Object.entries(def.options)) {
-        store[key] = saved?.settings?.[key] ?? opt.default;
+        store[key] = this.normalizeOptionValue(opt, saved?.settings?.[key], opt.default);
       }
     }
 
@@ -85,50 +89,62 @@ export class PluginManager {
 
   async toggle(name: string): Promise<void> {
     const plugin = this.plugins.get(name);
-    if (!plugin || plugin.unavailable || plugin.isLibrary || plugin.isMeta) return;
+    if (
+      !plugin ||
+      plugin.unavailable ||
+      plugin.isLibrary ||
+      plugin.isMeta ||
+      this.toggling.has(name)
+    )
+      return;
 
-    if (plugin.enabled) {
-      const disabled = await this.disableWithDependents(name);
-      await this.disableOrphanedLibraries();
-      const cascade = disabled.filter((n) => n !== name);
-      if (cascade.length > 0) {
-        notifications.showWarning(
-          `Also disabled: ${cascade.join(", ")} (depend on "${plugin.name}")`
-        );
-      }
-    } else {
-      const dependencyIssue = this.findDependencyIssue(name);
-      if (dependencyIssue) {
-        notifications.showError(`Cannot enable "${plugin.name}": ${dependencyIssue}`);
-        return;
-      }
-      const enabled = await this.enableWithDependencies(name);
-      if (!plugin.enabled) {
+    this.toggling.add(name);
+    try {
+      if (plugin.enabled) {
+        const disabled = await this.disableWithDependents(name);
         await this.disableOrphanedLibraries();
-        await this.persist();
-        notifications.showError(`Could not enable "${plugin.name}" because a dependency failed.`);
-        return;
+        const cascade = disabled.filter((n) => n !== name);
+        if (cascade.length > 0) {
+          notifications.showWarning(
+            `Also disabled: ${cascade.join(", ")} (depend on "${plugin.name}")`
+          );
+        }
+      } else {
+        const dependencyIssue = this.findDependencyIssue(name);
+        if (dependencyIssue) {
+          notifications.showError(`Cannot enable "${plugin.name}": ${dependencyIssue}`);
+          return;
+        }
+        const enabled = await this.enableWithDependencies(name);
+        if (!plugin.enabled) {
+          await this.disableOrphanedLibraries();
+          await this.persist();
+          notifications.showError(`Could not enable "${plugin.name}" because a dependency failed.`);
+          return;
+        }
+        const auto = enabled.filter((n) => n !== name);
+        if (auto.length > 0) {
+          notifications.showWarning(
+            `Also enabled: ${auto.join(", ")} (required by "${plugin.name}")`
+          );
+        }
       }
-      const auto = enabled.filter((n) => n !== name);
-      if (auto.length > 0) {
-        notifications.showWarning(
-          `Also enabled: ${auto.join(", ")} (required by "${plugin.name}")`
-        );
+
+      await this.persist();
+
+      if (plugin.requiresRestart) {
+        notifications.showWarning(`"${plugin.name}" requires a page refresh to fully apply.`, {
+          duration: 0,
+          actions: [
+            {
+              label: "Refresh now",
+              callback: () => location.reload(),
+            },
+          ],
+        });
       }
-    }
-
-    await this.persist();
-
-    if (plugin.requiresRestart) {
-      notifications.showWarning(`"${plugin.name}" requires a page refresh to fully apply.`, {
-        duration: 0,
-        actions: [
-          {
-            label: "Refresh now",
-            callback: () => location.reload(),
-          },
-        ],
-      });
+    } finally {
+      this.toggling.delete(name);
     }
   }
 
@@ -288,14 +304,18 @@ export class PluginManager {
     if (!optDef) return;
 
     const oldValue = (plugin.settings.store as Record<string, unknown>)[key];
-    (plugin.settings.store as Record<string, unknown>)[key] = value;
+    const normalized = this.normalizeOptionValue(optDef, value);
+    (plugin.settings.store as Record<string, unknown>)[key] = normalized;
 
-    const onChange = (optDef as { onChange?: (n: unknown, o: unknown) => void }).onChange;
+    const onChange = (optDef as { onChange?: (n: unknown, o: unknown) => void | Promise<void> })
+      .onChange;
     if (onChange) {
       try {
-        await onChange(value, oldValue);
+        await onChange(normalized, oldValue);
       } catch (err) {
+        (plugin.settings.store as Record<string, unknown>)[key] = oldValue;
         logger.error(`Plugin "${pluginName}" onChange for "${key}" threw:`, err);
+        throw err;
       }
     }
 
@@ -322,11 +342,48 @@ export class PluginManager {
 
     const states: Record<string, PluginStorageData> = {};
     for (const [name, plugin] of this.plugins) {
+      if (plugin.unavailable && this.savedStates[name]) {
+        states[name] = this.savedStates[name];
+        continue;
+      }
       states[name] = {
         enabled: plugin.enabled,
         settings: { ...(plugin.settings.store as Record<string, unknown>) },
       };
     }
     await this.storage.setPluginStates(states);
+    this.savedStates = states;
+  }
+
+  private normalizeOptionValue(
+    definition: PluginOptionDefs[string],
+    value: unknown,
+    fallback?: unknown
+  ): unknown {
+    const invalid = (): unknown => {
+      if (fallback !== undefined) return fallback;
+      throw new TypeError("Invalid plugin option value");
+    };
+
+    switch (definition.type) {
+      case OptionType.BOOLEAN:
+        return typeof value === "boolean" ? value : invalid();
+      case OptionType.STRING:
+        return typeof value === "string" ? value : invalid();
+      case OptionType.COLOR:
+        return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : invalid();
+      case OptionType.SELECT:
+        return typeof value === "string" && definition.options?.some((item) => item.value === value)
+          ? value
+          : invalid();
+      case OptionType.NUMBER: {
+        if (typeof value !== "number" || !Number.isFinite(value)) return invalid();
+        if (definition.min !== undefined && value < definition.min) return invalid();
+        if (definition.max !== undefined && value > definition.max) return invalid();
+        return value;
+      }
+      default:
+        return invalid();
+    }
   }
 }

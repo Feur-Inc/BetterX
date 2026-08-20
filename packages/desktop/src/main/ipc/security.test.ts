@@ -1,6 +1,7 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 import {
+  isPrivateAddress,
   isTrustedRendererUrl,
   parseCloudServerUrl,
   parseExternalHttpUrl,
@@ -32,6 +33,11 @@ describe("desktop IPC URL validation", () => {
     });
     expect(() => validateCloudRequest("/admin", "GET")).toThrow();
     expect(() => validateCloudRequest("/api/me", "POST")).toThrow();
+    expect(validateCloudRequest("/auth/logout", "POST")).toEqual({
+      path: "/auth/logout",
+      method: "POST",
+    });
+    expect(() => validateCloudRequest("/auth/logout", "GET")).toThrow();
   });
 
   test("blocks non-HTTP external protocols", () => {
@@ -47,5 +53,13 @@ describe("desktop IPC URL validation", () => {
     expect(() => parsePublicProxyUrl("https://127.0.0.1/admin")).toThrow();
     expect(() => parsePublicProxyUrl("https://192.168.1.2/admin")).toThrow();
     expect(() => validateProxyMethod("TRACE")).toThrow();
+  });
+
+  test("recognizes private IPv4, IPv6, and IPv4-mapped addresses", () => {
+    expect(isPrivateAddress("127.0.0.1")).toBe(true);
+    expect(isPrivateAddress("::1")).toBe(true);
+    expect(isPrivateAddress("::ffff:127.0.0.1")).toBe(true);
+    expect(isPrivateAddress("::ffff:8.8.8.8")).toBe(false);
+    expect(isPrivateAddress("8.8.8.8")).toBe(false);
   });
 });

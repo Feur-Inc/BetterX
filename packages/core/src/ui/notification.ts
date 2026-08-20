@@ -152,11 +152,11 @@ export class NotificationManager {
     if (!state) return false;
     const { element: el, timeout } = state;
     if (timeout) clearTimeout(timeout);
+    this.notifications.delete(id);
 
     el.classList.add("betterx-notification-hide");
     setTimeout(() => {
       el.remove();
-      this.notifications.delete(id);
     }, 300);
     return true;
   }

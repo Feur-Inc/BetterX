@@ -11,6 +11,7 @@ import org.json.JSONTokener
 import java.io.File
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URL
 import java.nio.charset.Charset
 import java.util.Locale
@@ -237,6 +238,12 @@ class BetterXBridge(private val activity: Activity, private val bridgeToken: Str
       throw IllegalArgumentException("HTTPS is required outside loopback")
     }
     if (parsed.userInfo != null) throw IllegalArgumentException("URL credentials are not allowed")
+    val addresses = InetAddress.getAllByName(parsed.host)
+    if (!loopback && addresses.any {
+        it.isAnyLocalAddress || it.isLoopbackAddress || it.isLinkLocalAddress || it.isSiteLocalAddress
+      }) {
+      throw IllegalArgumentException("Private network targets are not allowed")
+    }
     return parsed
   }
 

@@ -25,6 +25,9 @@ export default definePlugin({
 
   start() {
     const removeElements = (): void => {
+      for (const element of hiddenElements.keys()) {
+        if (!element.isConnected) hiddenElements.delete(element);
+      }
       for (const selector of SELECTORS) {
         for (const el of document.querySelectorAll<HTMLElement>(selector)) {
           if (!hiddenElements.has(el)) {

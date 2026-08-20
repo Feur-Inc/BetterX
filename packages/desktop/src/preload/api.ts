@@ -20,13 +20,6 @@ export type ElectronAPI = {
     chooseBundlePath(): Promise<string | null>;
   };
 
-  // Updates
-  update: {
-    checkBundle(): Promise<{ updateAvailable: boolean; remoteHash?: string }>;
-    applyBundle(remoteHash: string): Promise<void>;
-    onBundleApplied(callback: () => void): () => void;
-  };
-
   // Screenshot capture
   captureElement(rect: { x: number; y: number; width: number; height: number }): Promise<string>;
 

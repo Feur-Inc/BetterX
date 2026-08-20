@@ -12,9 +12,9 @@ const STYLE_PREFIX = "betterx-theme-";
  * every ordinary declaration `!important`. Do this through the parsed CSSOM
  * so multiline declarations, data URLs, nesting, and keyframes remain valid.
  */
-function prioritizeThemeRules(rules: CSSRuleList): void {
+export function prioritizeThemeRules(rules: CSSRuleList): void {
   for (const rule of rules) {
-    if (rule.type === CSSRule.STYLE_RULE) {
+    if (rule.type === 1) {
       const declaration = (rule as CSSStyleRule).style;
       for (const property of declaration) {
         if (declaration.getPropertyPriority(property) !== "important") {
@@ -77,6 +77,11 @@ export class ThemeManager {
         if (theme.enabled) {
           this.applyToDom(theme);
         }
+      } else if (css) {
+        this.themes.push({ id, name: id.replace(/\.css$/i, ""), css, enabled: false });
+        void this.persistState().catch((error) =>
+          logger.warn(`ThemeManager: failed to register external theme "${id}"`, error)
+        );
       }
     });
 
@@ -85,6 +90,8 @@ export class ThemeManager {
 
   destroy(): void {
     this.unsubscribeStorage?.();
+    this.unsubscribeStorage = null;
+    for (const theme of this.themes) this.removeDom(theme.id);
   }
 
   getAll(): Theme[] {
@@ -98,6 +105,13 @@ export class ThemeManager {
   async create(name: string, css = ""): Promise<Theme> {
     const id = this.uniqueId(name);
     await this.storage.writeTheme(id, css);
+
+    const externallyRegistered = this.themes.find((theme) => theme.id === id);
+    if (externallyRegistered) {
+      externallyRegistered.name = name;
+      externallyRegistered.css = css;
+      return externallyRegistered;
+    }
 
     const theme: Theme = { id, name, css, enabled: false };
     this.themes.push(theme);
@@ -144,7 +158,9 @@ export class ThemeManager {
 
   async reorder(ids: string[]): Promise<void> {
     const map = new Map(this.themes.map((t) => [t.id, t]));
-    this.themes = ids.map((id) => map.get(id)).filter((t): t is Theme => t !== undefined);
+    const reordered = ids.map((id) => map.get(id)).filter((t): t is Theme => t !== undefined);
+    const included = new Set(reordered.map((theme) => theme.id));
+    this.themes = [...reordered, ...this.themes.filter((theme) => !included.has(theme.id))];
 
     await this.persistState();
   }
@@ -160,7 +176,11 @@ export class ThemeManager {
       document.head.appendChild(style);
     }
     style.textContent = processed;
-    if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
+    try {
+      if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
+    } catch (error) {
+      logger.warn(`ThemeManager: could not prioritize theme "${theme.id}"`, error);
+    }
   }
 
   private removeDom(id: string): void {

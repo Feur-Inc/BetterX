@@ -4,6 +4,7 @@ import {
   OptionType,
   TabRegistry,
   definePlugin,
+  getSettingsModal,
   notifications,
 } from "@betterx/core";
 
@@ -41,6 +42,9 @@ export default definePlugin({
       label: "Notification duration (ms)",
       description: "How long notifications stay visible. Set to 0 to keep them until dismissed.",
       default: 5000,
+      min: 0,
+      max: 3_600_000,
+      step: 500,
       onChange(ms) {
         notifications.setDefaultDuration(ms as number);
       },
@@ -53,7 +57,7 @@ export default definePlugin({
       onChange(enabled) {
         TabRegistry.setTabHidden("developer", !enabled);
         // If the modal is open, close it so the tab list rebuilds on next open
-        document.getElementById("betterx-modal-overlay")?.remove();
+        getSettingsModal()?.close(true);
       },
     },
   },

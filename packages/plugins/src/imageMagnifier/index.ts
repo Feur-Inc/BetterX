@@ -35,12 +35,17 @@ export default definePlugin({
     defaultZoom: {
       type: OptionType.NUMBER,
       default: 2,
+      min: 1,
+      max: 6,
+      step: 0.1,
       label: "Default zoom level",
       description: "Default zoom level (1–6)",
     },
     magnifierSize: {
       type: OptionType.NUMBER,
       default: 150,
+      min: 50,
+      max: 400,
       label: "Magnifier size (px)",
       description: "Default magnifier size in pixels (50–400)",
     },

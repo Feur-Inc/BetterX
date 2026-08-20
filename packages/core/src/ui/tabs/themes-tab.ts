@@ -6,13 +6,12 @@ import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 const EDITOR_OVERLAY_ID = "betterx-editor-overlay";
 
 const SPLIT_STYLE_ID = "betterx-split-constraint";
+let activeEditorCleanup: (() => boolean) | null = null;
 
 type EditorMode = "full" | "split" | "window";
 
 function openEditorModal(theme: Theme, ctx: BetterXContext): void {
-  // Remove any existing editor modal
-  document.getElementById(EDITOR_OVERLAY_ID)?.remove();
-  document.getElementById(SPLIT_STYLE_ID)?.remove();
+  if (activeEditorCleanup && !activeEditorCleanup()) return;
 
   const overlay = document.createElement("div");
   overlay.id = EDITOR_OVERLAY_ID;
@@ -95,6 +94,8 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   let liveReload = false;
   let liveTimer: ReturnType<typeof setTimeout> | null = null;
   let splitWidth = 50; // percentage of viewport
+  let closed = false;
+  let activeDragCleanup: (() => void) | null = null;
 
   // Style element that constrains page content in split mode
   const splitStyle = document.createElement("style");
@@ -198,12 +199,14 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
       document.removeEventListener("mouseup", onUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      activeDragCleanup = null;
     };
 
     document.body.style.cursor = mode === "split" ? "ew-resize" : "nwse-resize";
     document.body.style.userSelect = "none";
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+    activeDragCleanup = onUp;
   });
 
   // ── Window drag (title bar) ─────────────────────
@@ -230,6 +233,7 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       modal.style.opacity = "";
+      activeDragCleanup = null;
     };
 
     modal.style.opacity = "0.75";
@@ -237,16 +241,28 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
     document.body.style.userSelect = "none";
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+    activeDragCleanup = onUp;
   });
 
-  const closeModal = (): void => {
+  const closeModal = (force = false): boolean => {
+    if (closed) return true;
+    if (!force && !liveReload && currentCSS !== theme.css) {
+      if (!window.confirm("Discard unsaved theme changes?")) return false;
+    }
+    closed = true;
     if (liveTimer) clearTimeout(liveTimer);
+    activeDragCleanup?.();
     editorView?.destroy();
     clearInlineSize();
     splitStyle.remove();
     overlay.remove();
     document.removeEventListener("keydown", onKey);
+    if (activeEditorCleanup === cleanup) activeEditorCleanup = null;
+    return true;
   };
+
+  const cleanup = (): boolean => closeModal();
+  activeEditorCleanup = cleanup;
 
   // Live reload toggle
   liveCheck.addEventListener("change", () => {
@@ -269,7 +285,7 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   };
   document.addEventListener("keydown", onKey);
 
-  closeBtn.addEventListener("click", closeModal);
+  closeBtn.addEventListener("click", () => closeModal());
 
   saveBtn.addEventListener("click", async () => {
     await ctx.themeManager.update(theme.id, currentCSS);
@@ -298,36 +314,43 @@ function openEditorModal(theme: Theme, ctx: BetterXContext): void {
   };
 
   // Lazy load CodeMirror
-  import("codemirror").then(({ EditorView, basicSetup }) => {
-    import("@codemirror/lang-css").then(({ css }) => {
-      import("@codemirror/theme-one-dark").then(({ oneDark }) => {
-        const view = new EditorView({
-          doc: theme.css,
-          extensions: [
-            basicSetup,
-            css(),
-            oneDark,
-            EditorView.theme({
-              "&": { height: "100%", fontSize: "13px" },
-              ".cm-scroller": { overflow: "auto" },
-            }),
-            EditorView.updateListener.of((update) => {
-              if (update.docChanged) {
-                currentCSS = update.state.doc.toString();
-                applyLive();
-              }
-            }),
-          ],
-          parent: editorEl,
-        });
-
-        editorView = view;
-
-        // Focus editor
-        view.focus();
+  Promise.all([
+    import("codemirror"),
+    import("@codemirror/lang-css"),
+    import("@codemirror/theme-one-dark"),
+  ])
+    .then(([{ EditorView, basicSetup }, { css }, { oneDark }]) => {
+      if (closed || !editorEl.isConnected) return;
+      const view = new EditorView({
+        doc: theme.css,
+        extensions: [
+          basicSetup,
+          css(),
+          oneDark,
+          EditorView.theme({
+            "&": { height: "100%", fontSize: "13px" },
+            ".cm-scroller": { overflow: "auto" },
+          }),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+              currentCSS = update.state.doc.toString();
+              applyLive();
+            }
+          }),
+        ],
+        parent: editorEl,
       });
+
+      editorView = view;
+
+      // Focus editor
+      view.focus();
+    })
+    .catch((error) => {
+      if (closed) return;
+      ctx.notifications.showError("Could not load the theme editor.");
+      console.error("[BetterX] Theme editor failed to load", error);
     });
-  });
 }
 
 export const ThemesTab: SettingsTab = {
@@ -437,14 +460,32 @@ export const ThemesTab: SettingsTab = {
 
       const files = e.dataTransfer?.files;
       if (!files || files.length === 0) return;
+      const cssFiles = Array.from(files).filter((file) => file.name.toLowerCase().endsWith(".css"));
+      if (cssFiles.length > 100 || themes.length + cssFiles.length > 100) {
+        ctx.notifications.showError("A maximum of 100 themes is supported.");
+        return;
+      }
+      if (cssFiles.some((file) => file.size > 2_000_000)) {
+        ctx.notifications.showError("Each theme must be 2 MB or smaller.");
+        return;
+      }
+      if (cssFiles.reduce((total, file) => total + file.size, 0) > 5_000_000) {
+        ctx.notifications.showError("The imported themes are too large.");
+        return;
+      }
 
       let imported = 0;
-      for (const file of Array.from(files)) {
-        if (!file.name.endsWith(".css")) continue;
-        const css = await file.text();
-        const name = file.name.replace(/\.css$/i, "");
-        await ctx.themeManager.create(name, css);
-        imported++;
+      try {
+        for (const file of cssFiles) {
+          const css = await file.text();
+          const name = file.name.replace(/\.css$/i, "");
+          await ctx.themeManager.create(name, css);
+          imported++;
+        }
+      } catch (error) {
+        ctx.notifications.showError(
+          error instanceof Error ? error.message : "Theme import failed."
+        );
       }
 
       if (imported > 0) {

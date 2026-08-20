@@ -3,6 +3,7 @@
 // 1. Inject active theme CSS before the page paints (no FOUC)
 // 2. Replace the X loading screen logo before it's visible
 
+import { prioritizeThemeRules } from "@betterx/core";
 import browser from "../platform/browser.js";
 
 // Preserve authored CSS; see core/theme/processor.ts.
@@ -31,6 +32,11 @@ async function injectThemes(): Promise<void> {
     style.id = STYLE_PREFIX + id;
     style.textContent = processCSS(css);
     root.appendChild(style);
+    try {
+      if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
+    } catch {
+      // Keep the authored CSS if this WebView cannot rewrite a particular rule.
+    }
   }
 }
 

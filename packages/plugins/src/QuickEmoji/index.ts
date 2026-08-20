@@ -141,6 +141,7 @@ let currentResults: [string, string][] = [];
 let currentQuery = "";
 let cleanupFns: (() => void)[] = [];
 let activeComposer: HTMLElement | null = null;
+let maxResults = 7;
 
 function detectThemeColors(): void {
   const bg = getComputedStyle(document.body).backgroundColor;
@@ -344,7 +345,7 @@ function attachToComposer(composer: HTMLElement): void {
       hideDropdown();
       return;
     }
-    const results = searchEmoji(query, 7);
+    const results = searchEmoji(query, maxResults);
     renderResults(query, results);
     positionDropdown(composer);
   };
@@ -400,12 +401,18 @@ export default definePlugin({
     maxResults: {
       type: OptionType.NUMBER,
       default: 7,
+      min: 1,
+      max: 15,
       label: "Max suggestions",
       description: "Maximum number of emoji suggestions to show (1-15)",
+      onChange(value) {
+        maxResults = Number(value);
+      },
     },
   },
 
   start() {
+    maxResults = this.settings.store.maxResults;
     injectStyle(CSS, STYLE_ID);
     dropdown = createDropdown();
 

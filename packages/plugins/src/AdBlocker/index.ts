@@ -11,9 +11,14 @@ const AD_KEYWORDS = new Set([
 ]);
 
 let adUnsub: (() => void) | null = null;
+const processedPosts = new Map<HTMLElement, { display: string; marker: string | undefined }>();
 
 function processPost(el: HTMLElement): void {
   if (el.dataset.adBlockerProcessed) return;
+  processedPosts.set(el, {
+    display: el.style.display,
+    marker: el.dataset.adBlockerProcessed,
+  });
   el.dataset.adBlockerProcessed = "true";
   if (isAd(el)) el.style.display = "none";
 }
@@ -64,5 +69,11 @@ export default definePlugin({
   stop() {
     adUnsub?.();
     adUnsub = null;
+    for (const [post, original] of processedPosts) {
+      post.style.display = original.display;
+      if (original.marker === undefined) delete post.dataset.adBlockerProcessed;
+      else post.dataset.adBlockerProcessed = original.marker;
+    }
+    processedPosts.clear();
   },
 });

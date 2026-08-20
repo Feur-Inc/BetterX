@@ -1,31 +1,35 @@
-import { session } from "electron";
+import type { Session } from "electron";
+import { patchBetterXCSP } from "./csp.js";
 
 // ─── Security ─────────────────────────────────────────────────────────────────
 
 /**
- * Configure Content-Security-Policy to allow the betterx:// script protocol
- * while keeping X.com's existing CSP otherwise intact.
+ * Configure X's Content-Security-Policy for BetterX's main-world patches and
+ * external plugin images while keeping the remaining directives intact.
  *
- * BetterX runs in an Electron isolated world, so X's script nonce remains
- * intact. Only resource directives needed by BetterX assets are extended.
+ * X includes a nonce alongside unsafe-inline, which makes Chromium ignore
+ * unsafe-inline and blocks BetterX's main-world patches. Strip only nonce
+ * sources from X's script directives and extend image sources for BetterX.
  */
-export function setupCSP(): void {
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+const configuredSessions = new WeakSet<Session>();
+
+export function setupCSP(targetSession: Session): void {
+  if (configuredSessions.has(targetSession)) return;
+  configuredSessions.add(targetSession);
+  targetSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = { ...details.responseHeaders };
 
     // Only patch X.com / Twitter CSP
-    const url = details.url;
-    let trustedMainDocument = false;
+    let trustedXResponse = false;
     try {
       const parsed = new URL(details.url);
-      trustedMainDocument =
-        details.resourceType === "mainFrame" &&
+      trustedXResponse =
         parsed.protocol === "https:" &&
         (parsed.hostname === "x.com" || parsed.hostname === "twitter.com");
     } catch {
-      trustedMainDocument = false;
+      trustedXResponse = false;
     }
-    if (!trustedMainDocument) {
+    if (!trustedXResponse) {
       callback({ responseHeaders });
       return;
     }
@@ -37,11 +41,11 @@ export function setupCSP(): void {
     if (cspKey) {
       const existing = responseHeaders[cspKey];
       if (Array.isArray(existing)) {
-        responseHeaders[cspKey] = existing.map((directive) =>
-          directive
-            // Allow any HTTPS image - plugins load from GitHub, cataas, unavatar, etc.
-            .replace("img-src", "img-src betterx: https:")
-        );
+        responseHeaders[cspKey] = existing.map((directive) => patchBetterXCSP(directive));
+      } else if (typeof existing === "string") {
+        // Electron currently types response header values as arrays, but keep
+        // this compatible with Chromium versions that surface a single value.
+        responseHeaders[cspKey] = [patchBetterXCSP(existing)];
       }
     }
 

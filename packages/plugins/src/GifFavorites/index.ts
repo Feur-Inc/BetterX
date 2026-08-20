@@ -120,6 +120,7 @@ function unpatchXHR(): void {
 }
 
 let gifObserver: MutationObserver | null = null;
+const positionedParents = new Map<HTMLElement, string>();
 
 function injectStars(): void {
   document
@@ -147,6 +148,7 @@ function injectStars(): void {
       });
       const parent = img.parentElement;
       if (parent) {
+        if (!positionedParents.has(parent)) positionedParents.set(parent, parent.style.position);
         parent.style.position = "relative";
         parent.appendChild(btn);
       }
@@ -172,5 +174,7 @@ export default definePlugin({
     gifObserver?.disconnect();
     gifObserver = null;
     document.querySelectorAll("[data-bx-gif-star]").forEach((el) => el.remove());
+    for (const [parent, position] of positionedParents) parent.style.position = position;
+    positionedParents.clear();
   },
 });

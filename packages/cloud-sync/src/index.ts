@@ -45,6 +45,8 @@ const MAX_CONFIG_BYTES = 5_000_000;
 const MAX_PLUGINS = 250;
 const MAX_THEMES = 100;
 const MAX_THEME_BYTES = 2_000_000;
+const MAX_SETTINGS_DEPTH = 20;
+const MAX_SETTINGS_NODES = 10_000;
 
 app.use("*", honoLogger());
 app.use("*", async (c, next) => {
@@ -227,7 +229,7 @@ app.get("/auth/callback", async (c) => {
   return c.redirect("/");
 });
 
-app.get("/auth/logout", (c) => {
+app.post("/auth/logout", (c) => {
   deleteCookie(c, "bx_session", { path: "/" });
   return c.redirect("/auth/twitter");
 });
@@ -247,6 +249,23 @@ function validThemeId(value: unknown): value is string {
   return typeof value === "string" && /^[a-zA-Z0-9_-]{1,100}\.css$/.test(value);
 }
 
+function isBoundedJsonValue(value: unknown): boolean {
+  let remaining = MAX_SETTINGS_NODES;
+  const visit = (candidate: unknown, depth: number): boolean => {
+    if (--remaining < 0 || depth > MAX_SETTINGS_DEPTH) return false;
+    if (candidate === null || typeof candidate === "string" || typeof candidate === "boolean") {
+      return true;
+    }
+    if (typeof candidate === "number") return Number.isFinite(candidate);
+    if (Array.isArray(candidate)) return candidate.every((item) => visit(item, depth + 1));
+    if (!isObject(candidate)) return false;
+    return Object.entries(candidate).every(
+      ([key, item]) => key.length <= 200 && visit(item, depth + 1)
+    );
+  };
+  return visit(value, 0);
+}
+
 function validateConfig(data: unknown): StoredConfig | null {
   if (!isObject(data)) return null;
 
@@ -261,6 +280,7 @@ function validateConfig(data: unknown): StoredConfig | null {
         : isObject(value.store)
           ? value.store
           : {};
+      if (!isBoundedJsonValue(candidateSettings)) return null;
       pluginStates[key] = {
         enabled: value.enabled === true,
         settings: candidateSettings,
@@ -346,13 +366,25 @@ app.post("/api/config", authMiddleware, async (c) => {
 
   let body: unknown;
   try {
-    body = await c.req.json();
+    const reader = c.req.raw.body?.getReader();
+    if (!reader) return c.json({ error: "Missing request body" }, 400);
+    const decoder = new TextDecoder();
+    let total = 0;
+    let raw = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_CONFIG_BYTES) {
+        await reader.cancel();
+        return c.json({ error: "Config is too large" }, 413);
+      }
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    body = JSON.parse(raw) as unknown;
   } catch {
     return c.json({ error: "Invalid JSON" }, 400);
-  }
-
-  if (JSON.stringify(body).length > MAX_CONFIG_BYTES) {
-    return c.json({ error: "Config is too large" }, 413);
   }
 
   const validated = validateConfig(body);
@@ -400,7 +432,8 @@ app.get("/", authMiddleware, (c) => {
       <body>
         <h1>BetterX Sync</h1>
         <div class="card">
-          <p>Logged in as <strong>@${displayUsername}</strong> &nbsp; <a href="/auth/logout" style="color:#f4212e;font-size:14px;">Logout</a></p>
+          <p>Logged in as <strong>@${displayUsername}</strong></p>
+          <form method="post" action="/auth/logout"><button type="submit">Logout</button></form>
           <h3>Export Config</h3>
           <p>Download your current cloud settings as a JSON file.</p>
           <button onclick="exportConfig()">Download betterx-config.json</button>

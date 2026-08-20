@@ -15,7 +15,7 @@
 // before any of Twitter's scripts run.
 
 /** Whether the SensitiveMedia plugin is currently enabled. */
-const sensitiveMediaEnabled = localStorage.getItem("betterx:sensitiveMedia") !== "0";
+const sensitiveMediaEnabled = localStorage.getItem("betterx:sensitiveMedia") === "1";
 /** When true, apply our own CSS blur instead of fully revealing media. */
 const sensitiveMediaBlur = localStorage.getItem("betterx:sensitiveMedia:blur") === "1";
 

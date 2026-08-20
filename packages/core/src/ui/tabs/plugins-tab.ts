@@ -88,8 +88,14 @@ function renderOptions(container: HTMLElement, plugin: Plugin, ctx: BetterXConte
       input.type = "number";
       input.className = "betterx-input-number";
       input.value = String(currentValue as number);
+      if (opt.min !== undefined) input.min = String(opt.min);
+      if (opt.max !== undefined) input.max = String(opt.max);
+      if (opt.step !== undefined) input.step = String(opt.step);
       input.addEventListener("change", () => {
-        ctx.pluginManager.updateOption(plugin.name, key, Number(input.value)).catch(console.error);
+        const next = input.valueAsNumber;
+        ctx.pluginManager.updateOption(plugin.name, key, next).catch(() => {
+          input.value = String(plugin.settings.store[key] as number);
+        });
       });
       control.appendChild(input);
     } else if (opt.type === OptionType.COLOR) {

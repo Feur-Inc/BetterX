@@ -45,12 +45,10 @@ export function registerSettingsHandlers(): void {
 
 const SETTING_KEYS = new Set<keyof DesktopSettings>([
   "bundlePath",
-  "currentHash",
   "enableTransparency",
   "startMinimized",
   "minimizeToTray",
   "autoStart",
-  "checkForUpdates",
   "enableDiscordRPC",
   "pluginStates",
   "themeState",
@@ -66,12 +64,6 @@ function assertSettingValue(key: unknown, value: unknown): asserts key is keyof 
   assertSettingKey(key);
   if (key === "bundlePath") {
     if (typeof value !== "string") throw new Error("Invalid bundle path");
-    return;
-  }
-  if (key === "currentHash") {
-    if (value !== null && (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value))) {
-      throw new Error("Invalid bundle hash");
-    }
     return;
   }
   if (key === "pluginStates") {

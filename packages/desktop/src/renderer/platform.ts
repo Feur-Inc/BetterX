@@ -23,18 +23,11 @@ type ElectronAPISettings = {
   chooseBundlePath(): Promise<string | null>;
 };
 
-type ElectronAPIUpdate = {
-  checkBundle(): Promise<{ updateAvailable: boolean; remoteHash: string }>;
-  applyBundle(remoteHash: string): Promise<void>;
-  onBundleApplied(callback: () => void): () => void;
-};
-
 declare global {
   interface Window {
     electronAPI: {
       themes: ElectronAPIThemes;
       settings: ElectronAPISettings;
-      update?: ElectronAPIUpdate;
       captureElement?(rect: {
         x: number;
         y: number;

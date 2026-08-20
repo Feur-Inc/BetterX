@@ -10,12 +10,13 @@
     "packages/android"
   ],
   "scripts": {
-    "build": "bun run build:core && bun run build:plugins && bun run build:extension && bun run build:desktop && bun run build:cloud-sync",
+    "build": "bun run build:core && bun run build:plugins && bun run build:extension && bun run build:desktop && bun run build:cloud-sync && bun run build:android",
     "build:core": "bun run --cwd packages/core build",
     "build:plugins": "bun run --cwd packages/plugins build",
     "build:extension": "bun run --cwd packages/extension build",
     "build:desktop": "bun run --cwd packages/desktop build",
     "build:cloud-sync": "bun run --cwd packages/cloud-sync typecheck",
+    "build:android": "bun run --cwd packages/android build:web",
     "start:cloud-sync": "bun run --cwd packages/cloud-sync start",
     "dev:cloud-sync": "bun run --cwd packages/cloud-sync dev",
     "start:desktop": "bun run --cwd packages/desktop start",

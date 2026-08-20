@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import type { IStorage, PluginDefinition, PluginStorageData, ThemeStorageState } from "../index.js";
+import {
+  type IStorage,
+  OptionType,
+  type PluginDefinition,
+  type PluginStorageData,
+  type ThemeStorageState,
+} from "../index.js";
 import { PluginManager } from "./manager.js";
 
 class MemoryStorage implements IStorage {
@@ -143,5 +149,42 @@ describe("PluginManager lifecycle", () => {
     await manager["disableWithDependents"]("dependency");
 
     expect(stops).toEqual(["dependent", "dependency"]);
+  });
+
+  test("preserves state for plugins unavailable on the current platform", async () => {
+    const desktopState = { enabled: true, settings: {} };
+    const storage = new MemoryStorage({ desktopOnly: desktopState });
+    const manager = new PluginManager(storage);
+
+    await manager.initialize(
+      [
+        { name: "desktopOnly", platform: "desktop", start() {} },
+        {
+          name: "portable",
+          options: { value: { type: OptionType.NUMBER, default: 1 } },
+          start() {},
+        },
+      ],
+      "extension"
+    );
+    await manager.updateOption("portable", "value", 2);
+
+    expect(storage.pluginStates.desktopOnly).toEqual(desktopState);
+  });
+
+  test("rejects invalid option values and bounds", async () => {
+    const storage = new MemoryStorage({});
+    const manager = new PluginManager(storage);
+    await manager.initialize([
+      {
+        name: "bounded",
+        options: { value: { type: OptionType.NUMBER, default: 5, min: 1, max: 10 } },
+        start() {},
+      },
+    ]);
+
+    await expect(manager.updateOption("bounded", "value", Number.NaN)).rejects.toThrow();
+    await expect(manager.updateOption("bounded", "value", 11)).rejects.toThrow();
+    expect(manager.get("bounded")?.settings.store.value).toBe(5);
   });
 });

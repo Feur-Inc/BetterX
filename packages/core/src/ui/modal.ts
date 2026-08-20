@@ -21,6 +21,7 @@ export class SettingsModal {
   private initialized = new Set<string>();
   private _closeCallbacks: (() => void)[] = [];
   private _closeInterceptor: (() => boolean | undefined) | null = null;
+  private keydownHandler: ((event: KeyboardEvent) => void) | null = null;
 
   setCloseInterceptor(fn: (() => boolean | undefined) | null): void {
     this._closeInterceptor = fn;
@@ -59,23 +60,17 @@ export class SettingsModal {
     // Close on overlay click (interceptor can cancel)
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) {
-        if (this._closeInterceptor?.() === false) return;
         this.close();
       }
     });
 
     // Close on Escape (interceptor can cancel)
-    const onKey = (e: KeyboardEvent) => {
+    this.keydownHandler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (this._closeInterceptor?.() === false) {
-          document.removeEventListener("keydown", onKey);
-          return;
-        }
         this.close();
-        document.removeEventListener("keydown", onKey);
       }
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", this.keydownHandler);
 
     // Close button
     overlay.querySelector(".betterx-modal-close")?.addEventListener("click", () => this.close());
@@ -96,7 +91,12 @@ export class SettingsModal {
     }
   }
 
-  close(): void {
+  close(force = false): boolean {
+    if (!force && this._closeInterceptor?.() === false) return false;
+    if (this.keydownHandler) {
+      document.removeEventListener("keydown", this.keydownHandler);
+      this.keydownHandler = null;
+    }
     this.overlay?.remove();
     this.overlay = null;
     this.activeTabId = null;
@@ -104,6 +104,7 @@ export class SettingsModal {
     const cbs = this._closeCallbacks.slice();
     this._closeCallbacks = [];
     for (const cb of cbs) cb();
+    return true;
   }
 
   toggle(): void {

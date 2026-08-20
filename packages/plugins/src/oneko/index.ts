@@ -84,6 +84,7 @@ let lastFrameTimestamp: number | null = null;
 let animationFrameId: number | null = null;
 let mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 let nekoSpeed = 10;
+let lifecycleGeneration = 0;
 
 function setSprite(name: string, frame: number): void {
   if (!nekoEl) return;
@@ -191,6 +192,9 @@ export default definePlugin({
     speed: {
       type: OptionType.NUMBER,
       default: 1,
+      min: 0.1,
+      max: 5,
+      step: 0.1,
       label: "Speed",
       description: "Speed multiplier (0.1 – 5).",
       onChange(val) {
@@ -232,6 +236,7 @@ export default definePlugin({
   },
 
   async start() {
+    const generation = ++lifecycleGeneration;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const speed = this.settings.store.speed;
@@ -239,6 +244,7 @@ export default definePlugin({
     nekoSpeed = 10 * (Number(speed) || 1);
     const rawUrl = theme === "default" ? DEFAULT_GIF_URL : `${THEME_BASE_URL}${theme}.png`;
     const bgUrl = await proxyImage(rawUrl);
+    if (generation !== lifecycleGeneration) return;
 
     const el = document.createElement("div");
     el.id = "betterx-oneko";
@@ -272,6 +278,7 @@ export default definePlugin({
   },
 
   stop() {
+    lifecycleGeneration++;
     if (animationFrameId !== null) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;

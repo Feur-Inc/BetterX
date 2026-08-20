@@ -28,7 +28,10 @@ export type PluginOptionDef<T extends OptionTypeKey = OptionTypeKey> = {
   /** If true, the option is persisted but not shown in the settings UI. */
   hidden?: boolean;
   options?: T extends "SELECT" ? SelectOption[] : never;
-  onChange?: (newValue: OptionValueMap[T], oldValue: OptionValueMap[T]) => void;
+  min?: T extends "NUMBER" ? number : never;
+  max?: T extends "NUMBER" ? number : never;
+  step?: T extends "NUMBER" ? number : never;
+  onChange?: (newValue: OptionValueMap[T], oldValue: OptionValueMap[T]) => void | Promise<void>;
 };
 
 export type PluginOptionDefs = Record<string, PluginOptionDef>;

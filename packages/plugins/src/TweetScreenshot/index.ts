@@ -15,6 +15,7 @@ const SCREENSHOT_BTN_HTML = `
 `.trim();
 
 let screenshotObserver: MutationObserver | null = null;
+let screenshotFrame: number | null = null;
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header = "", b64 = ""] = dataUrl.split(",");
@@ -111,7 +112,9 @@ export default definePlugin({
       for (const m of mutations) {
         for (const node of m.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            (node as HTMLElement)
+            const element = node as HTMLElement;
+            if (element.matches('article[data-testid="tweet"]')) pending.add(element);
+            element
               .querySelectorAll<HTMLElement>('article[data-testid="tweet"]')
               .forEach((t) => pending.add(t));
           }
@@ -119,7 +122,8 @@ export default definePlugin({
       }
       if (!scheduled) {
         scheduled = true;
-        requestAnimationFrame(() => {
+        screenshotFrame = requestAnimationFrame(() => {
+          screenshotFrame = null;
           pending.forEach((t) => addScreenshotButton(t));
           pending.clear();
           scheduled = false;
@@ -135,6 +139,8 @@ export default definePlugin({
   stop() {
     screenshotObserver?.disconnect();
     screenshotObserver = null;
+    if (screenshotFrame !== null) cancelAnimationFrame(screenshotFrame);
+    screenshotFrame = null;
     document.querySelectorAll('[data-testid="bx-screenshot"]').forEach((btn) => btn.remove());
   },
 });

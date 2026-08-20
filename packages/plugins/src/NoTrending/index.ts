@@ -66,7 +66,8 @@ export default definePlugin({
     noTrendingDebounce = null;
 
     for (const { element, parent, nextSibling } of noTrendingRemoved) {
-      if (nextSibling) {
+      if (!(parent as Node).isConnected) continue;
+      if (nextSibling?.parentNode === parent) {
         parent.insertBefore(element, nextSibling);
       } else {
         (parent as Element).appendChild(element);

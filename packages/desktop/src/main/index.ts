@@ -1,3 +1,4 @@
+import { lookup } from "node:dns/promises";
 import { existsSync, watch } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
@@ -13,6 +14,7 @@ import { registerCaptureHandlers } from "./ipc/capture.js";
 import { registerDiscordRPCHandlers } from "./ipc/discord-rpc.js";
 import {
   assertTrustedSender,
+  isPrivateAddress,
   parseCloudServerUrl,
   parsePublicProxyUrl,
   validateCloudRequest,
@@ -20,15 +22,8 @@ import {
 } from "./ipc/security.js";
 import { registerSettingsHandlers } from "./ipc/settings.js";
 import { registerThemeHandlers } from "./ipc/themes.js";
-import { registerUpdateHandlers } from "./ipc/update.js";
-import { setupCSP } from "./security.js";
-import {
-  applyBundleUpdate,
-  checkForBundleUpdate,
-  readPersistedHash,
-} from "./services/bundle-updater.js";
 import { destroyDiscordRPC, initializeDiscordRPC } from "./services/discord-rpc.js";
-import { getSetting, setSetting, settingsStore } from "./services/settings.js";
+import { getSetting, settingsStore } from "./services/settings.js";
 import { createTray } from "./tray.js";
 import {
   createMainWindow,
@@ -42,24 +37,39 @@ import {
 
 import { BETTERX_DIR } from "./paths.js";
 
-// Default to the locally-built bundle; overridden by userData path once a remote update is applied
+// Default to the bundle packaged with the desktop application.
 const BUNDLE_PATH = join(__dirname, "../bundle/bundle.iife.js");
-// Where remote bundle updates are saved (userData, persists across app updates)
-const SAVED_BUNDLE_PATH = join(BETTERX_DIR, "bundle.iife.js");
+// Older releases downloaded executable bundles here. Never load that legacy path implicitly.
+const LEGACY_SAVED_BUNDLE_PATH = join(BETTERX_DIR, "bundle.iife.js");
 const PRELOAD_PATH = join(__dirname, "../preload/preload.js");
+const MAX_PROXY_RESPONSE_BYTES = 10_000_000;
 
-async function updateManagedBundle(): Promise<boolean> {
-  const currentHash = (await readPersistedHash(SAVED_BUNDLE_PATH)) ?? getSetting("currentHash");
-  const result = await checkForBundleUpdate(currentHash);
-  if (!result.updateAvailable) return false;
+async function readLimitedText(response: Response, limit: number): Promise<string> {
+  const declaredSize = Number(response.headers.get("content-length") ?? 0);
+  if (declaredSize > limit) throw new Error("Response is too large");
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      throw new Error("Response is too large");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
 
-  logger.info("BetterX bundle update available, downloading...");
-  await applyBundleUpdate(SAVED_BUNDLE_PATH, result.remoteHash);
-  setSetting("currentHash", result.remoteHash);
-  setSetting("bundlePath", SAVED_BUNDLE_PATH);
-  setBundlePath(SAVED_BUNDLE_PATH);
-  logger.info("Bundle updated successfully");
-  return true;
+async function assertPublicProxyHost(url: URL): Promise<void> {
+  const addresses = await lookup(url.hostname, { all: true, verbatim: true });
+  if (addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address))) {
+    throw new Error("Private network proxy targets are not allowed");
+  }
 }
 
 // ─── Wayland support ──────────────────────────────────────────────────────────
@@ -129,46 +139,20 @@ app.whenReady().then(async () => {
   // Set up betterx:// protocol handler
   handleBetterxProtocol();
 
-  // Set up CSP
-  setupCSP();
-
-  // Configure bundle path. A user-selected custom path is never overwritten by
-  // automatic updates; managed updates always live under BetterX's user-data directory.
+  // Use the packaged bundle unless the user explicitly selected a local development bundle.
   const storedPath = getSetting("bundlePath");
   const hasCustomBundle =
     !!storedPath &&
     storedPath !== BUNDLE_PATH &&
-    storedPath !== SAVED_BUNDLE_PATH &&
+    storedPath !== LEGACY_SAVED_BUNDLE_PATH &&
     existsSync(storedPath);
-  let bundlePath = hasCustomBundle
-    ? storedPath
-    : existsSync(SAVED_BUNDLE_PATH)
-      ? SAVED_BUNDLE_PATH
-      : BUNDLE_PATH;
+  const bundlePath = hasCustomBundle ? storedPath : BUNDLE_PATH;
   setAssetsPath(join(__dirname, "../../assets"));
-
-  // Check/update bundle
-  if (getSetting("checkForUpdates") && !hasCustomBundle) {
-    try {
-      if (await updateManagedBundle()) bundlePath = SAVED_BUNDLE_PATH;
-    } catch (err) {
-      logger.warn("Bundle update check failed:", err);
-      // Non-fatal: use existing bundle if available
-    }
-  }
   setBundlePath(bundlePath);
 
   // Register IPC handlers
   registerThemeHandlers();
   registerSettingsHandlers();
-  registerUpdateHandlers({
-    managedBundlePath: SAVED_BUNDLE_PATH,
-    onApplied: (remoteHash) => {
-      setSetting("currentHash", remoteHash);
-      setSetting("bundlePath", SAVED_BUNDLE_PATH);
-      setBundlePath(SAVED_BUNDLE_PATH);
-    },
-  });
   registerDiscordRPCHandlers();
   ipcMain.on("app:get-version", (event) => {
     assertTrustedSender(event);
@@ -267,7 +251,7 @@ app.whenReady().then(async () => {
   async function getCloudCookie(serverUrl: string): Promise<string> {
     const url = parseCloudServerUrl(serverUrl);
     const cookies = await session.defaultSession.cookies.get({
-      domain: url.hostname,
+      url: url.origin,
       name: "bx_session",
     });
     return cookies[0]?.value ? `bx_session=${cookies[0].value}` : "";
@@ -323,8 +307,7 @@ app.whenReady().then(async () => {
           }
         }
 
-        const text = await res.text();
-        if (text.length > 2_000_000) throw new Error("Cloud response is too large");
+        const text = await readLimitedText(res, 2_000_000);
         let json: unknown = null;
         try {
           json = JSON.parse(text);
@@ -348,6 +331,7 @@ app.whenReady().then(async () => {
       try {
         assertTrustedSender(event);
         const target = parsePublicProxyUrl(url);
+        await assertPublicProxyHost(target);
         const method = validateProxyMethod(options?.method);
         if (options?.body && options.body.length > 2_000_000) {
           throw new Error("Proxy request body is too large");
@@ -364,10 +348,7 @@ app.whenReady().then(async () => {
           redirect: "manual",
           signal: AbortSignal.timeout(20_000),
         });
-        const declaredSize = Number(response.headers.get("content-length") ?? 0);
-        if (declaredSize > 10_000_000) throw new Error("Proxy response is too large");
-        const text = await response.text();
-        if (text.length > 10_000_000) throw new Error("Proxy response is too large");
+        const text = await readLimitedText(response, MAX_PROXY_RESPONSE_BYTES);
         let json: unknown = null;
         try {
           json = JSON.parse(text);
@@ -412,19 +393,7 @@ app.whenReady().then(async () => {
   // Tray
   const iconPath = join(__dirname, "../../assets/icon.png");
   if (existsSync(iconPath)) {
-    createTray(
-      iconPath,
-      () => mainWindow,
-      async () => {
-        try {
-          if (await updateManagedBundle()) {
-            mainWindow?.webContents.send("update:bundle-applied");
-          }
-        } catch (error) {
-          logger.warn("Tray update check failed:", error);
-        }
-      }
-    );
+    createTray(iconPath, () => mainWindow);
   }
 
   // If launched via deep link, navigate to the target URL

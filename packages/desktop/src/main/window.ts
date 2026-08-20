@@ -3,6 +3,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { logger } from "@betterx/core";
 import { BrowserWindow, app, protocol, shell } from "electron";
 import { isTrustedRendererUrl, parseExternalHttpUrl } from "./ipc/security.js";
+import { setupCSP } from "./security.js";
 
 // ─── Window Management ────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ export function createMainWindow(preloadPath: string, enableTransparency: boolea
     return { action: "deny" };
   });
 
+  setupCSP(win.webContents.session);
   win.loadURL("https://x.com");
   return win;
 }

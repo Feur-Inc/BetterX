@@ -11,7 +11,7 @@ function withWindow(getWindow: WindowProvider, callback: (window: BrowserWindow)
   if (window && !window.isDestroyed()) callback(window);
 }
 
-function buildMenu(getWindow: WindowProvider, checkForUpdates: () => Promise<void>): Menu {
+function buildMenu(getWindow: WindowProvider): Menu {
   return Menu.buildFromTemplate([
     {
       label: "Open BetterX",
@@ -34,11 +34,6 @@ function buildMenu(getWindow: WindowProvider, checkForUpdates: () => Promise<voi
     },
     { type: "separator" },
     {
-      label: "Check for Updates",
-      click: () => void checkForUpdates(),
-    },
-    { type: "separator" },
-    {
       label: "Restart",
       click: () => {
         app.relaunch();
@@ -54,17 +49,13 @@ function buildMenu(getWindow: WindowProvider, checkForUpdates: () => Promise<voi
   ]);
 }
 
-export function createTray(
-  iconPath: string,
-  getWindow: WindowProvider,
-  checkForUpdates: () => Promise<void>
-): void {
+export function createTray(iconPath: string, getWindow: WindowProvider): void {
   if (tray) return;
 
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
   tray.setToolTip("BetterX V3");
-  tray.setContextMenu(buildMenu(getWindow, checkForUpdates));
+  tray.setContextMenu(buildMenu(getWindow));
 
   // Click toggles show/hide (Linux/Windows - macOS shows context menu)
   tray.on("click", () => {

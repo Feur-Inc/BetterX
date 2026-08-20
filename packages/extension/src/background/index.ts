@@ -8,7 +8,8 @@ import browser from "webextension-polyfill";
 // redirect).  Once detected we close the tab and notify the originating
 // content-script tab so it can refresh its connection status.
 
-let pendingOAuth: { tabId: number; serverOrigin: string; contentTabId: number } | null = null;
+type PendingOAuth = { tabId: number; serverOrigin: string; contentTabId: number };
+const pendingOAuthByTab = new Map<number, PendingOAuth>();
 const ALLOWED_PROXY_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 const MAX_PROXY_BODY_BYTES = 2_000_000;
 const MAX_PROXY_RESPONSE_BYTES = 10_000_000;
@@ -27,19 +28,53 @@ function parseProxyUrl(rawUrl: string): URL {
 async function readLimitedText(response: Response): Promise<string> {
   const declaredSize = Number(response.headers.get("content-length") ?? 0);
   if (declaredSize > MAX_PROXY_RESPONSE_BYTES) throw new Error("Proxy response is too large");
-  const text = await response.text();
-  if (text.length > MAX_PROXY_RESPONSE_BYTES) throw new Error("Proxy response is too large");
-  return text;
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_PROXY_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error("Proxy response is too large");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+async function readLimitedBlob(response: Response): Promise<Blob> {
+  const declaredSize = Number(response.headers.get("content-length") ?? 0);
+  if (declaredSize > MAX_PROXY_RESPONSE_BYTES) throw new Error("Image is too large");
+  if (!response.body) return new Blob([], { type: response.headers.get("content-type") ?? "" });
+  const reader = response.body.getReader();
+  const chunks: BlobPart[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_PROXY_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error("Image is too large");
+    }
+    chunks.push(value.slice().buffer as ArrayBuffer);
+  }
+  return new Blob(chunks, { type: response.headers.get("content-type") ?? "" });
 }
 
 browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (!pendingOAuth || tabId !== pendingOAuth.tabId || !changeInfo.url) return;
+  const pendingOAuth = pendingOAuthByTab.get(tabId);
+  if (!pendingOAuth || !changeInfo.url) return;
   try {
     const parsed = new URL(changeInfo.url);
     // Done when the tab lands on the server root (not /auth/*)
     if (parsed.origin === pendingOAuth.serverOrigin && !parsed.pathname.startsWith("/auth")) {
       const { contentTabId, tabId: oauthTabId } = pendingOAuth;
-      pendingOAuth = null;
+      pendingOAuthByTab.delete(tabId);
       browser.tabs.remove(oauthTabId).catch(() => {});
       browser.tabs.sendMessage(contentTabId, { type: "OAUTH_COMPLETE" }).catch(() => {});
     }
@@ -49,9 +84,10 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 browser.tabs.onRemoved.addListener((tabId) => {
-  if (!pendingOAuth || tabId !== pendingOAuth.tabId) return;
+  const pendingOAuth = pendingOAuthByTab.get(tabId);
+  if (!pendingOAuth) return;
   const { contentTabId } = pendingOAuth;
-  pendingOAuth = null;
+  pendingOAuthByTab.delete(tabId);
   // User closed the tab manually — still refresh status
   browser.tabs.sendMessage(contentTabId, { type: "OAUTH_COMPLETE" }).catch(() => {});
 });
@@ -84,7 +120,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     }
     return browser.tabs.create({ url: msg.url }).then((tab) => {
       if (tab.id != null && contentTabId != null) {
-        pendingOAuth = { tabId: tab.id, serverOrigin, contentTabId };
+        pendingOAuthByTab.set(tab.id, { tabId: tab.id, serverOrigin, contentTabId });
       }
       return { started: true };
     });
@@ -98,11 +134,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     return fetch(parseProxyUrl(msg.url), { signal: AbortSignal.timeout(20_000) })
       .then(async (res) => {
         if (!res.ok) throw new Error(`Image request failed (${res.status})`);
-        const declaredSize = Number(res.headers.get("content-length") ?? 0);
-        if (declaredSize > MAX_PROXY_RESPONSE_BYTES) throw new Error("Image is too large");
-        const blob = await res.blob();
-        if (blob.size > MAX_PROXY_RESPONSE_BYTES) throw new Error("Image is too large");
-        return blob;
+        return readLimitedBlob(res);
       })
       .then(
         (blob) =>

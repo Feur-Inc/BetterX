@@ -1,4 +1,4 @@
-import { Devs, OptionType, definePlugin, injectStyle, removeStyle } from "@betterx/core";
+import { Devs, definePlugin, injectStyle, removeStyle } from "@betterx/core";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -443,20 +443,9 @@ export default definePlugin({
   name: "MenuReorder",
   description: "Drag-and-drop reordering and hiding of navigation menu items",
   authors: [Devs.TPM28, Devs.Mopi],
-  options: {
-    enableReordering: {
-      type: OptionType.BOOLEAN,
-      default: true,
-      label: "Enable reordering",
-      description: "Allow menu items to be reordered by drag and drop",
-    },
-  },
-
   start() {
     injectStyle(CSS, STYLE_ID);
     hiddenIds = loadHidden();
-
-    if (!this.settings.store.enableReordering) return;
 
     const tryInit = (): void => {
       const nav = findNav();

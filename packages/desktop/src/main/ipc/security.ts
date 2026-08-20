@@ -1,6 +1,35 @@
+import { isIP } from "node:net";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 
 const TRUSTED_RENDERER_HOSTS = new Set(["x.com", "twitter.com"]);
+
+export function isPrivateAddress(address: string): boolean {
+  if (isIP(address) === 6) {
+    const normalized = address.toLowerCase();
+    if (normalized.startsWith("::ffff:")) {
+      const mappedAddress = normalized.slice("::ffff:".length);
+      if (isIP(mappedAddress) === 4) return isPrivateAddress(mappedAddress);
+    }
+    return (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") ||
+      normalized.startsWith("fe8") ||
+      normalized.startsWith("fe9") ||
+      normalized.startsWith("fea") ||
+      normalized.startsWith("feb")
+    );
+  }
+  return (
+    /^127\./.test(address) ||
+    /^10\./.test(address) ||
+    /^192\.168\./.test(address) ||
+    /^169\.254\./.test(address) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(address) ||
+    address === "0.0.0.0"
+  );
+}
 
 export function isTrustedRendererUrl(rawUrl: string): boolean {
   try {
@@ -85,7 +114,7 @@ export function validateCloudRequest(
   const allowed = new Map<string, ReadonlySet<string>>([
     ["/api/config", new Set(["GET", "POST"])],
     ["/api/me", new Set(["GET"])],
-    ["/auth/logout", new Set(["GET"])],
+    ["/auth/logout", new Set(["POST"])],
   ]);
   if (!allowed.get(path)?.has(normalizedMethod)) throw new Error("Cloud request is not allowed");
   return { path, method: normalizedMethod as "GET" | "POST" };

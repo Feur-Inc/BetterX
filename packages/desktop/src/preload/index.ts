@@ -10,7 +10,7 @@ import type { ElectronAPI } from "./api.js";
 // Mirrors the logic in extension/src/content/main-world.ts but runs as an
 // injected inline script since the preload context is isolated from the page.
 const SENSITIVE_MEDIA_PATCH = `(function () {
-  var enabled = localStorage.getItem('betterx:sensitiveMedia') !== '0';
+  var enabled = localStorage.getItem('betterx:sensitiveMedia') === '1';
   if (!enabled) return;
 
   var blurMode = localStorage.getItem('betterx:sensitiveMedia:blur') === '1';
@@ -98,7 +98,7 @@ const SENSITIVE_MEDIA_PATCH = `(function () {
         var match = href ? href.match(/\\/status\\/(\\d+)/) : null;
         if (match && sensitiveIds.has(match[1])) article.setAttribute('data-betterx-sensitive', '1');
       });
-    }).observe(document.documentElement, { childList: true, subtree: true });
+    }).observe(document, { childList: true, subtree: true });
   }
 })();`;
 
@@ -273,16 +273,6 @@ const api: ElectronAPI = {
     chooseBundlePath: () => ipcRenderer.invoke("settings:choose-bundle-path"),
   },
 
-  update: {
-    checkBundle: () => ipcRenderer.invoke("update:check-bundle"),
-    applyBundle: (remoteHash) => ipcRenderer.invoke("update:apply-bundle", remoteHash),
-    onBundleApplied: (callback) => {
-      const handler = (): void => callback();
-      ipcRenderer.on("update:bundle-applied", handler);
-      return () => ipcRenderer.removeListener("update:bundle-applied", handler);
-    },
-  },
-
   captureElement: (rect) => ipcRenderer.invoke("capture:element", rect),
 
   getVersion: () => ipcRenderer.sendSync("app:get-version") as string,
@@ -323,6 +313,21 @@ function processCSS(css: string): string {
 // ─── Theme Injection ────────────────────────────────────────────────────────
 const STYLE_PREFIX = "betterx-theme-";
 
+function prioritizeThemeRules(rules: CSSRuleList): void {
+  for (const rule of rules) {
+    if (rule.type === 1) {
+      const declaration = (rule as CSSStyleRule).style;
+      for (const property of declaration) {
+        if (declaration.getPropertyPriority(property) !== "important") {
+          declaration.setProperty(property, declaration.getPropertyValue(property), "important");
+        }
+      }
+    }
+    const nestedRules = (rule as CSSRule & { cssRules?: CSSRuleList }).cssRules;
+    if (nestedRules) prioritizeThemeRules(nestedRules);
+  }
+}
+
 ipcRenderer
   .invoke("settings:get", "themeState")
   .then(async (val: unknown) => {
@@ -338,6 +343,11 @@ ipcRenderer
         style.id = STYLE_PREFIX + id;
         style.textContent = processCSS(css);
         root.appendChild(style);
+        try {
+          if (style.sheet) prioritizeThemeRules(style.sheet.cssRules);
+        } catch {
+          // Keep the authored CSS if this Electron build cannot rewrite a rule.
+        }
       } catch {
         /* theme not available - skip */
       }

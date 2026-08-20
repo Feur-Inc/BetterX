@@ -104,13 +104,7 @@ async function init(): Promise<void> {
   injectNavButton(openModal, logoUrl);
   watchNavButton(openModal, logoUrl);
 
-  // 11. Listen for bundle updates from main process
-  window.electronAPI?.update?.onBundleApplied(() => {
-    notifications.showInfo("BetterX bundle updated. Refreshing...", { duration: 3000 });
-    setTimeout(() => window.location.reload(), 3000);
-  });
-
-  // 12. Page tracker (Discord RPC)
+  // 11. Page tracker (Discord RPC)
   startPageTracker();
 
   logger.info("BetterX Desktop initialized ✓");

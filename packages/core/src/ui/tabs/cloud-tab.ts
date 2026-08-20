@@ -10,6 +10,11 @@ import type { BetterXContext, SettingsTab } from "../tab-registry.js";
 
 const DEFAULT_SERVER = "https://cloud.betterx.mopigames.dev";
 const AUTO_SYNC_INTERVAL_MS = 30_000;
+const MAX_CONFIG_CHARS = 5_000_000;
+const MAX_PLUGINS = 250;
+const MAX_THEMES = 100;
+const MAX_THEME_CHARS = 2_000_000;
+const THEME_ID = /^[a-zA-Z0-9._ -]{1,100}\.css$/;
 
 type CloudThemeState = ThemeStorageState & { themes: Record<string, string> };
 type CloudConfig = {
@@ -56,30 +61,40 @@ function parseCloudConfig(value: unknown): CloudConfig | null {
   )
     return null;
 
-  const pluginStates = Object.fromEntries(
-    Object.entries(config.plugin_states).filter((entry): entry is [string, PluginStorageData] =>
-      isPluginState(entry[1])
-    )
-  );
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    return null;
+  }
+  if (serialized.length > MAX_CONFIG_CHARS) return null;
+
+  const pluginEntries = Object.entries(config.plugin_states);
+  if (pluginEntries.length > MAX_PLUGINS) return null;
+  const pluginStates: Record<string, PluginStorageData> = {};
+  for (const [name, state] of pluginEntries) {
+    if (name.length === 0 || name.length > 100 || !isPluginState(state)) return null;
+    pluginStates[name] = { enabled: state.enabled, settings: { ...state.settings } };
+  }
   const themeState = config.theme_state as Record<string, unknown>;
-  const themes =
-    themeState.themes && typeof themeState.themes === "object"
-      ? Object.fromEntries(
-          Object.entries(themeState.themes).filter(
-            (entry): entry is [string, string] => typeof entry[1] === "string"
-          )
-        )
-      : {};
+  if (!themeState.themes || typeof themeState.themes !== "object") return null;
+  const themeEntries = Object.entries(themeState.themes);
+  if (themeEntries.length > MAX_THEMES) return null;
+  const themes: Record<string, string> = {};
+  for (const [id, css] of themeEntries) {
+    if (!THEME_ID.test(id) || typeof css !== "string" || css.length > MAX_THEME_CHARS) return null;
+    themes[id] = css;
+  }
   const ids = new Set(Object.keys(themes));
   const normalizeIds = (items: unknown): string[] =>
     Array.isArray(items)
       ? [
           ...new Set(
             items.filter(
-              (id): id is string => typeof id === "string" && (ids.has(id) || id.endsWith(".css"))
+              (id): id is string => typeof id === "string" && THEME_ID.test(id) && ids.has(id)
             )
           ),
-        ]
+        ].slice(0, MAX_THEMES)
       : [];
 
   return {
@@ -151,7 +166,8 @@ export function startCloudAutoSync(ctx: BetterXContext): void {
   if (autoSyncTimer !== null) window.clearInterval(autoSyncTimer);
   collectCloudConfig(ctx.storage)
     .then((config) => {
-      lastAutoSyncSnapshot = JSON.stringify(config);
+      lastAutoSyncSnapshot =
+        localStorage.getItem("bx_autosync") === "true" ? "" : JSON.stringify(config);
     })
     .catch((error) => logger.warn("Could not initialize automatic cloud sync", error));
   autoSyncTimer = window.setInterval(() => void runAutoSync(ctx), AUTO_SYNC_INTERVAL_MS);
@@ -230,19 +246,6 @@ async function importConfig(storage: IStorage, json: string, ctx: BetterXContext
   }
 
   if (hasPluginStates) {
-    const unavailable = new Set(
-      ctx.pluginManager
-        .getAll()
-        .filter((p) => p.unavailable)
-        .map((p) => p.name)
-    );
-
-    for (const [name, state] of Object.entries(pluginStates)) {
-      if (unavailable.has(name)) {
-        state.enabled = false;
-      }
-    }
-
     await storage.setPluginStates(pluginStates);
   }
 
@@ -394,17 +397,30 @@ async function setupEvents(container: HTMLElement, ctx: BetterXContext) {
   });
 
   loginBtn.addEventListener("click", () => {
-    const url = `${getServer()}/auth/twitter`;
-    if (ctx.openOAuth) {
-      ctx.openOAuth(url).catch(console.error);
-    } else {
-      window.open(url, "_blank");
+    try {
+      const url = `${getServer()}/auth/twitter`;
+      if (ctx.openOAuth) {
+        ctx.openOAuth(url).catch(() => ctx.notifications.showError("Could not open login."));
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (error) {
+      ctx.notifications.showError(
+        error instanceof Error ? error.message : "Invalid cloud server URL"
+      );
     }
   });
 
   logoutBtn.addEventListener("click", async () => {
-    await proxyFetch(`${getServer()}/auth/logout`, { credentials: "include" }).catch(() => {});
-    refreshStatus(container, ctx);
+    try {
+      await proxyFetch(`${getServer()}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      await refreshStatus(container, ctx);
+    } catch (error) {
+      ctx.notifications.showError(error instanceof Error ? error.message : "Could not log out.");
+    }
   });
 
   pushBtn.addEventListener("click", async () => {

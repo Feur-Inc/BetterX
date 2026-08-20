@@ -27,7 +27,7 @@ export { OptionType, definePlugin } from "./types/plugin.js";
 export { PluginManager } from "./plugin/manager.js";
 
 // Theme
-export { ThemeManager } from "./theme/manager.js";
+export { ThemeManager, prioritizeThemeRules } from "./theme/manager.js";
 export { processCSS } from "./theme/processor.js";
 export {
   detectAccentColor,
@@ -39,7 +39,7 @@ export {
 // UI
 export { TabRegistry } from "./ui/tab-registry.js";
 export type { SettingsTab, BetterXContext } from "./ui/tab-registry.js";
-export { SettingsModal } from "./ui/modal.js";
+export { SettingsModal, getSettingsModal } from "./ui/modal.js";
 export { NotificationManager, notifications } from "./ui/notification.js";
 export { injectNavButton, removeNavButton, ensureNavButton, watchNavButton } from "./ui/button.js";
 export { BETTERX_STYLES } from "./ui/styles.js";
