@@ -38,6 +38,7 @@
   "build": {
     "appId": "com.feurinc.betterx",
     "productName": "BetterX V3 Desktop",
+    "icon": "assets/icon512.png",
     "directories": {
       "output": "release"
     },
