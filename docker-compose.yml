@@ -7,6 +7,7 @@ services:
       - "4000:4000"
     volumes:
       - ./data:/data
+      - betterx-data:/data
     environment:
       - TWITTER_CLIENT_ID=${TWITTER_CLIENT_ID}
       - TWITTER_CLIENT_SECRET=${TWITTER_CLIENT_SECRET}
@@ -15,3 +16,5 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - PORT=${PORT:-4000}
     restart: unless-stopped
+volumes:
+  betterx-data:
