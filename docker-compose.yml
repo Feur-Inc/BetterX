@@ -6,7 +6,6 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ./data:/data
       - betterx-data:/data
     environment:
       - TWITTER_CLIENT_ID=${TWITTER_CLIENT_ID}
