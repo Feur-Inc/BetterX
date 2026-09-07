@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type { ElectronAPI } from "./api.js";
+import { PUSH_NOTIFICATIONS_PATCH } from "./desktop-push.js";
 
 const settingCache = new Map<string, unknown>();
 const settingRequests = new Map<string, Promise<unknown>>();
@@ -335,6 +336,22 @@ const api: ElectronAPI = {
 // Keep privileged APIs out of X's main world. The BetterX renderer bundle runs
 // in this same isolated world (see main/window.ts).
 contextBridge.exposeInIsolatedWorld(1000, "electronAPI", api);
+
+// X needs PushManager in the main world; keep all other Electron APIs isolated.
+if (
+  window.location.protocol === "https:" &&
+  (window.location.hostname === "x.com" || window.location.hostname === "twitter.com")
+) {
+  contextBridge.exposeInMainWorld("betterxDesktopPush", {
+    getSubscription: (scope: string) => ipcRenderer.invoke("desktop-push:get-subscription", scope),
+    subscribe: (scope: string, appServerKey: string) =>
+      ipcRenderer.invoke("desktop-push:subscribe", scope, appServerKey),
+    unsubscribe: (scope: string) => ipcRenderer.invoke("desktop-push:unsubscribe", scope),
+  });
+  void webFrame.executeJavaScript(PUSH_NOTIFICATIONS_PATCH).catch((error) => {
+    console.error("[BetterXDesktop] Failed to install push notification patch", error);
+  });
+}
 
 // ─── Early Injection ─────────────────────────────────────────────────────────
 // Runs at document_start (preload timing) to:

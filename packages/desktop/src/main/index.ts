@@ -12,6 +12,10 @@ const __dirname = dirname(__filename);
 import { logger } from "@betterx/core";
 
 import { registerCaptureHandlers } from "./ipc/capture.js";
+import {
+  configureDesktopNotificationPermissions,
+  registerDesktopPushHandlers,
+} from "./ipc/desktop-push.js";
 import { registerDiscordRPCHandlers } from "./ipc/discord-rpc.js";
 import {
   assertTrustedSender,
@@ -23,6 +27,7 @@ import {
 } from "./ipc/security.js";
 import { registerSettingsHandlers } from "./ipc/settings.js";
 import { registerThemeHandlers } from "./ipc/themes.js";
+import { DesktopPushService } from "./services/desktop-push.js";
 import { destroyDiscordRPC, initializeDiscordRPC } from "./services/discord-rpc.js";
 import { getSetting, settingsStore } from "./services/settings.js";
 import { createTray } from "./tray.js";
@@ -139,10 +144,17 @@ const launchDeepLink = process.argv.find((arg) => arg.startsWith("betterx://"));
 
 let mainWindow: BrowserWindow | null = null;
 let bundleWatcher: FSWatcher | null = null;
+const desktopPushService = new DesktopPushService(() => mainWindow);
+
+if (process.platform === "win32") {
+  app.setAppUserModelId(app.isPackaged ? "com.feurinc.betterx" : process.execPath);
+}
 
 app.whenReady().then(async () => {
   // Ensure BetterX directory exists
   await mkdir(BETTERX_DIR, { recursive: true });
+  await desktopPushService.initialize();
+  configureDesktopNotificationPermissions(session.defaultSession);
 
   // Set up betterx:// protocol handler
   handleBetterxProtocol();
@@ -164,6 +176,7 @@ app.whenReady().then(async () => {
   registerThemeHandlers();
   registerSettingsHandlers();
   registerDiscordRPCHandlers();
+  registerDesktopPushHandlers(desktopPushService);
   ipcMain.handle("bx:renderer-module:load", async (event, name: unknown) => {
     assertTrustedSender(event);
     if (name !== "editor" && name !== "emoji") throw new Error("Invalid renderer module");
@@ -466,6 +479,7 @@ app.on("open-url", (event, url) => {
 
 app.on("before-quit", () => {
   (app as typeof app & { isQuitting: boolean }).isQuitting = true;
+  desktopPushService.dispose();
   void destroyDiscordRPC();
   bundleWatcher?.close();
   bundleWatcher = null;

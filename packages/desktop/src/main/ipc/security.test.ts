@@ -7,10 +7,26 @@ import {
   parseExternalHttpUrl,
   parsePublicProxyUrl,
   validateCloudRequest,
+  validateDesktopPushScope,
   validateProxyMethod,
 } from "./security.js";
 
 describe("desktop IPC URL validation", () => {
+  test("limits desktop push subscriptions to the requesting X origin", () => {
+    expect(validateDesktopPushScope("https://x.com/", "https://x.com/home")).toBe("https://x.com/");
+    for (const scope of [
+      "https://twitter.com/",
+      "https://x.com.evil.example/",
+      "http://x.com/",
+      "https://user:pass@x.com/",
+      "https://x.com/?scope=other",
+      "https://x.com/#other",
+      null,
+    ]) {
+      expect(() => validateDesktopPushScope(scope, "https://x.com/home")).toThrow();
+    }
+  });
+
   test("trusts only exact HTTPS X hosts", () => {
     expect(isTrustedRendererUrl("https://x.com/home")).toBe(true);
     expect(isTrustedRendererUrl("https://twitter.com/home")).toBe(true);

@@ -46,6 +46,23 @@ export function assertTrustedSender(event: IpcMainEvent | IpcMainInvokeEvent): v
   }
 }
 
+export function validateDesktopPushScope(scope: unknown, senderUrl: string): string {
+  if (typeof scope !== "string" || scope.length > 2048 || !isTrustedRendererUrl(scope)) {
+    throw new Error("Invalid desktop push scope");
+  }
+  const url = new URL(scope);
+  if (
+    url.origin !== new URL(senderUrl).origin ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("Desktop push scope must belong to the requesting origin");
+  }
+  return url.toString();
+}
+
 export function parseExternalHttpUrl(rawUrl: string): URL {
   const url = new URL(rawUrl);
   if (url.protocol !== "https:" && url.protocol !== "http:") {

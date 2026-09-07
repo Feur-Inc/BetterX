@@ -146,6 +146,7 @@ export function createMainWindow(preloadPath: string, enableTransparency: boolea
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
       // No disable-web-security, no contextBridge bypass
     },
   });
@@ -178,6 +179,17 @@ export function createMainWindow(preloadPath: string, enableTransparency: boolea
 
   // Allow OAuth popups to open inside the app so postMessage works back to the opener
   win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isTrustedRendererUrl(url)) {
+      // Service-worker notification clicks can call clients.openWindow().
+      void win.loadURL(url).catch((error) => {
+        logger.error("Failed to open notification URL:", error);
+      });
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      return { action: "deny" };
+    }
+
     try {
       const external = parseExternalHttpUrl(url);
       if (external.hostname === "accounts.google.com") {
