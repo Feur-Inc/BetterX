@@ -3,6 +3,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { logger } from "@betterx/core";
 import { BrowserWindow, app, protocol, shell } from "electron";
 import type { WebContents } from "electron";
+import { attachContextMenu } from "./context-menu.js";
 import { isTrustedRendererUrl, parseExternalHttpUrl } from "./ipc/security.js";
 import { setupCSP } from "./security.js";
 
@@ -210,6 +211,8 @@ export function createMainWindow(preloadPath: string, enableTransparency: boolea
     }
     return { action: "deny" };
   });
+
+  attachContextMenu(win.webContents);
 
   setupCSP(win.webContents.session);
   win.loadURL("https://x.com");

@@ -4,9 +4,18 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { logger } from "@betterx/core";
-import { type BrowserWindow, Notification, shell } from "electron";
+import { type BrowserWindow, type NativeImage, Notification, nativeImage, shell } from "electron";
 import WebSocket, { type RawData } from "ws";
 import { BETTERX_DIR } from "../paths.js";
+import {
+  X_BASE_URL,
+  asRecord,
+  findTargetUrlDeep,
+  isHttpUrl,
+  isXUrl,
+  resolveNotificationUrl,
+  scoreTargetUrl,
+} from "./push-target.js";
 
 const require = createRequire(import.meta.url);
 const ece = require("http_ece") as {
@@ -25,6 +34,11 @@ const ece = require("http_ece") as {
 const AUTOPUSH_WS_URL = "wss://push.services.mozilla.com/";
 const STORE_PATH = join(BETTERX_DIR, "desktop-push-subscriptions.json");
 const FALLBACK_X_URL = "https://x.com/notifications";
+
+const NOTIFICATION_ICON_TIMEOUT_MS = 3_000;
+const NOTIFICATION_ICON_MAX_BYTES = 2 * 1024 * 1024;
+const NOTIFICATION_ICON_MAX_SIZE = 256;
+const NOTIFICATION_ICON_CACHE_LIMIT = 32;
 
 const WS_REGISTER_TIMEOUT_MS = 20_000;
 const WS_UNREGISTER_TIMEOUT_MS = 8_000;
@@ -165,11 +179,6 @@ function toView(subscription: StoredDesktopPushSubscription): DesktopPushSubscri
   };
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object") return null;
-  return value as Record<string, unknown>;
-}
-
 function pickString(...candidates: Array<unknown>): string | null {
   for (const candidate of candidates) {
     if (typeof candidate !== "string") continue;
@@ -177,30 +186,6 @@ function pickString(...candidates: Array<unknown>): string | null {
     if (trimmed.length > 0) return trimmed;
   }
   return null;
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function isXUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    const host = url.hostname;
-    return (
-      host === "x.com" ||
-      host === "twitter.com" ||
-      host.endsWith(".x.com") ||
-      host.endsWith(".twitter.com")
-    );
-  } catch {
-    return false;
-  }
 }
 
 function parseJsonIfPossible(value: string): unknown {
@@ -257,6 +242,89 @@ function describeError(error: unknown): string {
   }
 }
 
+// ─── Notification Icons ───────────────────────────────────────────────────────
+
+// Electron's Notification only accepts a local path or a NativeImage, so the
+// remote avatar X sends has to be fetched here before it can be displayed.
+
+const iconCache = new Map<string, NativeImage>();
+let fallbackIconPath: string | null = null;
+let fallbackIcon: NativeImage | null = null;
+let fallbackIconLoaded = false;
+
+export function setNotificationFallbackIcon(path: string): void {
+  fallbackIconPath = path;
+  fallbackIcon = null;
+  fallbackIconLoaded = false;
+}
+
+function getFallbackIcon(): NativeImage | null {
+  if (fallbackIconLoaded) return fallbackIcon;
+  fallbackIconLoaded = true;
+  if (fallbackIconPath) {
+    const image = nativeImage.createFromPath(fallbackIconPath);
+    fallbackIcon = image.isEmpty() ? null : image;
+  }
+  return fallbackIcon;
+}
+
+function isTrustedIconHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "x.com" ||
+    host === "twitter.com" ||
+    host === "twimg.com" ||
+    host.endsWith(".x.com") ||
+    host.endsWith(".twitter.com") ||
+    host.endsWith(".twimg.com")
+  );
+}
+
+async function fetchNotificationIcon(rawIcon: string): Promise<NativeImage | null> {
+  let url: URL;
+  try {
+    url = new URL(rawIcon, X_BASE_URL);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || !isTrustedIconHost(url.hostname)) return null;
+
+  const href = url.toString();
+  const cached = iconCache.get(href);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(href, {
+      signal: AbortSignal.timeout(NOTIFICATION_ICON_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength === 0 || buffer.byteLength > NOTIFICATION_ICON_MAX_BYTES) return null;
+
+    let image = nativeImage.createFromBuffer(buffer);
+    if (image.isEmpty()) return null;
+
+    const { width, height } = image.getSize();
+    if (width > NOTIFICATION_ICON_MAX_SIZE || height > NOTIFICATION_ICON_MAX_SIZE) {
+      image = image.resize({
+        width: NOTIFICATION_ICON_MAX_SIZE,
+        height: NOTIFICATION_ICON_MAX_SIZE,
+      });
+    }
+
+    if (iconCache.size >= NOTIFICATION_ICON_CACHE_LIMIT) {
+      const oldest = iconCache.keys().next().value;
+      if (oldest !== undefined) iconCache.delete(oldest);
+    }
+    iconCache.set(href, image);
+    return image;
+  } catch (error) {
+    logger.warn(`[BetterX][desktop-push] Failed to fetch notification icon ${href}`, error);
+    return null;
+  }
+}
+
 function extractDisplayPayload(rawNotification: unknown): NotificationPayload {
   const parsedRoot =
     typeof rawNotification === "string"
@@ -297,22 +365,47 @@ function extractDisplayPayload(rawNotification: unknown): NotificationPayload {
     pickString(source?.body, root.body, rootData?.body, rootNotification?.body) ??
     deepBody ??
     "New activity on X";
-  const icon = pickString(source?.icon, root.icon, rootData?.icon, rootNotification?.icon);
+  const icon = pickString(
+    source?.icon,
+    root.icon,
+    rootData?.icon,
+    rootNotification?.icon,
+    source?.iconUrl,
+    source?.icon_url,
+    source?.avatar,
+    rootData?.avatar,
+    source?.image,
+    rootData?.image
+  );
 
-  const targetUrl =
-    pickString(
-      source?.click_action,
-      source?.clickAction,
-      source?.url,
-      source?.link,
-      source?.targetUrl,
-      root.click_action,
-      root.url,
-      rootData?.click_action,
-      rootData?.url,
-      rootData?.link,
-      fcmOptions?.link
-    ) ?? FALLBACK_X_URL;
+  const declaredTarget = [
+    source?.click_action,
+    source?.clickAction,
+    source?.url,
+    source?.uri,
+    source?.link,
+    source?.permalink,
+    source?.targetUrl,
+    root.click_action,
+    root.url,
+    root.uri,
+    root.link,
+    rootData?.click_action,
+    rootData?.url,
+    rootData?.uri,
+    rootData?.link,
+    rootData?.permalink,
+    fcmOptions?.link,
+  ].reduce<string | null>((found, candidate) => found ?? resolveNotificationUrl(candidate), null);
+
+  // A declared link wins ties, but a post permalink found deeper in the payload
+  // beats a generic landing page so clicks land on the actual post.
+  const deepTarget = findTargetUrlDeep(root);
+  const bestTarget =
+    declaredTarget && (!deepTarget || scoreTargetUrl(declaredTarget) >= deepTarget.score)
+      ? declaredTarget
+      : (deepTarget?.url ?? declaredTarget);
+  const targetUrl = bestTarget ?? FALLBACK_X_URL;
 
   const debugKind = rootNotification
     ? "notification-object"
@@ -323,7 +416,7 @@ function extractDisplayPayload(rawNotification: unknown): NotificationPayload {
   return {
     title,
     body,
-    targetUrl: isHttpUrl(targetUrl) ? targetUrl : FALLBACK_X_URL,
+    targetUrl,
     ...(icon ? { icon } : {}),
     debugKind,
   };
@@ -770,7 +863,8 @@ export class DesktopPushService {
 
       logger.info(
         `[BetterX][desktop-push] Notification received scope=${subscription.scope} ` +
-          `kind=${displayPayload.debugKind} title=${displayPayload.title} ` +
+          `kind=${displayPayload.debugKind} url=${displayPayload.targetUrl} ` +
+          `title=${displayPayload.title} ` +
           `body=${displayPayload.body.slice(0, 140)} keys=${decryptedKeys}`
       );
 
@@ -778,12 +872,14 @@ export class DesktopPushService {
       this.enqueueStoreWrite();
       this.sendAck(channelId, version, 100);
 
-      this.showDesktopNotification(
+      void this.showDesktopNotification(
         displayPayload.title,
         displayPayload.body,
         displayPayload.targetUrl,
         displayPayload.icon
-      );
+      ).catch((error) => {
+        logger.warn("[BetterX][desktop-push] Failed to display notification", error);
+      });
     } catch (error) {
       logger.warn(
         `[BetterX][desktop-push] Failed to process notification scope=${subscription.scope}`,
@@ -922,21 +1018,23 @@ export class DesktopPushService {
     }
   }
 
-  private showDesktopNotification(
+  private async showDesktopNotification(
     title: string,
     body: string,
     targetUrl: string,
     icon?: string
-  ): void {
+  ): Promise<void> {
     if (!Notification.isSupported()) {
       logger.warn("[BetterX][desktop-push] Notification API unsupported on this platform");
       return;
     }
 
+    const image = (icon ? await fetchNotificationIcon(icon) : null) ?? getFallbackIcon();
+
     const notification = new Notification({
       title,
       body,
-      ...(icon ? { icon } : {}),
+      ...(image ? { icon: image } : {}),
     });
 
     notification.on("click", () => {
@@ -951,12 +1049,20 @@ export class DesktopPushService {
     if (isXUrl(safeTarget)) {
       const win = this.getMainWindow();
       if (win && !win.isDestroyed()) {
-        void win.loadURL(safeTarget);
         if (win.isMinimized()) {
           win.restore();
         }
         win.show();
         win.focus();
+
+        if (win.webContents.getURL() !== safeTarget) {
+          win.loadURL(safeTarget).catch((error) => {
+            logger.error(
+              `[BetterX][desktop-push] Failed to open notification target ${safeTarget}`,
+              error
+            );
+          });
+        }
         return;
       }
     }

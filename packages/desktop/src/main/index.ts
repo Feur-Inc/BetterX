@@ -27,7 +27,7 @@ import {
 } from "./ipc/security.js";
 import { registerSettingsHandlers } from "./ipc/settings.js";
 import { registerThemeHandlers } from "./ipc/themes.js";
-import { DesktopPushService } from "./services/desktop-push.js";
+import { DesktopPushService, setNotificationFallbackIcon } from "./services/desktop-push.js";
 import { destroyDiscordRPC, initializeDiscordRPC } from "./services/discord-rpc.js";
 import { getSetting, settingsStore } from "./services/settings.js";
 import { createTray } from "./tray.js";
@@ -409,6 +409,7 @@ app.whenReady().then(async () => {
   const iconPath = join(__dirname, "../../assets/icon.png");
   if (existsSync(iconPath)) {
     createTray(iconPath, () => mainWindow);
+    setNotificationFallbackIcon(iconPath);
   }
 
   // If launched via deep link, navigate to the target URL
