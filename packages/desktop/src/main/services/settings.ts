@@ -11,6 +11,8 @@ export type DesktopSettings = {
   minimizeToTray: boolean;
   autoStart: boolean;
   enableDiscordRPC: boolean;
+  /** Re-enable the read-only agent bridge automatically at launch (explicit opt-in). */
+  agentAccessRemembered: boolean;
   pluginStates: Record<string, PluginStorageData>;
   themeState: ThemeStorageState;
 };
@@ -22,6 +24,7 @@ const DEFAULT_SETTINGS: DesktopSettings = {
   minimizeToTray: true,
   autoStart: false,
   enableDiscordRPC: false,
+  agentAccessRemembered: false,
   pluginStates: {},
   themeState: { order: [], active: [] },
 };
