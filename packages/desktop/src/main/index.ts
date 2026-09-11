@@ -26,6 +26,7 @@ import { registerThemeHandlers } from "./ipc/themes.js";
 import { destroyDiscordRPC, initializeDiscordRPC } from "./services/discord-rpc.js";
 import { getSetting, settingsStore } from "./services/settings.js";
 import { createTray } from "./tray.js";
+import { installAgentMenu } from "./agent-menu.js";
 import {
   createMainWindow,
   handleBetterxProtocol,
@@ -391,6 +392,7 @@ app.whenReady().then(async () => {
   };
 
   openMainWindow(getSetting("startMinimized"));
+  installAgentMenu(() => mainWindow);
 
   // Tray
   const iconPath = join(__dirname, "../../assets/icon.png");
